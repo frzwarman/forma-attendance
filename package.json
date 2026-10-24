@@ -7,11 +7,19 @@
     "start": "expo start",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
+    "build:apk": "npx eas-cli@latest build --platform android --profile preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --import tsx --test src/domain/*.test.ts",
     "test:e2e": "playwright test",
-    "test:e2e:dev": "playwright test --config playwright.dev.config.ts"
+    "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+    "db:login": "supabase login",
+    "db:link": "node --env-file=.env.supabase.local scripts/supabase-link.cjs",
+    "db:plan": "supabase db push --dry-run",
+    "db:push": "supabase db push",
+    "db:status": "supabase migration list",
+    "db:types": "node scripts/supabase-types.cjs",
+    "db:test": "node --test tests/database/*.test.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.1",

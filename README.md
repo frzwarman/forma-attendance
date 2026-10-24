@@ -31,6 +31,16 @@ npx expo run:android
 
 These generate native projects and require Xcode / Android tooling. Native packaging has not been verified in this initial web phase. Use an Expo development build compatible with SDK 58; store Expo Go support may lag the SDK release. Permissions are configured in `app.json`.
 
+### Installable Android APK
+
+```sh
+npm run build:apk
+```
+
+This starts an EAS cloud build using the `preview` profile, which explicitly produces a signed `.apk` for direct installation. It uses the configured Expo account and Android signing credentials. When the build finishes, open its download link on an Android phone, download the APK, and allow installation from that browser when Android prompts. This standalone preview does not require a running development server or a Google Play developer account.
+
+The APK uses the same local demo repository as the web app. Supabase database setup does not yet enable cloud data or real employee sign-in.
+
 ## Demo access
 
 The first launch opens the employee demo, clearly labeled in the header. Log out to explore the sign-in experience, or use the workspace badge / workspace selector to change roles.
@@ -106,6 +116,20 @@ Presentation uses the repository/query boundary. It does not seed or mutate hard
 - Demo seeds today as a working shift even on a weekend to make attendance immediately testable. Other dates use the organization’s configured workweek. Demo office policy still requires a geofence check for all attendance actions; production remote/field rules should be enforced per shift on the server.
 - Office coordinate fields are numeric inputs; a map picker and richer native date pickers are future polish. Current request forms use explicitly labeled ISO dates and 24-hour times.
 - Demo portraits are bundled locally from Pravatar (https://pravatar.cc). Replace them with organization-controlled employee assets for production.
+
+## Supabase database setup
+
+The Supabase database foundation is in `supabase/`: an additive migration for 15 organization-scoped tables, Row Level Security, explicit client permissions, and PostgreSQL policy tests. The application still uses its local mock repository; database deployment alone does not enable real sign-in or cloud persistence. No demo data is seeded into Supabase.
+
+See [Supabase setup and integration status](supabase/README.md) for account login, project linking, credentials, deployment, and the remaining integration work.
+
+```sh
+npm run db:test
+npm run db:link
+npm run db:plan
+npm run db:push
+npm run db:status
+```
 
 ## Backend integration roadmap
 
