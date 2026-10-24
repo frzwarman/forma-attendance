@@ -151,3 +151,4 @@ The production Playwright suite starts a local static preview on port 4173. Set 
 Physical-device iOS/Android builds, Safari, real GPS, and camera capture on physical devices have not been validated. Permission failure behavior is covered by injected location-provider tests. The host provided Node 25.8; checks passed, but use the supported Node versions above for development and CI.
 # forma-attendance
 # forma-attendance
+# forma-attendance

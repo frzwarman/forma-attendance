@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root {
+  /* Keep late-injected development styles consistent with NativeWind's class mode. */
+  --css-interop-darkMode: class dark;
+}
+html,
+body,
+#root {
+  min-height: 100%;
+}
+body {
+  margin: 0;
+}
+*:focus-visible {
+  outline: 2px solid #8179ed;
+  outline-offset: 3px;
+}
+input,
+textarea {
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
