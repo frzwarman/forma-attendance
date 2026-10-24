@@ -20,7 +20,7 @@ npm test
 npm run build:web
 ```
 
-The web build is written to `dist/`. Deploy to an HTTPS static host with an SPA fallback rewriting non-asset routes to `/index.html`.
+The web build is written to `dist/`. Hosting services can use `npm run build` (an alias for `npm run build:web`) as the build command and publish `dist/`. Deploy to an HTTPS static host with an SPA fallback rewriting non-asset routes to `/index.html`.
 
 ### iOS / Android later
 
