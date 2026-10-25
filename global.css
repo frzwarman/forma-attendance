@@ -14,7 +14,7 @@ body {
   margin: 0;
 }
 *:focus-visible {
-  outline: 2px solid #8179ed;
+  outline: 2px solid #DBAF6D;
   outline-offset: 3px;
 }
 input,

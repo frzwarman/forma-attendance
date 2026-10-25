@@ -31,17 +31,17 @@ test("startup, reload and appearance changes do not open the Expo error overlay"
   await expect(heading).toBeVisible();
 
   await page.getByRole("button", { name: "Dark", exact: true }).click();
-  await expect(heading).toHaveCSS("color", "rgb(242, 241, 250)");
+  await expect(heading).toHaveCSS("color", "rgb(243, 230, 210)");
   await page.reload();
-  await expect(heading).toHaveCSS("color", "rgb(242, 241, 250)");
+  await expect(heading).toHaveCSS("color", "rgb(243, 230, 210)");
 
   await page.getByRole("button", { name: "Light", exact: true }).click();
-  await expect(heading).toHaveCSS("color", "rgb(35, 36, 56)");
+  await expect(heading).toHaveCSS("color", "rgb(219, 175, 109)");
   await page.getByRole("button", { name: "System", exact: true }).click();
   await page.emulateMedia({ colorScheme: "dark" });
-  await expect(heading).toHaveCSS("color", "rgb(242, 241, 250)");
+  await expect(heading).toHaveCSS("color", "rgb(243, 230, 210)");
   await page.emulateMedia({ colorScheme: "light" });
-  await expect(heading).toHaveCSS("color", "rgb(35, 36, 56)");
+  await expect(heading).toHaveCSS("color", "rgb(219, 175, 109)");
 
   await expect(
     page.getByRole("button", { name: "Dismiss error", exact: true }),

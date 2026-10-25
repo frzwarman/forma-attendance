@@ -9,6 +9,8 @@ distanceMeters,
 geofence,
 leaveSchema,
 workingDays,
+attendanceAvailability,
+nextWorkingDate,
 } from "./attendance";
 const base: AttendanceSession = {
   id: "1",
@@ -133,6 +135,29 @@ describe("Geofence", () => {
     ));
 });
 describe("Leave and timezone", () => {
+  it("starts leave on the next configured working day, including year rollover", () => {
+    assert.equal(nextWorkingDate("2026-10-25"), "2026-10-26");
+    assert.equal(nextWorkingDate("2026-10-26"), "2026-10-26");
+    assert.equal(nextWorkingDate("2026-12-31", [1]), "2027-01-04");
+    assert.equal(nextWorkingDate("2026-10-23", [0, 6]), "2026-10-24");
+    assert.throws(() => nextWorkingDate("2026-02-30"), /valid date/);
+    assert.throws(() => nextWorkingDate("2026-10-25", []), /working day/);
+  });
+  it("distinguishes rest days, leave and missing shifts while allowing overnight clock-out", () => {
+    const schedule = {
+      id: "shift-today", employeeId: "1", date: "2026-10-23", shiftId: "night",
+      start: base.scheduledStart, end: base.scheduledEnd, locationId: "1",
+      arrangement: "Office" as const, dayOff: false,
+    };
+    assert.equal(attendanceAvailability(undefined, schedule), "ready");
+    assert.equal(attendanceAvailability(undefined, { ...schedule, dayOff: true }), "day-off");
+    assert.equal(attendanceAvailability({ ...base, status: "Leave" }, schedule), "leave");
+    assert.equal(attendanceAvailability(), "unscheduled");
+    const active = clockIn(base, base.scheduledStart, policy);
+    assert.equal(attendanceAvailability(active, { ...schedule, dayOff: true }), "working");
+    assert.equal(attendanceAvailability(active), "working");
+    assert.equal(attendanceAvailability(clockOut(active, base.scheduledEnd)), "complete");
+  });
   it("counts configurable workdays", () => {
     assert.equal(workingDays("2026-10-23", "2026-10-26"), 2);
     assert.equal(workingDays("2026-10-23", "2026-10-26", [6, 0]), 2);

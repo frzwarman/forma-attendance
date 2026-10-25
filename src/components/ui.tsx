@@ -1,18 +1,22 @@
-import { ChevronRight,X,type LucideIcon } from "lucide-react-native";
+import { ChevronRight, X, type LucideIcon } from "lucide-react-native";
 import React from "react";
 import {
-ActivityIndicator,
-Modal,
-Pressable,
-ScrollView,
-StyleProp,
-Text,
-TextInput,
-TextInputProps,
-View,
-ViewStyle,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  Text,
+  TextInput,
+  TextInputProps,
+  View,
+  ViewStyle,
+  useWindowDimensions,
 } from "react-native";
-import { fonts,useTheme } from "../theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { fonts, fontWeights, useTheme } from "../theme";
 export function T({
   children,
   size = 14,
@@ -32,6 +36,7 @@ export function T({
       style={[
         {
           fontFamily: fonts[weight],
+          fontWeight: fontWeights[weight],
           fontSize: size,
           lineHeight: size * 1.5,
           color: color || c.text,
@@ -69,7 +74,7 @@ export function Card({
       style={[
         {
           backgroundColor: c.surface,
-          borderRadius: 18,
+          borderRadius: 6,
           padding: 24,
           borderWidth: 1,
           borderColor: c.border,
@@ -134,19 +139,19 @@ export function Button({
   const c = useTheme();
   const background =
     variant === "primary"
-      ? c.primary
+      ? c.buttonSurface
       : variant === "secondary"
         ? c.lavender
         : variant === "white"
-          ? c.white
+          ? c.primary
           : variant === "danger"
             ? c.redBg
             : "transparent";
   const color =
     variant === "primary"
-      ? c.white
+      ? c.primaryText
       : variant === "white"
-        ? c.primary
+        ? c.onPrimary
         : variant === "danger"
           ? c.red
           : c.primaryText;
@@ -159,7 +164,14 @@ export function Button({
       style={({ pressed }) => [
         {
           minHeight: small ? 40 : 49,
-          borderRadius: 11,
+          borderRadius: 100,
+          borderWidth: variant === "ghost" ? 0 : 1,
+          borderColor:
+            variant === "danger"
+              ? c.red
+              : variant === "primary" || variant === "white"
+                ? c.primary
+                : c.border,
           paddingHorizontal: small ? 14 : 20,
           backgroundColor: background,
           opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
@@ -312,8 +324,8 @@ export function Field({
 }: TextInputProps & { label: string; error?: string }) {
   const c = useTheme();
   return (
-    <View style={{ gap: 7 }}>
-      <T size={12} weight="semibold">
+    <View style={{ gap: 10 }}>
+      <T size={15} weight="regular">
         {label}
       </T>
       <TextInput
@@ -322,16 +334,16 @@ export function Field({
         placeholderTextColor={c.muted}
         style={[
           {
-            minHeight: 49,
-            borderRadius: 10,
+            minHeight: 44,
+            borderRadius: 6,
             borderWidth: 1,
-            borderColor: error ? c.red : c.border,
+            borderColor: error ? c.red : c.primary,
             paddingHorizontal: 14,
-            paddingVertical: 12,
-            color: c.text,
-            backgroundColor: c.bg,
+            paddingVertical: 10,
+            color: c.white,
+            backgroundColor: c.inputSurface,
             fontFamily: fonts.regular,
-            fontSize: 13,
+            fontSize: 15,
           },
           props.style,
         ]}
@@ -358,59 +370,85 @@ export function Sheet({
   wide?: boolean;
 }) {
   const c = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
+  const native = Platform.OS !== "web";
+  const topPadding = Math.max(16, insets.top);
+  const bottomPadding = Math.max(16, insets.bottom);
+  const panelHeight = Math.max(0, Math.min(780, height - topPadding - bottomPadding));
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "#14132977",
-          justifyContent: "center",
-          alignItems: "center",
-          padding: 16,
-        }}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        enabled={native}
+        style={{ flex: 1 }}
       >
-        <Pressable
-          accessibilityLabel="Close dialog backdrop"
-          onPress={onClose}
-          style={{ position: "absolute", inset: 0 }}
-        />
         <View
-          accessibilityViewIsModal
           style={{
-            width: "100%",
-            maxWidth: wide ? 720 : 480,
-            maxHeight: "92%",
-            backgroundColor: c.surface,
-            borderRadius: 24,
-            overflow: "hidden",
+            flex: 1,
+            backgroundColor: "#1D1B1ACC",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 16,
+            paddingTop: topPadding,
+            paddingBottom: bottomPadding,
           }}
         >
-          <Row
+          <Pressable
+            accessibilityLabel="Close dialog backdrop"
+            onPress={onClose}
+            style={{ position: "absolute", inset: 0 }}
+          />
+          <View
+            testID="sheet-panel"
+            accessibilityRole="dialog"
+            accessibilityLabel={title}
+            accessibilityViewIsModal
             style={{
-              paddingHorizontal: 24,
-              paddingTop: 18,
-              paddingBottom: 10,
-              justifyContent: "space-between",
+              width: "100%",
+              maxWidth: wide ? 720 : 480,
+              height: native ? panelHeight : undefined,
+              maxHeight: native ? "100%" : "92%",
+              backgroundColor: c.bg,
+              borderRadius: 24,
+              overflow: "hidden",
             }}
           >
-            <T size={19} weight="bold">
-              {title}
-            </T>
-            <IconButton icon={X} label="Close dialog" onPress={onClose} />
-          </Row>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ padding: 24, paddingTop: 8, gap: 18 }}
-          >
-            {children}
-          </ScrollView>
+            <Row
+              style={{
+                paddingHorizontal: 24,
+                paddingTop: 18,
+                paddingBottom: 10,
+                justifyContent: "space-between",
+                flexShrink: 0,
+                gap: 12,
+              }}
+            >
+              <T size={19} weight="bold" style={{ flex: 1 }}>
+                {title}
+              </T>
+              <IconButton icon={X} label="Close dialog" onPress={onClose} />
+            </Row>
+            <ScrollView
+              testID="sheet-scroll"
+              style={{ flexGrow: native ? 1 : 0, flexShrink: 1 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              nestedScrollEnabled
+              contentContainerStyle={{ padding: 24, paddingTop: 8, gap: 18 }}
+            >
+              {children}
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

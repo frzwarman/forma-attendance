@@ -1,40 +1,40 @@
 import { useRouter } from "expo-router";
 import {
-Activity,
-CalendarDays,
-Check,
-CheckCheck,
-ChevronRight,
-ClipboardCheck,
-Clock3,
-FilePenLine,
-MapPin,
-Palmtree,
-Plus,
-Users,
-X,
+  Activity,
+  CalendarDays,
+  Check,
+  CheckCheck,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  FilePenLine,
+  MapPin,
+  Palmtree,
+  Plus,
+  Users,
+  X,
 } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable,Switch,useWindowDimensions,View } from "react-native";
+import { Pressable, Switch, useWindowDimensions, View } from "react-native";
 import { Avatar } from "../components/Avatar";
 import {
-Badge,
-Button,
-Card,
-Empty,
-Field,
-IconBox,
-Row,
-SectionTitle,
-Sheet,
-T,
+  Badge,
+  Button,
+  Card,
+  Empty,
+  Field,
+  IconBox,
+  Row,
+  SectionTitle,
+  Sheet,
+  T,
 } from "../components/ui";
-import { dateKey,duration,time } from "../domain/attendance";
+import { dateKey, duration, time } from "../domain/attendance";
 import { useData } from "../services/data";
-import { repository,uid } from "../services/repository";
+import { repository, uid } from "../services/repository";
 import { departments } from "../services/seed";
 import { useTheme } from "../theme";
-import type { Employee,WorkforceRequest,WorkLocation } from "../types";
+import type { Employee, WorkforceRequest, WorkLocation } from "../types";
 import { PageHeading } from "./Home";
 import { requestTone } from "./Requests";
 export default function Admin({ page }: { page: string }) {
@@ -428,7 +428,7 @@ export default function Admin({ page }: { page: string }) {
                               4,
                               (count / db.employees.length) * 130,
                             ),
-                            backgroundColor: i === 6 ? c.primary : "#B8B3ED",
+                            backgroundColor: i === 6 ? c.primary : "#B59058",
                             borderTopLeftRadius: 5,
                             borderTopRightRadius: 5,
                           }}
@@ -706,7 +706,7 @@ export default function Admin({ page }: { page: string }) {
                     width: 110,
                     height: 110,
                     borderRadius: 60,
-                    backgroundColor: "#5851DB15",
+                    backgroundColor: c.lavender,
                     borderWidth: 1,
                     borderColor: c.primary,
                     alignItems: "center",

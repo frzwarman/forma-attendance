@@ -31,6 +31,7 @@ import {
   correctionSchema,
   dateKey,
   leaveSchema,
+  nextWorkingDate,
   workingDays,
 } from "../domain/attendance";
 import { useData } from "../services/data";
@@ -38,6 +39,7 @@ import { repository, uid } from "../services/repository";
 import { useTheme } from "../theme";
 import type { WorkforceRequest } from "../types";
 import { PageHeading } from "./Home";
+import { NusantaraPattern } from "../components/NusantaraPattern";
 export const requestTone = (status: string) =>
   status === "Approved"
     ? "green"
@@ -100,8 +102,10 @@ export default function Requests() {
             flex: width >= 700 ? 1 : undefined,
             backgroundColor: c.lavender,
             borderWidth: 0,
+            overflow: "hidden",
           }}
         >
+          <NusantaraPattern style={{ right: -160, top: 15, opacity: 0.2 }} />
           <Row style={{ justifyContent: "space-between" }}>
             <IconBox icon={Palmtree} bg={c.surface} />
             <Badge label="Annual leave" />
@@ -288,7 +292,8 @@ export default function Requests() {
 type LeaveValues = z.infer<typeof leaveSchema>;
 function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
   const c = useTheme();
-  const { employee } = useData();
+  const { width } = useAppDimensions();
+  const { employee, organization } = useData();
   const [error, setError] = useState("");
   const {
     control,
@@ -298,8 +303,8 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
     resolver: zodResolver(leaveSchema),
     defaultValues: {
       type: "Annual leave",
-      start: dateKey(),
-      end: dateKey(),
+      start: nextWorkingDate(dateKey(), organization.workweek),
+      end: nextWorkingDate(dateKey(), organization.workweek),
       reason: "",
     },
   });
@@ -336,9 +341,9 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
           </View>
         )}
       />
-      <Row style={{ alignItems: "flex-start" }}>
+      <View style={{ flexDirection: width >= 480 ? "row" : "column", gap: 14 }}>
         {(["start", "end"] as const).map((name) => (
-          <View key={name} style={{ flex: 1 }}>
+          <View key={name} style={{ flex: width >= 480 ? 1 : undefined }}>
             <Controller
               control={control}
               name={name}
@@ -352,12 +357,17 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
                   placeholder="2026-11-02"
                   error={errors[name]?.message}
                   maxLength={10}
+                  autoCorrect={false}
+                  autoCapitalize="none"
                 />
               )}
             />
           </View>
         ))}
-      </Row>
+      </View>
+      <T size={11} color={c.muted}>
+        Dates use YYYY-MM-DD. Only working days count toward your leave.
+      </T>
       <Controller
         control={control}
         name="reason"
@@ -375,7 +385,7 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
       />
       {!!values.start && !!values.end && values.end >= values.start && (
         <Badge
-          label={`${workingDays(values.start, values.end)} working days requested`}
+          label={`${workingDays(values.start, values.end, organization.workweek)} working days requested`}
           tone="blue"
         />
       )}
@@ -396,7 +406,7 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
               id: uid(),
               employeeId: employee.id,
               kind: "leave",
-              days: workingDays(data.start, data.end),
+              days: workingDays(data.start, data.end, organization.workweek),
               status: "Pending",
               createdAt: new Date().toISOString(),
             });

@@ -237,12 +237,16 @@ export default function Schedule() {
                   backgroundColor: active ? c.primary : c.bg,
                 }}
               >
-                <T size={11} color={active ? c.white : c.muted}>
+                <T size={11} color={active ? c.onPrimary : c.muted}>
                   {new Intl.DateTimeFormat("en-GB", {
                     weekday: "short",
                   }).format(new Date(date + "T12:00:00Z"))}
                 </T>
-                <T size={20} weight="bold" color={active ? c.white : c.text}>
+                <T
+                  size={20}
+                  weight="bold"
+                  color={active ? c.onPrimary : c.text}
+                >
                   {Number(date.slice(-2))}
                 </T>
                 <View
@@ -251,7 +255,7 @@ export default function Schedule() {
                     height: 4,
                     borderRadius: 3,
                     backgroundColor: active
-                      ? c.white
+                      ? c.onPrimary
                       : s?.dayOff
                         ? c.muted
                         : c.primary,

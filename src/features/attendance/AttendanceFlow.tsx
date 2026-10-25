@@ -257,7 +257,9 @@ export function AttendanceFlow({
             </Row>
             <T size={10} color={c.muted}>
               {mode === "real"
-                ? "Use HTTPS or localhost for browser location access."
+                ? Platform.OS === "web"
+                  ? "Use HTTPS or localhost for browser location access."
+                  : "Allow location access when prompted and keep device location services on."
                 : "Demo locations are simulated and do not verify real-world attendance."}
             </T>
           </View>

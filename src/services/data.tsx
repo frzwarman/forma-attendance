@@ -3,11 +3,13 @@ import React,{ createContext,useContext } from "react";
 import { View } from "react-native";
 import { Button,Card,T } from "../components/ui";
 import { usePreferences } from "../stores/preferences";
-import type { DemoDatabase,Employee } from "../types";
+import type { DemoDatabase,Employee,Organization } from "../types";
 import { repository } from "./repository";
+import { organization } from "./seed";
 const Context = createContext<{
   db: DemoDatabase;
   employee: Employee;
+  organization: Organization;
   refresh: () => Promise<void>;
 }>({} as never);
 export function DataProvider({
@@ -45,6 +47,7 @@ export function DataProvider({
     <Context.Provider
       value={{
         db: query.data,
+        organization,
         employee:
           query.data.employees.find((e) => e.id === id) ||
           query.data.employees[0],

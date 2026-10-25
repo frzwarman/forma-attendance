@@ -176,11 +176,14 @@ export default function Profile() {
                         gap: 6,
                       }}
                     >
-                      <Icon size={19} color={selected ? c.white : c.muted} />
+                      <Icon
+                        size={19}
+                        color={selected ? c.onPrimary : c.muted}
+                      />
                       <T
                         size={12}
                         weight="semibold"
-                        color={selected ? c.white : c.text}
+                        color={selected ? c.onPrimary : c.text}
                       >
                         {theme[0].toUpperCase() + theme.slice(1)}
                       </T>

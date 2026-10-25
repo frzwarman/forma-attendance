@@ -1,5 +1,4 @@
 import { useAppDimensions } from "../hooks/useAppDimensions";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import {
   ArrowDownLeft,
@@ -29,11 +28,12 @@ import {
   SectionTitle,
   T,
 } from "../components/ui";
-import { dateKey, duration, time } from "../domain/attendance";
+import { attendanceAvailability, dateKey, duration, time } from "../domain/attendance";
 import { useData } from "../services/data";
 import { useTheme } from "../theme";
 import type { AttendanceSession } from "../types";
 import { AttendanceFlow } from "./attendance/AttendanceFlow";
+import { NusantaraPattern } from "../components/NusantaraPattern";
 export function PageHeading({
   title,
   subtitle,
@@ -97,6 +97,12 @@ export default function Home() {
     );
   const working = !!today?.clockIn && !today.clockOut;
   const complete = !!today?.clockOut;
+  const availability = attendanceAvailability(today, schedule);
+  const unavailable = ["day-off", "leave", "unscheduled"].includes(availability);
+  const unavailableLabel = availability === "day-off" ? "Rest day" : availability === "leave" ? "On leave" : "No shift assigned";
+  const nextShift = db.schedules
+    .filter((s) => s.employeeId === employee.id && !s.dayOff && s.date > dateKey())
+    .sort((a, b) => a.start.localeCompare(b.start))[0];
   const office = db.locations.find(
     (l) => l.id === (schedule?.locationId || "hq"),
   )!;
@@ -163,43 +169,18 @@ export default function Home() {
       </View>
       <View style={{ flexDirection: large ? "row" : "column", gap: 22 }}>
         <View style={{ flex: large ? 1.64 : undefined }}>
-          <LinearGradient
-            colors={["#6660E5", "#5149CE"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <View
             style={{
-              borderRadius: 20,
+              borderRadius: 6,
+              backgroundColor: c.hero,
+              borderWidth: 1,
+              borderColor: c.border,
               padding: 26,
               minHeight: 290,
               overflow: "hidden",
             }}
           >
-            <View
-              pointerEvents="none"
-              style={{
-                position: "absolute",
-                width: 320,
-                height: 320,
-                borderWidth: 1,
-                borderColor: "#FFFFFF10",
-                borderRadius: 160,
-                right: -84,
-                top: -98,
-              }}
-            />
-            <View
-              pointerEvents="none"
-              style={{
-                position: "absolute",
-                width: 236,
-                height: 236,
-                borderWidth: 1,
-                borderColor: "#FFFFFF12",
-                borderRadius: 140,
-                right: -42,
-                top: -55,
-              }}
-            />
+            <NusantaraPattern />
             <Row
               style={{
                 justifyContent: "space-between",
@@ -213,20 +194,22 @@ export default function Home() {
                     height: 7,
                     width: 7,
                     borderRadius: 4,
-                    backgroundColor: working ? "#9EF0BD" : "#CCC8FF",
+                    backgroundColor: working ? c.green : c.primary,
                   }}
                 />
-                <T color="#E1DEFF" size={11} weight="medium">
+                <T color={c.heroText} size={11} weight="medium">
                   {working
                     ? "You’re on the clock"
                     : complete
                       ? "Your day is complete"
+                      : unavailable
+                        ? unavailableLabel
                       : "Ready when you are"}
                 </T>
               </Row>
               <View
                 style={{
-                  backgroundColor: "#FFFFFF18",
+                  backgroundColor: c.lavender,
                   borderRadius: 6,
                   paddingHorizontal: 8,
                   paddingVertical: 4,
@@ -234,7 +217,7 @@ export default function Home() {
               >
                 <Row style={{ gap: 5 }}>
                   <BuildingIcon />
-                  <T color="#F1F0FF" size={9}>
+                  <T color={c.heroText} size={9}>
                     {schedule?.arrangement === "Remote"
                       ? "Work from home"
                       : "Work from office"}
@@ -245,7 +228,7 @@ export default function Home() {
             <Row style={{ alignItems: "baseline", gap: 9, marginTop: 18 }}>
               <T
                 size={51}
-                color="#FFFFFF"
+                color={c.heroText}
                 weight="semibold"
                 style={{
                   letterSpacing: -2,
@@ -255,34 +238,36 @@ export default function Home() {
               >
                 {time(now)}
               </T>
-              <T size={12} color="#C6C2F6">
+              <T size={12} color={c.heroText}>
                 WIB
               </T>
             </Row>
-            <T color="#D9D6FF" size={11} style={{ marginTop: 2 }}>
+            <T color={c.heroText} size={11} style={{ marginTop: 2 }}>
               {working
                 ? `Checked in at ${time(today?.clockIn)} · ${duration((+now - +new Date(today!.clockIn!)) / 60000)} elapsed`
                 : complete
                   ? `${duration(today!.durationMinutes)} worked today. See you next time!`
+                  : unavailable
+                    ? nextShift ? `Next shift: ${nextShift.date} · ${time(nextShift.start)}` : "Ask your People team to assign a working shift."
                   : `${shift?.name || "Regular shift"} · ${time(schedule?.start)} – ${time(schedule?.end)}`}
             </T>
             <View
               style={{
                 height: 1,
-                backgroundColor: "#FFFFFF20",
+                backgroundColor: c.border,
                 marginVertical: 20,
               }}
             />
             <Row style={{ gap: 15, flexWrap: "wrap" }}>
               <View style={{ flex: 1, minWidth: 100 }}>
                 <Row style={{ gap: 5 }}>
-                  <ArrowDownLeft color="#C8C3FF" size={13} />
-                  <T size={9} color="#C8C3FF">
+                  <ArrowDownLeft color={c.heroText} size={13} />
+                  <T size={9} color={c.heroText}>
                     Clock in
                   </T>
                 </Row>
                 <T
-                  color="#FFFFFF"
+                  color={c.heroText}
                   weight="semibold"
                   size={14}
                   style={{ marginTop: 4 }}
@@ -292,13 +277,13 @@ export default function Home() {
               </View>
               <View style={{ flex: 1, minWidth: 70 }}>
                 <Row style={{ gap: 5 }}>
-                  <ArrowUpRight color="#C8C3FF" size={13} />
-                  <T size={9} color="#C8C3FF">
+                  <ArrowUpRight color={c.heroText} size={13} />
+                  <T size={9} color={c.heroText}>
                     Clock out
                   </T>
                 </Row>
                 <T
-                  color="#FFFFFF"
+                  color={c.heroText}
                   weight="semibold"
                   size={14}
                   style={{ marginTop: 4 }}
@@ -308,11 +293,11 @@ export default function Home() {
               </View>
               <Button
                 label={
-                  complete ? "Day complete" : working ? "Clock out" : "Clock in"
+                  complete ? "Day complete" : working ? "Clock out" : unavailable ? unavailableLabel : "Clock in"
                 }
                 icon={complete ? CheckCheck : Fingerprint}
                 variant="white"
-                disabled={complete}
+                disabled={complete || unavailable}
                 onPress={() => {
                   setFlowType(working ? "out" : "in");
                   setFlow(true);
@@ -320,7 +305,7 @@ export default function Home() {
                 style={{ minWidth: 135, flexGrow: width < 500 ? 1 : 0 }}
               />
             </Row>
-          </LinearGradient>
+          </View>
         </View>
         <Card
           style={{
@@ -334,10 +319,10 @@ export default function Home() {
             <IconBox icon={CalendarDays} />
             <View style={{ flex: 1 }}>
               <T size={13} weight="bold">
-                {shift?.name || "Regular shift"}
+                {unavailable ? unavailableLabel : shift?.name || "Regular shift"}
               </T>
               <T size={10} color={c.muted}>
-                A little structure for your day
+                {unavailable ? "No attendance is scheduled today" : "A little structure for your day"}
               </T>
             </View>
             <Badge label="Today" />
@@ -352,7 +337,7 @@ export default function Home() {
                 weight="bold"
                 style={{ marginTop: 3, letterSpacing: -0.7 }}
               >
-                {time(schedule?.start)}
+                {unavailable ? "—" : time(schedule?.start)}
               </T>
             </View>
             <View
@@ -371,7 +356,7 @@ export default function Home() {
                 weight="bold"
                 style={{ marginTop: 3, letterSpacing: -0.7 }}
               >
-                {time(schedule?.end)}
+                {unavailable ? "—" : time(schedule?.end)}
               </T>
             </View>
             <View style={{ width: 1, height: 35, backgroundColor: c.border }} />
@@ -688,7 +673,8 @@ export default function Home() {
   );
 }
 function BuildingIcon() {
-  return <House size={11} color="#EFEDFF" />;
+  const c = useTheme();
+  return <House size={11} color={c.primary} />;
 }
 export function AttendanceRows({
   sessions,

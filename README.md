@@ -1,4 +1,4 @@
-# Forma — a better rhythm for work
+# Nusantara — Workforce Attendance
 
 A mobile-first, universal workforce attendance prototype for the fictional Northstar Technologies in Jakarta. Built with Expo and React Native primitives. The employee experience keeps a phone layout (up to 480px) with bottom tabs, including on desktop previews; the HR workspace adapts to wider screens. No backend credentials required.
 
@@ -54,7 +54,7 @@ These are fictional demo identities, not secure authentication. Preferences and 
 
 ## Stack and compatibility
 
-Expo SDK 58, Expo Router, React 19.3, React Native 0.88, React Native Web 0.21; TypeScript; stable NativeWind v4 / Tailwind v3; SDK-pinned Reanimated 4 and Worklets; Lucide React Native and react-native-svg; Expo Camera, Location, Image, Linear Gradient, Haptics, Document Picker, SecureStore; AsyncStorage; Zustand; TanStack Query; React Hook Form and Zod. Plus Jakarta Sans is bundled through Expo Google Fonts.
+Expo SDK 58, Expo Router, React 19.3, React Native 0.88, React Native Web 0.21; TypeScript; stable NativeWind v4 / Tailwind v3; SDK-pinned Reanimated 4 and Worklets; Lucide React Native and react-native-svg; Expo Camera, Location, Image, Linear Gradient, Haptics, Document Picker, SecureStore; AsyncStorage; Zustand; TanStack Query; React Hook Form and Zod. Typography matches the reference with Arial on web/iOS and the native sans-serif family on Android; remote font loading is not required.
 
 Expo dependencies follow SDK 58’s `bundledNativeModules.json`, rather than independently selecting incompatible platform versions. NativeWind v4 is used instead of the v5 release candidate. Semantic dynamic themes use a context and native styles, with NativeWind configured for universal utilities. Charts are built from React Native views for web/native compatibility. There is no browser-only chart dependency.
 
@@ -66,7 +66,7 @@ References checked before implementation:
 - [Talenta attendance workflows](https://www.talenta.co/en/features/attendance-app/)
 - [Talenta configurable branch radius](https://help-center.talenta.co/hc/en-us/articles/12173252263833-How-to-Activate-Live-Attendance-per-Branch)
 
-Talenta informed the GPS/office-radius, shift, selfie, and approval workflows. Forma’s identity and interface are original; no Talenta assets are used.
+Talenta informed the GPS/office-radius, shift, selfie, and approval workflows. Visual branding follows the user-provided [Nusantara Jotform reference](https://form.jotform.com/241414717939059): the original gold logo and aerial background, `#DBAF6D`, translucent charcoal surfaces, Arial typography, 6px field corners, and gold-bordered pill buttons. Original assets and source URLs are documented in [assets/brand/README.md](assets/brand/README.md). Attendance workflows remain intact; no Talenta assets or live Jotform submission endpoint are used.
 
 ## Architecture
 
@@ -103,6 +103,8 @@ Presentation uses the repository/query boundary. It does not seed or mutate hard
 - Compact employee profile with content-sized cards, a single-row appearance selector, notification preferences, light/dark/system themes, sign-out and demo reset.
 - HR dashboard, native-view weekly charts, department attendance, employee search/filter/detail, attendance monitoring with date/department/status filters, approval/rejection confirmation and geofence editing.
 - Employee bottom tabs at every preview width; adaptive HR sidebar/mobile tabs. Content scrolls clear of the bottom navigation. 44px minimum primary touch targets; keyboard-friendly forms and focus outlines.
+- Native dialogs have an explicit bounded height, safe-area spacing, keyboard avoidance and scrollable forms. Android uses keyboard resize mode. Gold vector ribbon accents echo the supplied Nusantara pattern on attendance and leave cards.
+- Rest days, approved leave and unassigned shifts show attendance availability before an action is offered; active overnight sessions still allow clock-out. Leave dates start on the next configured working day. Company date keys are assembled from Intl date parts to avoid locale-specific separators across runtimes.
 
 ## Known prototype limitations
 
@@ -148,9 +150,10 @@ Verified in this workspace:
 
 - TypeScript: passes.
 - ESLint: passes without warnings.
-- Domain/service suite: **28 tests pass**, including transitions, concurrent duplicates, overnight timestamps, geofence uncertainty, malformed coordinates, permission denial/timeouts, leave dates, persistence, approval audit history, and storage failures.
+- Domain/service suite: **30 tests pass**, including transitions, concurrent duplicates, overnight timestamps, geofence uncertainty, malformed coordinates, permission denial/timeouts, leave dates, rest-day availability, configurable next working days, persistence, approval audit history, and storage failures.
 - Production web export: passes.
-- Playwright: **12 end-to-end tests pass** against the built web application, including clock-in/out, invalid location blocking, reload persistence, leave/correction submissions, HR approval, employee search, office editing, light/dark settings, selfie preview/retake, camera permission denial, and non-remembered login sessions. All employee and HR screens pass a 320px overflow check; the dashboard is additionally checked at 375, 390, 430 and 1440px.
+- Playwright: **15 end-to-end tests pass** against the built web application, including original Nusantara logo dimensions, Arial typography, gold form styling, clock-in/out, invalid location blocking, reload persistence, leave/correction submissions, HR approval, employee search, office editing, light/dark settings, selfie preview/retake, camera permission denial, and non-remembered login sessions. Attendance and leave submission also pass at 320 × 500, and persisted rest days show the next shift. All employee and HR screens pass a 320px overflow check; the dashboard is additionally checked at 375, 390, 430 and 1440px.
+- Android Hermes bundle export passes. This is a JavaScript/assets compatibility check, not an installed APK test. No Android device/emulator is connected in this workspace; permission dialogs, the physical keyboard and native modal behavior still require device confirmation. Rebuild with `npm run build:apk` and install the new APK to receive native configuration changes.
 - Clean installation (`npm ci`) and a subsequent `npm install` pass using an offline package cache. All lockfile package entries have valid versions.
 - Expo's offline compatibility check reports dependencies up to date; it warns that offline dependency validation is less reliable.
 
@@ -168,9 +171,9 @@ To test Expo development startup and theme switching (including absence of the E
 npm run test:e2e:dev
 ```
 
-This starts or reuses the Expo web server on port 8081. The **9 development browser tests** cover initial load, reload, manual Light/Dark selection, system appearance changes, empty form/feedback states without React Native text-node console errors, selfie live view/capture/preview/retake/selection, permission denial, vertical card containment, visible profile actions, repeated tab navigation at 320/375/390/430px, and a phone-sized employee preview on desktop. Camera tests use Chromium’s simulated webcam with explicit test permissions, never a physical camera.
+This starts or reuses the Expo web server on port 8081. The **10 development browser tests** cover initial load, reload, manual Light/Dark selection, system appearance changes, empty form/feedback states without React Native text-node console errors, selfie live view/capture/preview/retake/selection, permission denial, vertical card containment, visible profile actions, repeated tab navigation at 320/375/390/430px, and a phone-sized employee preview on desktop. Camera tests use Chromium’s simulated webcam with explicit test permissions, never a physical camera.
 
-The production Playwright suite starts a local static preview on port 4173. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use an existing compatible Chromium binary. Review screenshots in `artifacts/` (employee overview, clock-in success, HR dashboard, dark profile and mobile viewports).
+The production Playwright suite starts a local static preview on port 4173. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use an existing compatible Chromium binary. Review screenshots in `artifacts/` (Nusantara login and overview, clock-in success, HR dashboard, dark profile and mobile viewports).
 
 Physical-device iOS/Android builds, Safari, real GPS, and camera capture on physical devices have not been validated. Permission failure behavior is covered by injected location-provider tests. The host provided Node 25.8; checks passed, but use the supported Node versions above for development and CI.
 # forma-attendance

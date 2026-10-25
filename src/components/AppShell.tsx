@@ -1,3 +1,4 @@
+import { NusantaraLogo, NusantaraBackdrop } from "./NusantaraBrand";
 import { EMPLOYEE_APP_WIDTH } from "../hooks/useAppDimensions";
 import { Redirect, usePathname, useRouter } from "expo-router";
 import {
@@ -76,51 +77,7 @@ const adminNav = [
   },
 ];
 export function Brand({ compact = false }: { compact?: boolean }) {
-  const c = useTheme();
-  return (
-    <Row style={{ gap: 10 }}>
-      <View
-        style={{
-          width: 35,
-          height: 35,
-          borderRadius: 10,
-          backgroundColor: c.primary,
-          alignItems: "center",
-          justifyContent: "center",
-          transform: [{ rotate: "-7deg" }],
-        }}
-      >
-        <View
-          style={{
-            width: 17,
-            height: 20,
-            borderLeftWidth: 5,
-            borderTopWidth: 5,
-            borderColor: "#FFFFFF",
-            borderRadius: 1,
-          }}
-        />
-        <View
-          style={{
-            position: "absolute",
-            width: 10,
-            height: 4,
-            backgroundColor: "#FFFFFF",
-            top: 17,
-            left: 12,
-          }}
-        />
-      </View>
-      {!compact && (
-        <T size={29} weight="extra" style={{ letterSpacing: -1.3 }}>
-          forma
-          <T color={c.primary} size={29}>
-            .
-          </T>
-        </T>
-      )}
-    </Row>
-  );
+  return <NusantaraLogo width={compact ? 64 : 108} />;
 }
 export function AppShell({ children }: { children: React.ReactNode }) {
   const c = useTheme();
@@ -141,20 +98,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const login = path === "/login";
   if (login)
     return (
-      <View
-        style={{ flex: 1, backgroundColor: c.subtle, alignItems: "center" }}
-      >
+      <NusantaraBackdrop style={{ alignItems: "center" }}>
         <View
           style={{
             flex: 1,
             width: "100%",
             maxWidth: EMPLOYEE_APP_WIDTH,
-            backgroundColor: c.bg,
+            backgroundColor: "transparent",
           }}
         >
           {children}
         </View>
-      </View>
+      </NusantaraBackdrop>
     );
   if (!prefs.hydrated)
     return <View style={{ flex: 1, backgroundColor: c.bg }} />;
@@ -170,14 +125,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push(p as never);
   }
   return (
-    <View style={{ flex: 1, backgroundColor: c.subtle, alignItems: "center" }}>
+    <NusantaraBackdrop style={{ alignItems: "center" }}>
       <View
         style={{
           flex: 1,
           width: "100%",
           maxWidth: admin ? undefined : EMPLOYEE_APP_WIDTH,
           flexDirection: "row",
-          backgroundColor: c.bg,
+          backgroundColor: "transparent",
         }}
       >
         {desktop && (
@@ -396,7 +351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             style={{
               paddingHorizontal: desktop ? 38 : 16,
               paddingTop: desktop ? 0 : insets.top,
-              height: desktop ? 82 : 70 + insets.top,
+              height: desktop ? 96 : 92 + insets.top,
               backgroundColor: c.surface,
               borderBottomWidth: 1,
               borderColor: c.border,
@@ -499,7 +454,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }}
               >
                 <T size={9} color={c.muted}>
-                  © {new Date().getFullYear()} Forma. A better rhythm for work.
+                  © {new Date().getFullYear()} Nusantara. Workforce attendance.
                 </T>
                 <Row style={{ gap: 14 }}>
                   <T size={9} color={c.muted}>
@@ -524,7 +479,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                backgroundColor: c.surface,
+                backgroundColor: c.bg,
                 borderTopWidth: 1,
                 borderColor: c.border,
                 paddingBottom: Math.max(
@@ -640,6 +595,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </T>
         </Sheet>
       </View>
-    </View>
+    </NusantaraBackdrop>
   );
 }

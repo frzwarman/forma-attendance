@@ -139,7 +139,7 @@ test("employee attendance, persistent requests and HR review work across respons
   await page.reload();
   await expect(
     page.getByRole("button", { name: "Dark", exact: true }),
-  ).toHaveCSS("background-color", "rgb(88, 81, 219)");
+  ).toHaveCSS("background-color", "rgb(219, 175, 109)");
   await page.screenshot({ path: "artifacts/dark-profile.png", fullPage: true });
   expect(errors).toEqual([]);
 });

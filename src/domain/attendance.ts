@@ -1,20 +1,48 @@
 import { z } from "zod";
 import type {
-AttendancePolicy,
-AttendanceSession,
-Coordinates,
-WorkLocation,
+  AttendancePolicy,
+  AttendanceSession,
+  Coordinates,
+  WorkLocation,
+  Schedule,
 } from "../types";
 export const dateKey = (
   date: Date | string = new Date(),
   timezone = "Asia/Jakarta",
-) =>
-  new Intl.DateTimeFormat("en-CA", {
+) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date(date));
+    numberingSystem: "latn",
+  }).formatToParts(new Date(date));
+  const part = (type: string) => parts.find((p) => p.type === type)!.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+};
+
+export function attendanceAvailability(
+  session?: AttendanceSession,
+  schedule?: Schedule,
+) {
+  if (session?.clockIn && !session.clockOut) return "working";
+  if (session?.clockOut) return "complete";
+  if (session?.status === "Leave") return "leave";
+  if (schedule?.dayOff || session?.status === "Day off") return "day-off";
+  return schedule ? "ready" : "unscheduled";
+}
+
+export function nextWorkingDate(start = dateKey(), workweek = [1, 2, 3, 4, 5]) {
+  if (
+    !validDate(start) ||
+    !workweek.some((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+  )
+    throw new Error("A valid date and at least one working day are required.");
+  const day = new Date(`${start}T12:00:00Z`);
+  while (!workweek.includes(day.getUTCDay()))
+    day.setUTCDate(day.getUTCDate() + 1);
+  return day.toISOString().slice(0, 10);
+}
 export const time = (value?: string | Date) =>
   value
     ? new Intl.DateTimeFormat("id-ID", {
