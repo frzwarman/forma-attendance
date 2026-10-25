@@ -37,6 +37,11 @@ import { useTheme } from "../theme";
 import type { Employee, WorkforceRequest, WorkLocation } from "../types";
 import { PageHeading } from "./Home";
 import { requestTone } from "./Requests";
+type LocationDraft = Omit<WorkLocation, "latitude" | "longitude" | "radius"> & {
+  latitude: string;
+  longitude: string;
+  radius: string;
+};
 export default function Admin({ page }: { page: string }) {
   const { width } = useWindowDimensions();
   const c = useTheme();
@@ -51,10 +56,19 @@ export default function Admin({ page }: { page: string }) {
     request: WorkforceRequest;
     status: "Approved" | "Rejected";
   }>();
-  const [location, setLocation] = useState<WorkLocation>();
+  const [location, setLocation] = useState<LocationDraft>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [feedback, setFeedback] = useState("");
+  function openLocation(value: WorkLocation) {
+    setError("");
+    setLocation({
+      ...value,
+      latitude: String(value.latitude),
+      longitude: String(value.longitude),
+      radius: String(value.radius),
+    });
+  }
   const today = db.sessions.filter((s) => s.date === dateKey());
   const present = today.filter((s) => s.clockIn).length;
   const late = today.filter((s) => s.lateMinutes > 0).length;
@@ -278,7 +292,7 @@ export default function Admin({ page }: { page: string }) {
                 label="Add location"
                 icon={Plus}
                 onPress={() =>
-                  setLocation({
+                  openLocation({
                     id: uid(),
                     name: "",
                     address: "",
@@ -746,10 +760,7 @@ export default function Admin({ page }: { page: string }) {
               <Button
                 variant="secondary"
                 label="Manage location"
-                onPress={() => {
-                  setError("");
-                  setLocation({ ...l });
-                }}
+                onPress={() => openLocation(l)}
               />
             </Card>
           ))}
@@ -823,6 +834,7 @@ export default function Admin({ page }: { page: string }) {
         visible={!!review}
         title={`${review?.status === "Approved" ? "Approve" : "Reject"} this request?`}
         onClose={() => setReview(undefined)}
+        busy={busy}
       >
         <T color={c.muted}>
           {review?.request.type} ·{" "}
@@ -842,9 +854,11 @@ export default function Admin({ page }: { page: string }) {
           }
           variant={review?.status === "Approved" ? "primary" : "danger"}
           loading={busy}
+          loadingLabel="Saving decision…"
           onPress={async () => {
-            if (!review) return;
+            if (!review || busy) return;
             setBusy(true);
+            setError("");
             try {
               await repository.reviewRequest(
                 review.request.id,
@@ -865,6 +879,7 @@ export default function Admin({ page }: { page: string }) {
         />
         <Button
           label="Go back"
+          disabled={busy}
           variant="ghost"
           onPress={() => setReview(undefined)}
         />
@@ -873,40 +888,46 @@ export default function Admin({ page }: { page: string }) {
         visible={!!location}
         title="Office attendance zone"
         onClose={() => setLocation(undefined)}
+        busy={busy}
       >
         {location && (
           <View style={{ gap: 16 }}>
             <Field
               label="Office name"
+              editable={!busy}
               value={location.name}
               onChangeText={(name) => setLocation({ ...location, name })}
             />
             <Field
               label="Address"
+              editable={!busy}
               value={location.address}
               onChangeText={(address) => setLocation({ ...location, address })}
             />
             <Field
               label="Latitude"
-              value={String(location.latitude)}
+              editable={!busy}
+              value={location.latitude}
               onChangeText={(v) =>
-                setLocation({ ...location, latitude: Number(v) })
+                setLocation({ ...location, latitude: v })
               }
               keyboardType="numbers-and-punctuation"
             />
             <Field
               label="Longitude"
-              value={String(location.longitude)}
+              editable={!busy}
+              value={location.longitude}
               onChangeText={(v) =>
-                setLocation({ ...location, longitude: Number(v) })
+                setLocation({ ...location, longitude: v })
               }
               keyboardType="numbers-and-punctuation"
             />
             <Field
               label="Allowed radius (meters)"
-              value={String(location.radius)}
+              editable={!busy}
+              value={location.radius}
               onChangeText={(v) =>
-                setLocation({ ...location, radius: Number(v) })
+                setLocation({ ...location, radius: v })
               }
               keyboardType="numeric"
             />
@@ -914,6 +935,7 @@ export default function Admin({ page }: { page: string }) {
               <T size={12}>Active attendance zone</T>
               <Switch
                 accessibilityLabel="Active attendance zone"
+                disabled={busy}
                 value={location.active}
                 onValueChange={(active) => setLocation({ ...location, active })}
                 trackColor={{ true: c.primary, false: c.border }}
@@ -927,11 +949,24 @@ export default function Admin({ page }: { page: string }) {
             <Button
               label="Save location"
               loading={busy}
+              loadingLabel="Saving location…"
               onPress={async () => {
+                if (busy) return;
                 setBusy(true);
                 setError("");
                 try {
-                  await repository.saveLocation(location);
+                  if (
+                    [location.latitude, location.longitude, location.radius].some(
+                      (value) => !value.trim(),
+                    )
+                  )
+                    throw new Error("Enter coordinates and an allowed radius.");
+                  await repository.saveLocation({
+                    ...location,
+                    latitude: Number(location.latitude),
+                    longitude: Number(location.longitude),
+                    radius: Number(location.radius),
+                  });
                   await refresh();
                   setLocation(undefined);
                   setFeedback("Office location saved.");

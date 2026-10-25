@@ -261,6 +261,7 @@ export default function Profile() {
         visible={reset}
         title="A fresh start?"
         onClose={() => setReset(false)}
+        busy={busy}
       >
         <T color={c.muted}>
           This resets attendance, requests, approvals, and locations to the
@@ -270,7 +271,9 @@ export default function Profile() {
           variant="danger"
           label="Reset demo workspace"
           loading={busy}
+          loadingLabel="Resetting workspace…"
           onPress={async () => {
+            if (busy) return;
             setBusy(true);
             try {
               await repository.reset();
@@ -288,6 +291,7 @@ export default function Profile() {
         <Button
           variant="ghost"
           label="Keep my changes"
+          disabled={busy}
           onPress={() => setReset(false)}
         />
       </Sheet>

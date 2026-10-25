@@ -27,7 +27,7 @@ import {
   Sheet,
   T,
 } from "../../components/ui";
-import { geofence, time } from "../../domain/attendance";
+import { attendanceContext, geofence, time } from "../../domain/attendance";
 import { useData } from "../../services/data";
 import { acquireLocation, type LocationMode } from "../../services/location";
 import { repository, uid } from "../../services/repository";
@@ -44,11 +44,26 @@ export function AttendanceFlow({
 }) {
   const c = useTheme();
   const { db, employee, refresh } = useData();
-  const office = db.locations.find((l) => l.id === employee.locationId)!;
+  const { schedule, session } = attendanceContext(db.schedules, db.sessions, employee.id);
+  const office = db.locations.find((l) => l.id ===
+    (session?.locationId || schedule?.locationId || employee.locationId))!;
   const [mode, setMode] = useState<LocationMode>("inside");
   const [coords, setCoords] = useState<Coordinates>();
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  type Operation = "location" | "permission" | "capture" | "submit";
+  const [pending, setPending] = useState<Operation>();
+  const pendingRef = useRef<Operation | undefined>(undefined);
+  const busy = pending !== undefined;
+  function begin(operation: Operation) {
+    if (pendingRef.current) return false;
+    pendingRef.current = operation;
+    setPending(operation);
+    return true;
+  }
+  function finish() {
+    pendingRef.current = undefined;
+    setPending(undefined);
+  }
   const [success, setSuccess] = useState("");
   const [selfie, setSelfie] = useState("");
   const [preview, setPreview] = useState("");
@@ -62,6 +77,7 @@ export function AttendanceFlow({
     ? geofence(coords, office, db.policy.maxAccuracy)
     : undefined;
   const close = () => {
+    if (pendingRef.current) return;
     onClose();
     setCoords(undefined);
     setError("");
@@ -73,7 +89,7 @@ export function AttendanceFlow({
     key.current = uid();
   };
   async function locate() {
-    setBusy(true);
+    if (!begin("location")) return;
     setError("");
     setCoords(undefined);
     try {
@@ -81,10 +97,11 @@ export function AttendanceFlow({
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      finish();
     }
   }
   async function startCamera() {
+    if (!begin("permission")) return;
     setError("");
     setCameraReady(false);
     try {
@@ -97,11 +114,12 @@ export function AttendanceFlow({
       setPreview("");
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      finish();
     }
   }
   async function capture() {
-    if (!cameraReady || busy) return;
-    setBusy(true);
+    if (!cameraReady || !begin("capture")) return;
     setError("");
     try {
       const shot = await cameraRef.current?.takePictureAsync({ quality: 0.5 });
@@ -112,12 +130,11 @@ export function AttendanceFlow({
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      finish();
     }
   }
   async function confirm() {
-    if (!coords || camera || preview) return;
-    setBusy(true);
+    if (!coords || camera || preview || !begin("submit")) return;
     setError("");
     try {
       const session = await repository.submitAttendance({
@@ -137,13 +154,14 @@ export function AttendanceFlow({
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setBusy(false);
+      finish();
     }
   }
   return (
     <Sheet
       visible={visible}
       onClose={close}
+      busy={busy}
       title={
         success
           ? "A moment, well marked."
@@ -230,6 +248,7 @@ export function AttendanceFlow({
                 <Pressable
                   key={item.key}
                   accessibilityRole="radio"
+                  disabled={busy || camera}
                   accessibilityState={{ checked: mode === item.key }}
                   onPress={() => {
                     setMode(item.key);
@@ -268,7 +287,9 @@ export function AttendanceFlow({
             variant="secondary"
             icon={LocateFixed}
             onPress={locate}
-            loading={busy && !camera}
+            loading={pending === "location"}
+            loadingLabel="Checking location…"
+            disabled={busy || camera || !!preview}
           />
           {coords && result && (
             <Animated.View
@@ -379,11 +400,13 @@ export function AttendanceFlow({
                   label="Capture selfie"
                   icon={Camera}
                   onPress={capture}
-                  loading={busy}
-                  disabled={!cameraReady}
+                  loading={pending === "capture"}
+                  loadingLabel="Capturing selfie…"
+                  disabled={busy || !cameraReady}
                 />
                 <Button
                   label="Cancel camera"
+                  disabled={busy}
                   variant="ghost"
                   onPress={() => {
                     setCamera(false);
@@ -413,11 +436,15 @@ export function AttendanceFlow({
                     variant="secondary"
                     icon={RefreshCw}
                     onPress={startCamera}
+                    loading={pending === "permission"}
+                    loadingLabel="Opening camera…"
+                    disabled={busy}
                     style={{ flex: 1 }}
                   />
                   <Button
                     label="Use photo"
                     icon={CheckCheck}
+                    disabled={busy}
                     onPress={() => {
                       setSelfie(preview);
                       setPreview("");
@@ -448,6 +475,9 @@ export function AttendanceFlow({
                     variant="secondary"
                     icon={RefreshCw}
                     onPress={startCamera}
+                    loading={pending === "permission"}
+                    loadingLabel="Opening camera…"
+                    disabled={busy}
                   />
                 </Row>
               </View>
@@ -457,6 +487,9 @@ export function AttendanceFlow({
                 variant="secondary"
                 icon={Camera}
                 onPress={startCamera}
+                loading={pending === "permission"}
+                loadingLabel="Opening camera…"
+                disabled={busy}
               />
             )}
           </View>
@@ -479,8 +512,10 @@ export function AttendanceFlow({
             label={`Confirm clock ${type}`}
             icon={Fingerprint}
             onPress={confirm}
-            loading={busy}
+            loading={pending === "submit"}
+            loadingLabel={type === "in" ? "Recording clock-in…" : "Recording clock-out…"}
             disabled={
+              busy ||
               !coords ||
               camera ||
               !!preview ||

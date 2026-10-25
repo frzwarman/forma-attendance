@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe,it } from "node:test";
-import type { AttendanceSession } from "../types";
+import type { AttendanceSession, WorkforceRequest } from "../types";
 import {
 clockIn,
 clockOut,
@@ -11,6 +11,8 @@ leaveSchema,
 workingDays,
 attendanceAvailability,
 nextWorkingDate,
+attendanceContext,
+annualLeaveBalance,
 } from "./attendance";
 const base: AttendanceSession = {
   id: "1",
@@ -83,6 +85,40 @@ describe("Attendance transitions", () => {
       /not available/,
     );
   });
+});
+
+it("selects an ongoing previous-night shift even when today is a rest day", () => {
+  const night = {
+    id: "night", employeeId: "1", date: base.date, shiftId: "night",
+    start: base.scheduledStart, end: base.scheduledEnd, locationId: "1",
+    arrangement: "Office" as const, dayOff: false,
+  };
+  const rest = { ...night, id: "rest", date: "2026-10-24", dayOff: true,
+    start: "2026-10-24T15:00:00Z", end: "2026-10-24T23:00:00Z" };
+  const context = attendanceContext([rest, night], [base], "1", "2026-10-23T17:15:00Z");
+  assert.equal(context.schedule?.id, "night");
+  assert.equal(context.session?.id, base.id);
+  const active = clockIn(base, base.scheduledStart, policy);
+  assert.equal(attendanceContext([rest, night], [active], "1", "2026-10-24T02:00:00Z").schedule?.id, "night");
+  assert.equal(attendanceContext([rest, night], [], "1", "2026-10-24T02:00:00Z").schedule?.id, "rest");
+});
+
+it("reserves pending leave and divides annual leave at the entitlement year boundary", () => {
+  const request: WorkforceRequest = {
+    id: "cross-year", employeeId: "1", kind: "leave", type: "Annual leave",
+    start: "2026-12-30", end: "2027-01-05", reason: "Family holiday together",
+    days: 5, status: "Approved", createdAt: "2026-10-25T00:00:00Z",
+  };
+  const requests: WorkforceRequest[] = [request,
+    { ...request, id: "pending", start: "2027-01-06", end: "2027-01-08", status: "Pending" },
+    { ...request, id: "rejected", status: "Rejected" },
+    { ...request, id: "other", employeeId: "2" },
+  ];
+  assert.deepEqual(annualLeaveBalance(requests, "1", 2026),
+    { year: 2026, entitlement: 14, approved: 2, pending: 0, available: 12 });
+  assert.deepEqual(annualLeaveBalance(requests, "1", 2027),
+    { year: 2027, entitlement: 14, approved: 3, pending: 3, available: 8 });
+  assert.equal(annualLeaveBalance(requests, "1", 2028).available, 14);
 });
 describe("Geofence", () => {
   const office = {

@@ -8,8 +8,10 @@ import Profile from "../features/Profile";
 import Requests from "../features/Requests";
 import Schedule from "../features/Schedule";
 import { usePreferences } from "../stores/preferences";
+import { useSectionReady } from "../components/Loading";
 export default function Page() {
   const { page } = useLocalSearchParams<{ page: string }>();
+  useSectionReady(`/${page}`);
   const role = usePreferences((s) => s.role);
   if (
     ["admin", "employees", "monitoring", "approvals", "locations"].includes(

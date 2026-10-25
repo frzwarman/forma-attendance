@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { describe,it } from "node:test";
 import { createMockRepository,DATABASE_KEY } from "../services/mockRepository";
-import type { StorageAdapter } from "../services/storageAdapter";
-import { dateKey } from "./attendance";
+import { withBrowserStorageLock, type StorageAdapter } from "../services/storageAdapter";
+import { dateKey, workingDays, nextWorkingDate } from "./attendance";
+import { seedDatabase } from "../services/seed";
 function setup() {
   const map = new Map<string, string>();
   const storage: StorageAdapter = {
@@ -26,6 +27,96 @@ function setup() {
   };
 }
 describe("Persistent mock repository", () => {
+  it("keeps unsupported web browsers readable while refusing unsafe writes", async () => {
+    const { storage } = setup();
+    const repo = createMockRepository({ ...storage,
+      withLock: (key, action, mode) => withBrowserStorageLock(undefined, key, action, mode),
+    });
+    assert.equal((await repo.read()).employees.length, 36);
+    await assert.rejects(repo.reviewRequest("req-2", "Approved", "emp-5"), /HTTPS/);
+    await assert.rejects(repo.reset(), /HTTPS/);
+    assert.equal((await repo.read()).requests.find((r) => r.id === "req-2")?.status, "Pending");
+  });
+  it("serializes independent repository instances and reads fresh saved state", async () => {
+    const { storage } = setup();
+    let lockCalls = 0;
+    const lockedStorage: StorageAdapter = { ...storage, withLock: async (_key, action) => {
+      lockCalls++;
+      return action();
+    } };
+    const first = createMockRepository(lockedStorage);
+    const second = createMockRepository(lockedStorage);
+    await first.read();
+    await second.read();
+    await Promise.all([
+      first.reviewRequest("req-2", "Approved", "emp-5"),
+      second.reviewRequest("req-3", "Rejected", "emp-5"),
+    ]);
+    const saved = await first.read();
+    assert.equal(saved.requests.find((r) => r.id === "req-2")?.status, "Approved");
+    assert.equal(saved.requests.find((r) => r.id === "req-3")?.status, "Rejected");
+    assert.equal(saved.approvals.length, 2);
+    assert.equal(saved.audit.length, 2);
+    assert.ok(lockCalls >= 5);
+  });
+
+  it("records a late after-midnight clock-in against yesterday's overnight shift", async () => {
+    const { storage } = setup();
+    const db = seedDatabase(new Date("2027-01-01T12:00:00+07:00"));
+    db.sessions = db.sessions.filter((s) => s.employeeId !== "emp-14");
+    await storage.setItem(DATABASE_KEY, JSON.stringify(db));
+    const repo = createMockRepository(storage, { now: () => new Date("2027-01-02T00:15:00+07:00") });
+    const office = db.locations[0];
+    const session = await repo.submitAttendance({
+      employeeId: "emp-14", type: "in", locationId: office.id,
+      coordinates: { ...office, accuracy: 8, simulated: true }, idempotencyKey: "overnight-late",
+    });
+    assert.equal(session.date, "2027-01-01");
+    assert.equal(session.lateMinutes, 125);
+    assert.equal(session.scheduledStart, "2027-01-01T15:00:00.000Z");
+  });
+
+  it("extends an old workspace without replacing edits, history, or saved requests", async () => {
+    const { storage } = setup();
+    const db = seedDatabase(new Date("2026-10-25T12:00:00+07:00"));
+    const edited = db.schedules.find((s) => s.employeeId === "emp-1" && s.date === "2026-11-26")!;
+    edited.arrangement = "Field";
+    edited.locationId = "bandung";
+    db.requests[0].reason = "Keep this saved request unchanged.";
+    await storage.setItem(DATABASE_KEY, JSON.stringify(db));
+    const repo = createMockRepository(storage, { now: () => new Date("2026-12-02T09:00:00+07:00") });
+    const refreshed = await repo.read();
+    assert.deepEqual(refreshed.sessions, JSON.parse(JSON.stringify(db.sessions)));
+    assert.deepEqual(refreshed.requests, db.requests);
+    assert.deepEqual(refreshed.schedules.find((s) => s.id === edited.id), edited);
+    assert.ok(refreshed.schedules.some((s) => s.employeeId === "emp-1" && s.date === "2027-01-06"));
+    assert.equal((await repo.read()).schedules.length, refreshed.schedules.length);
+    const office = db.locations[0];
+    const session = await repo.submitAttendance({ employeeId: "emp-1", type: "in", locationId: office.id,
+      coordinates: { ...office, accuracy: 8, simulated: true }, idempotencyKey: "renewed-schedule" });
+    assert.equal(session.date, "2026-12-02");
+  });
+
+  it("renews annual entitlement and checks each year of a cross-year request", async () => {
+    const { storage } = setup();
+    const db = seedDatabase();
+    const year = new Date().getUTCFullYear() + 1;
+    db.requests = [{ id: "old-leave", employeeId: "emp-1", kind: "leave", type: "Annual leave",
+      start: `${year - 1}-01-01`, end: `${year - 1}-01-31`, days: 14,
+      reason: "A previous year's approved leave", status: "Approved", createdAt: new Date().toISOString() }];
+    await storage.setItem(DATABASE_KEY, JSON.stringify(db));
+    const repo = createMockRepository(storage);
+    const start = `${year}-12-20`;
+    const end = `${year + 1}-01-15`;
+    const request = { id: "cross-year-leave", employeeId: "emp-1", kind: "leave" as const,
+      type: "Annual leave" as const, start, end, days: workingDays(start, end),
+      reason: "A holiday across the new year", status: "Pending" as const, createdAt: new Date().toISOString() };
+    assert.ok(request.days > 14);
+    await repo.submitRequest(request);
+    const extra = nextWorkingDate(`${year + 1}-01-18`);
+    await repo.submitRequest({ ...request, id: "reserve-more", start: extra, end: extra });
+    await assert.rejects(repo.submitRequest({ ...request, id: "too-many", start: `${year + 1}-02-01`, end: `${year + 1}-02-07` }), /Not enough annual leave/);
+  });
   it("persists clock-in/out, raw events, notifications and actual duration", async () => {
     const { repo, storage, setTime } = setup();
     const db = await repo.read();

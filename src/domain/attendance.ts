@@ -5,6 +5,7 @@ import type {
   Coordinates,
   WorkLocation,
   Schedule,
+  WorkforceRequest,
 } from "../types";
 export const dateKey = (
   date: Date | string = new Date(),
@@ -30,6 +31,53 @@ export function attendanceAvailability(
   if (session?.status === "Leave") return "leave";
   if (schedule?.dayOff || session?.status === "Day off") return "day-off";
   return schedule ? "ready" : "unscheduled";
+}
+
+export function attendanceContext(
+  schedules: Schedule[],
+  sessions: AttendanceSession[],
+  employeeId: string,
+  at: Date | string = new Date(),
+  timezone = "Asia/Jakarta",
+) {
+  const employeeSchedules = schedules.filter((s) => s.employeeId === employeeId);
+  const active = sessions.find(
+    (s) => s.employeeId === employeeId && s.clockIn && !s.clockOut,
+  );
+  const instant = +new Date(at);
+  const schedule = active
+    ? employeeSchedules.find((s) => s.date === active.date && s.shiftId === active.shiftId)
+    : employeeSchedules
+        .filter((s) => !s.dayOff && +new Date(s.start) <= instant && +new Date(s.end) >= instant)
+        .sort((a, b) => b.start.localeCompare(a.start))[0] ||
+      employeeSchedules.find((s) => s.date === dateKey(at, timezone));
+  const session = active || sessions.find(
+    (s) => s.employeeId === employeeId && s.date === (schedule?.date || dateKey(at, timezone)),
+  );
+  return { schedule, session };
+}
+
+export function annualLeaveBalance(
+  requests: WorkforceRequest[],
+  employeeId: string,
+  year: number,
+  workweek = [1, 2, 3, 4, 5],
+  entitlement = 14,
+) {
+  const start = `${year}-01-01`;
+  const end = `${year}-12-31`;
+  let approved = 0;
+  let pending = 0;
+  for (const request of requests) {
+    if (request.employeeId !== employeeId || request.kind !== "leave" ||
+        request.type !== "Annual leave" || request.start > end || request.end < start ||
+        (request.status !== "Approved" && request.status !== "Pending")) continue;
+    const days = workingDays(request.start > start ? request.start : start,
+      request.end < end ? request.end : end, workweek);
+    if (request.status === "Approved") approved += days;
+    else pending += days;
+  }
+  return { year, entitlement, approved, pending, available: Math.max(0, entitlement - approved - pending) };
 }
 
 export function nextWorkingDate(start = dateKey(), workweek = [1, 2, 3, 4, 5]) {

@@ -11,7 +11,7 @@ import {
   Plus,
   Send,
 } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { Pressable, View } from "react-native";
 import { z } from "zod";
@@ -29,6 +29,7 @@ import {
 } from "../components/ui";
 import {
   correctionSchema,
+  annualLeaveBalance,
   dateKey,
   leaveSchema,
   nextWorkingDate,
@@ -50,7 +51,7 @@ export const requestTone = (status: string) =>
         : "neutral";
 export default function Requests() {
   const c = useTheme();
-  const { db, employee, refresh } = useData();
+  const { db, employee, organization, refresh } = useData();
   const { width } = useAppDimensions();
   const params = useLocalSearchParams<{ new?: string }>();
   const router = useRouter();
@@ -68,15 +69,10 @@ export default function Requests() {
   const [filter, setFilter] = useState("All requests");
   const [selected, setSelected] = useState<WorkforceRequest>();
   const [success, setSuccess] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const requests = db.requests.filter((r) => r.employeeId === employee.id);
-  const used = requests
-    .filter(
-      (r) =>
-        r.kind === "leave" &&
-        r.type === "Annual leave" &&
-        r.status === "Approved",
-    )
-    .reduce((n, r) => n + (r.kind === "leave" ? r.days : 0), 0);
+  const balance = annualLeaveBalance(db.requests, employee.id,
+    Number(dateKey().slice(0, 4)), organization.workweek);
   const pending = requests.filter((r) => r.status === "Pending").length;
   const list = requests.filter(
     (r) => filter === "All requests" || r.status === filter,
@@ -112,14 +108,14 @@ export default function Requests() {
           </Row>
           <Row style={{ alignItems: "baseline", marginTop: 18 }}>
             <T size={40} weight="bold" color={c.primaryText}>
-              {14 - used}
+              {balance.available}
             </T>
             <T color={c.primaryText} size={12}>
               days remaining
             </T>
           </Row>
           <T size={11} color={c.muted}>
-            {used} of 14 days used · Take a breather when you need one.
+            {balance.year} · {balance.approved} approved · {balance.pending} pending · {balance.entitlement} days total
           </T>
         </Card>
         <Card style={{ flex: width >= 700 ? 1 : undefined }}>
@@ -217,9 +213,11 @@ export default function Requests() {
           form === "leave" ? "A little time for you" : "Let’s set it right"
         }
         onClose={() => setForm(undefined)}
+        busy={submitting}
       >
         {form === "leave" ? (
           <LeaveForm
+            onSubmittingChange={setSubmitting}
             onDone={async () => {
               await refresh();
               setForm(undefined);
@@ -228,6 +226,7 @@ export default function Requests() {
           />
         ) : form === "correction" ? (
           <CorrectionForm
+            onSubmittingChange={setSubmitting}
             onDone={async () => {
               await refresh();
               setForm(undefined);
@@ -290,7 +289,11 @@ export default function Requests() {
   );
 }
 type LeaveValues = z.infer<typeof leaveSchema>;
-function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
+type RequestFormProps = {
+  onDone: () => Promise<void>;
+  onSubmittingChange: (submitting: boolean) => void;
+};
+function LeaveForm({ onDone, onSubmittingChange }: RequestFormProps) {
   const c = useTheme();
   const { width } = useAppDimensions();
   const { employee, organization } = useData();
@@ -309,6 +312,10 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
     },
   });
   const values = useWatch({ control });
+  useEffect(() => {
+    onSubmittingChange(isSubmitting);
+    return () => onSubmittingChange(false);
+  }, [isSubmitting, onSubmittingChange]);
   return (
     <View style={{ gap: 17 }}>
       <T size={12} color={c.muted}>
@@ -333,6 +340,7 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
                   key={type}
                   small
                   label={type}
+                  disabled={isSubmitting}
                   variant={field.value === type ? "primary" : "secondary"}
                   onPress={() => field.onChange(type)}
                 />
@@ -357,6 +365,7 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
                   placeholder="2026-11-02"
                   error={errors[name]?.message}
                   maxLength={10}
+                  editable={!isSubmitting}
                   autoCorrect={false}
                   autoCapitalize="none"
                 />
@@ -378,6 +387,7 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
             value={field.value}
             onChangeText={field.onChange}
             multiline
+            editable={!isSubmitting}
             style={{ minHeight: 100, textAlignVertical: "top" }}
             error={errors.reason?.message}
           />
@@ -398,6 +408,7 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
         label="Send leave request"
         icon={Send}
         loading={isSubmitting}
+        loadingLabel="Sending leave request…"
         onPress={handleSubmit(async (data) => {
           setError("");
           try {
@@ -420,11 +431,12 @@ function LeaveForm({ onDone }: { onDone: () => Promise<void> }) {
   );
 }
 type CorrectionValues = z.infer<typeof correctionSchema>;
-function CorrectionForm({ onDone }: { onDone: () => Promise<void> }) {
+function CorrectionForm({ onDone, onSubmittingChange }: RequestFormProps) {
   const c = useTheme();
   const { employee } = useData();
   const [error, setError] = useState("");
   const [attachment, setAttachment] = useState("");
+  const [picking, setPicking] = useState(false);
   const {
     control,
     handleSubmit,
@@ -438,6 +450,10 @@ function CorrectionForm({ onDone }: { onDone: () => Promise<void> }) {
       reason: "",
     },
   });
+  useEffect(() => {
+    onSubmittingChange(isSubmitting || picking);
+    return () => onSubmittingChange(false);
+  }, [isSubmitting, picking, onSubmittingChange]);
   return (
     <View style={{ gap: 17 }}>
       <T size={12} color={c.muted}>
@@ -463,6 +479,7 @@ function CorrectionForm({ onDone }: { onDone: () => Promise<void> }) {
                   key={type}
                   small
                   label={type}
+                  disabled={isSubmitting || picking}
                   variant={field.value === type ? "primary" : "secondary"}
                   onPress={() => field.onChange(type)}
                 />
@@ -488,6 +505,7 @@ function CorrectionForm({ onDone }: { onDone: () => Promise<void> }) {
               value={field.value}
               onChangeText={field.onChange}
               multiline={name === "reason"}
+              editable={!isSubmitting && !picking}
               style={
                 name === "reason"
                   ? { minHeight: 90, textAlignVertical: "top" }
@@ -502,7 +520,13 @@ function CorrectionForm({ onDone }: { onDone: () => Promise<void> }) {
         variant="secondary"
         label={attachment || "Add supporting attachment (optional)"}
         icon={Paperclip}
+        loading={picking}
+        loadingLabel="Opening files…"
+        disabled={isSubmitting}
         onPress={async () => {
+          if (picking || isSubmitting) return;
+          setPicking(true);
+          setError("");
           try {
             const result = await DocumentPicker.getDocumentAsync({
               type: ["image/*", "application/pdf"],
@@ -511,6 +535,8 @@ function CorrectionForm({ onDone }: { onDone: () => Promise<void> }) {
             if (!result.canceled) setAttachment(result.assets[0].name);
           } catch {
             setError("Could not open the file picker. Please try again.");
+          } finally {
+            setPicking(false);
           }
         }}
       />
@@ -528,6 +554,8 @@ function CorrectionForm({ onDone }: { onDone: () => Promise<void> }) {
         label="Send correction request"
         icon={Send}
         loading={isSubmitting}
+        loadingLabel="Sending correction…"
+        disabled={picking}
         onPress={handleSubmit(async (data) => {
           setError("");
           try {

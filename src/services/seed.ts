@@ -60,8 +60,7 @@ const names = [
 ];
 export const avatar = (index: number) =>
   `https://i.pravatar.cc/120?img=${[12, 47, 11, 44, 13, 49, 14, 45, 15, 46, 33, 48][index % 12]}`;
-export function seedDatabase(): DemoDatabase {
-  const now = new Date();
+export function seedDatabase(now = new Date()): DemoDatabase {
   const today = dateKey(now);
   const employees: Employee[] = names.map((name, i) => ({
     id: `emp-${i + 1}`,
@@ -244,8 +243,8 @@ export function seedDatabase(): DemoDatabase {
         employeeId: "emp-1",
         kind: "leave",
         type: "Annual leave",
-        start: future(8),
-        end: future(9),
+        start: future(8, now),
+        end: future(9, now),
         reason: "A little time away with family.",
         days: 2,
         status: "Approved",
@@ -256,8 +255,8 @@ export function seedDatabase(): DemoDatabase {
         employeeId: "emp-2",
         kind: "leave",
         type: "Annual leave",
-        start: future(3),
-        end: future(4),
+        start: future(3, now),
+        end: future(4, now),
         reason: "Family celebration in Bandung.",
         days: 2,
         status: "Pending",
@@ -268,7 +267,7 @@ export function seedDatabase(): DemoDatabase {
         employeeId: "emp-3",
         kind: "correction",
         type: "Forgot to clock out",
-        date: future(-1),
+        date: future(-1, now),
         time: "18:05",
         reason: "I left the office but forgot to clock out.",
         status: "Pending",
@@ -301,8 +300,47 @@ export function seedDatabase(): DemoDatabase {
     audit: [],
   };
 }
-function future(offset: number) {
-  const d = new Date(dateKey() + "T12:00:00Z");
+function future(offset: number, now: Date) {
+  const d = new Date(dateKey(now) + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + offset);
   return d.toISOString().slice(0, 10);
+}
+
+// Extend only missing schedule rows. Saved assignments and all attendance,
+// request and audit history remain authoritative.
+export function extendDemoSchedules(db: DemoDatabase, now = new Date()) {
+  let changed = false;
+  const today = dateKey(now);
+  for (const employee of db.employees) {
+    const existing = db.schedules
+      .filter((s) => s.employeeId === employee.id)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const dates = new Set(existing.map((s) => s.date));
+    for (let offset = -1; offset <= 35; offset++) {
+      const day = new Date(`${today}T12:00:00Z`);
+      day.setUTCDate(day.getUTCDate() + offset);
+      const date = day.toISOString().slice(0, 10);
+      if (dates.has(date)) continue;
+      const template = existing.find((s) =>
+        new Date(`${s.date}T12:00:00Z`).getUTCDay() === day.getUTCDay(),
+      ) || existing[0];
+      const shift = db.shifts.find((s) => s.id === template?.shiftId) || db.shifts[0];
+      if (!shift) continue;
+      const endDay = new Date(day);
+      if (shift.end < shift.start) endDay.setUTCDate(endDay.getUTCDate() + 1);
+      db.schedules.push({
+        id: `sch-${employee.id}-${date}`,
+        employeeId: employee.id,
+        shiftId: shift.id,
+        date,
+        start: new Date(`${date}T${shift.start}:00+07:00`).toISOString(),
+        end: new Date(`${endDay.toISOString().slice(0, 10)}T${shift.end}:00+07:00`).toISOString(),
+        arrangement: template?.arrangement || "Office",
+        locationId: template?.locationId || employee.locationId,
+        dayOff: !organization.workweek.includes(day.getUTCDay()),
+      });
+      changed = true;
+    }
+  }
+  return changed;
 }

@@ -35,6 +35,7 @@ export default function Login() {
   const [forgot, setForgot] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [resetting, setResetting] = useState(false);
   const {
     control,
     handleSubmit,
@@ -95,6 +96,7 @@ export default function Login() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
+              editable={!isSubmitting}
               value={field.value}
               onChangeText={field.onChange}
               error={errors.email?.message}
@@ -111,6 +113,7 @@ export default function Login() {
                 placeholder="Enter your password"
                 secureTextEntry={!show}
                 autoComplete="current-password"
+                editable={!isSubmitting}
                 value={field.value}
                 onChangeText={field.onChange}
                 error={errors.password?.message}
@@ -132,6 +135,7 @@ export default function Login() {
           <Row style={{ gap: 7 }}>
             <Switch
               accessibilityLabel="Remember session"
+              disabled={isSubmitting}
               value={remember}
               onValueChange={setRemember}
               trackColor={{ true: c.primary, false: c.border }}
@@ -142,6 +146,7 @@ export default function Login() {
           </Row>
           <Pressable
             accessibilityRole="button"
+            disabled={isSubmitting}
             onPress={() => setForgot(true)}
             style={{ minHeight: 44, justifyContent: "center" }}
           >
@@ -159,6 +164,7 @@ export default function Login() {
           label="Sign in"
           icon={ArrowRight}
           loading={isSubmitting}
+          loadingLabel="Signing in…"
           onPress={handleSubmit(async (values) => {
             setError("");
             try {
@@ -178,6 +184,7 @@ export default function Login() {
           label="Explore demo"
           icon={Sparkles}
           variant="secondary"
+          disabled={isSubmitting}
           onPress={() => {
             prefs.setSession("emp-1", "employee");
             router.replace("/");
@@ -205,6 +212,7 @@ export default function Login() {
         visible={forgot}
         title="Find your way back"
         onClose={() => setForgot(false)}
+        busy={resetting}
       >
         <T color={c.muted}>
           Enter your corporate email to request a password reset.
@@ -214,14 +222,22 @@ export default function Login() {
           value={resetEmail}
           onChangeText={setResetEmail}
           keyboardType="email-address"
+          editable={!resetting}
         />
         <Button
           label="Request reset"
+          loading={resetting}
+          loadingLabel="Requesting reset…"
           onPress={async () => {
+            if (resetting) return;
+            setResetting(true);
+            setMessage("");
             try {
               setMessage(await authRepository.resetPassword(resetEmail));
             } catch (e) {
               setMessage((e as Error).message);
+            } finally {
+              setResetting(false);
             }
           }}
         />

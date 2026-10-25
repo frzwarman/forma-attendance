@@ -10,6 +10,9 @@ export default function Notifications() {
   const c = useTheme();
   const { db, employee, refresh } = useData();
   const [filter, setFilter] = useState("All");
+  const [marking, setMarking] = useState(false);
+  const [error, setError] = useState("");
+  const hasUnread = db.notifications.some((n) => n.employeeId === employee.id && !n.read);
   const notes = db.notifications.filter(
     (n) =>
       n.employeeId === employee.id &&
@@ -29,14 +32,27 @@ export default function Notifications() {
               label="Mark all as read"
               icon={CheckCheck}
               variant="secondary"
+              loading={marking}
+              loadingLabel="Marking as read…"
+              disabled={!hasUnread}
               onPress={async () => {
-                await repository.markNotifications(employee.id);
-                await refresh();
+                if (marking) return;
+                setMarking(true);
+                setError("");
+                try {
+                  await repository.markNotifications(employee.id);
+                  await refresh();
+                } catch (e) {
+                  setError(`Couldn’t update notifications. ${(e as Error).message}`);
+                } finally {
+                  setMarking(false);
+                }
               }}
             />
           }
         />
       </View>
+      {!!error && <T accessibilityRole="alert" color={c.red} size={12}>{error}</T>}
       <Row style={{ flexWrap: "wrap" }}>
         {["All", "Unread", "Attendance", "Request", "Company"].map((item) => (
           <Button

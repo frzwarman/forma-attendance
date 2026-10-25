@@ -33,6 +33,7 @@ import { usePreferences } from "../stores/preferences";
 import { useTheme } from "../theme";
 import { Avatar } from "./Avatar";
 import { Badge, Button, Card, IconButton, Row, Sheet, T } from "./ui";
+import { LoadingStatus, SectionContent, WorkspaceLoading } from "./Loading";
 const employeeNav = [
   { label: "Overview", mobile: "Home", path: "/", icon: House },
   { label: "Attendance", mobile: "History", path: "/history", icon: Clock3 },
@@ -85,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const path = usePathname();
   const insets = useSafeAreaInsets();
-  const { db, employee } = useData();
+  const { db, employee, isRefreshing, refreshError, refresh } = useData();
   const prefs = usePreferences();
   const admin = prefs.role === "admin";
   const desktop = admin && width >= 1050;
@@ -107,12 +108,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             backgroundColor: "transparent",
           }}
         >
-          {children}
+          <SectionContent fill>{children}</SectionContent>
         </View>
       </NusantaraBackdrop>
     );
   if (!prefs.hydrated)
-    return <View style={{ flex: 1, backgroundColor: c.bg }} />;
+    return <WorkspaceLoading label="Restoring your session…" />;
   if (!prefs.authenticated) return <Redirect href="/login" />;
   const selected =
     nav.find((n) => n.path === path)?.label ||
@@ -414,11 +415,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   label="Notifications"
                   badge={unread}
                 />
-                {desktop && (
+                {(desktop || admin) && (
                   <Pressable
                     onPress={() => go("/profile")}
                     accessibilityRole="button"
                     accessibilityLabel="Profile"
+                    style={{
+                      minWidth: 44,
+                      minHeight: 44,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
                   >
                     <Avatar employee={employee} size={33} radius={12} />
                   </Pressable>
@@ -444,7 +451,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 alignSelf: "center",
               }}
             >
-              {children}
+              {isRefreshing && (
+                <View style={{ marginBottom: 18 }}>
+                  <LoadingStatus label="Updating workspace…" />
+                </View>
+              )}
+              {!!refreshError && (
+                <Card style={{ marginBottom: 18, gap: 12 }}>
+                  <T accessibilityRole="alert" color={c.amber} size={12}>{refreshError}</T>
+                  <Button small label="Retry update" loading={isRefreshing} loadingLabel="Updating…" onPress={() => { void refresh(); }} />
+                </Card>
+              )}
+              <SectionContent>{children}</SectionContent>
               <Row
                 style={{
                   marginTop: 30,

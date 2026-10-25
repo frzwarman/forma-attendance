@@ -49,7 +49,8 @@ test("persisted rest days explain clock-in availability and leave starts on a wo
   }, db);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Rest day", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Clock in", exact: true })).toBeDisabled();
+  await expect(page.getByText("Clock-in unavailable: rest day.", { exact: true })).toBeVisible();
   await expect(page.getByText(/Next shift:/)).toBeVisible();
   await page.getByRole("tab", { name: "Requests", exact: true }).click();
   await page.getByRole("button", { name: "Request leave", exact: true }).click();

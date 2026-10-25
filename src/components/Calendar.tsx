@@ -107,7 +107,7 @@ export function Calendar({
               <T
                 size={12}
                 weight={active ? "bold" : "medium"}
-                color={active ? c.white : c.text}
+                color={active ? c.onPrimary : c.text}
               >
                 {valid ? day : ""}
               </T>
@@ -119,7 +119,7 @@ export function Calendar({
                   backgroundColor:
                     valid && statuses[date]
                       ? active
-                        ? c.white
+                        ? c.onPrimary
                         : color
                       : "transparent",
                 }}

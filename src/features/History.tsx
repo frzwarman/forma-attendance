@@ -159,25 +159,27 @@ export default function History() {
           }
         />
       </View>
-      <View
-        style={{ flexDirection: width >= 1100 ? "row" : "column", gap: 22 }}
-      >
-        <Card style={{ flex: width >= 1100 ? 1.4 : undefined }}>
-          <Calendar
-            month={month}
-            onMonth={setMonth}
-            selected={selected}
-            onSelect={setSelected}
-            statuses={Object.fromEntries(
-              sessions.map((s) => [s.date, s.status]),
-            )}
-          />
-        </Card>
-        <Card style={{ flex: width >= 1100 ? 1 : undefined }}>
-          <SectionTitle title="Day details" />
-          {detailContent}
-        </Card>
-      </View>
+      {view === "calendar" && (
+        <View
+          style={{ flexDirection: width >= 1100 ? "row" : "column", gap: 22 }}
+        >
+          <Card style={{ flex: width >= 1100 ? 1.4 : undefined }}>
+            <Calendar
+              month={month}
+              onMonth={setMonth}
+              selected={selected}
+              onSelect={setSelected}
+              statuses={Object.fromEntries(
+                sessions.map((s) => [s.date, s.status]),
+              )}
+            />
+          </Card>
+          <Card style={{ flex: width >= 1100 ? 1 : undefined }}>
+            <SectionTitle title="Day details" />
+            {detailContent}
+          </Card>
+        </View>
+      )}
       <Card>
         <SectionTitle
           title={`${new Intl.DateTimeFormat("en-GB", { month: "long" }).format(new Date(month + "-15"))} attendance`}

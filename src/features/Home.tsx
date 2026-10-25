@@ -28,7 +28,7 @@ import {
   SectionTitle,
   T,
 } from "../components/ui";
-import { attendanceAvailability, dateKey, duration, time } from "../domain/attendance";
+import { attendanceAvailability, attendanceContext, dateKey, duration, time } from "../domain/attendance";
 import { useData } from "../services/data";
 import { useTheme } from "../theme";
 import type { AttendanceSession } from "../types";
@@ -84,17 +84,9 @@ export default function Home() {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
-  const schedule = db.schedules.find(
-    (s) => s.employeeId === employee.id && s.date === dateKey(),
+  const { schedule, session: today } = attendanceContext(
+    db.schedules, db.sessions, employee.id, now,
   );
-  const active = db.sessions.find(
-    (s) => s.employeeId === employee.id && s.clockIn && !s.clockOut,
-  );
-  const today =
-    active ||
-    db.sessions.find(
-      (s) => s.employeeId === employee.id && s.date === dateKey(),
-    );
   const working = !!today?.clockIn && !today.clockOut;
   const complete = !!today?.clockOut;
   const availability = attendanceAvailability(today, schedule);
@@ -104,9 +96,13 @@ export default function Home() {
     .filter((s) => s.employeeId === employee.id && !s.dayOff && s.date > dateKey())
     .sort((a, b) => a.start.localeCompare(b.start))[0];
   const office = db.locations.find(
-    (l) => l.id === (schedule?.locationId || "hq"),
+    (l) => l.id === (today?.locationId || schedule?.locationId || employee.locationId),
   )!;
-  const shift = db.shifts.find((s) => s.id === schedule?.shiftId);
+  const shift = db.shifts.find((s) => s.id === (today?.shiftId || schedule?.shiftId));
+  const upcomingLeave = db.requests
+    .filter((request) => request.employeeId === employee.id && request.kind === "leave" &&
+      request.status === "Approved" && request.end >= dateKey(now))
+    .sort((a, b) => (a.kind === "leave" && b.kind === "leave") ? a.start.localeCompare(b.start) : 0)[0];
   const history = db.sessions
     .filter(
       (s) =>
@@ -291,20 +287,23 @@ export default function Home() {
                   {time(today?.clockOut)}
                 </T>
               </View>
-              <Button
-                label={
-                  complete ? "Day complete" : working ? "Clock out" : unavailable ? unavailableLabel : "Clock in"
-                }
-                icon={complete ? CheckCheck : Fingerprint}
-                variant="white"
-                disabled={complete || unavailable}
-                onPress={() => {
-                  setFlowType(working ? "out" : "in");
-                  setFlow(true);
-                }}
-                style={{ minWidth: 135, flexGrow: width < 500 ? 1 : 0 }}
-              />
             </Row>
+            <Button
+              label={complete ? "Day complete" : working ? "Clock out" : "Clock in"}
+              icon={complete ? CheckCheck : Fingerprint}
+              variant="white"
+              disabled={complete || unavailable}
+              onPress={() => {
+                setFlowType(working ? "out" : "in");
+                setFlow(true);
+              }}
+              style={{ alignSelf: "stretch", marginTop: 18, minHeight: 52 }}
+            />
+            {unavailable && (
+              <T size={12} color={c.heroText} style={{ marginTop: 10 }}>
+                Clock-in unavailable: {unavailableLabel.toLowerCase()}.
+              </T>
+            )}
           </View>
         </View>
         <Card
@@ -595,15 +594,14 @@ export default function Home() {
               {
                 icon: Palmtree,
                 title: "A well-deserved break",
-                sub: "Your annual leave is approved",
+                sub: upcomingLeave?.kind === "leave"
+                  ? `Your ${upcomingLeave.type.toLowerCase()} is approved`
+                  : "No upcoming approved leave",
                 badge: "Time off",
                 tone: "blue" as const,
-                date:
-                  db.requests.find(
-                    (r) => r.employeeId === employee.id && r.kind === "leave",
-                  )?.kind === "leave"
-                    ? "Coming up next week"
-                    : "Plan your next break",
+                date: upcomingLeave?.kind === "leave"
+                  ? `${upcomingLeave.start} → ${upcomingLeave.end}`
+                  : "Request time off from Requests",
                 bg: c.blueBg,
                 color: c.blue,
               },

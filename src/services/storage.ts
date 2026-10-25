@@ -1,9 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
-import type { StorageAdapter } from "./storageAdapter";
+import { withBrowserStorageLock, type StorageAdapter } from "./storageAdapter";
+import { createChunkedStorage } from "./chunkedStorage";
 export type { StorageAdapter } from "./storageAdapter";
-export const storage: StorageAdapter = AsyncStorage;
+const dataStorage = Platform.OS === "web" ? AsyncStorage : createChunkedStorage(AsyncStorage);
+export const storage: StorageAdapter = {
+  getItem: (key) => dataStorage.getItem(key),
+  setItem: (key, value) => dataStorage.setItem(key, value),
+  removeItem: (key) => dataStorage.removeItem(key),
+  withLock: (key, action, mode) => Platform.OS === "web"
+    ? withBrowserStorageLock(globalThis.navigator?.locks, key, action, mode)
+    : action(),
+};
 // Production native auth can use this adapter. Demo identity is not an auth token.
 export const tokenStorage: StorageAdapter =
   Platform.OS === "web"

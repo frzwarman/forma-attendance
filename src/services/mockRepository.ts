@@ -1,8 +1,9 @@
 import {
 clockIn,
 clockOut,
+attendanceContext,
+annualLeaveBalance,
 correctionSchema,
-dateKey,
 geofence,
 leaveSchema,
 workingDays,
@@ -16,8 +17,8 @@ DemoDatabase,
 WorkLocation,
 WorkforceRequest,
 } from "../types";
-import { organization,seedDatabase } from "./seed";
-import type { StorageAdapter } from "./storageAdapter";
+import { extendDemoSchedules,organization,seedDatabase } from "./seed";
+import { withStorageLock,type StorageAdapter } from "./storageAdapter";
 export const DATABASE_KEY = "forma.demo.v1";
 export const uid = () =>
   `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -51,29 +52,25 @@ export function createMockRepository(
   storage: StorageAdapter,
   clock: AuthoritativeClock = mockClock,
 ): WorkforceRepository {
-  let database: DemoDatabase | undefined;
-  let queue: Promise<unknown> = Promise.resolve();
   async function load() {
-    if (database) return database;
     const raw = await storage.getItem(DATABASE_KEY);
+    let database: DemoDatabase;
     try {
       const parsed = raw ? JSON.parse(raw) : undefined;
-      database = parsed?.version === 1 ? parsed : seedDatabase();
+      database = parsed?.version === 1 ? parsed : seedDatabase(clock.now());
     } catch {
-      database = seedDatabase();
+      database = seedDatabase(clock.now());
     }
-    return database!;
+    extendDemoSchedules(database, clock.now());
+    return database;
   }
   async function transaction<T>(fn: (db: DemoDatabase) => T): Promise<T> {
-    const result = queue.then(async () => {
-      const db = structuredCopy(await load());
+    return withStorageLock(storage, DATABASE_KEY, async () => {
+      const db = await load();
       const value = fn(db);
       await storage.setItem(DATABASE_KEY, JSON.stringify(db));
-      database = db;
       return value;
     });
-    queue = result.catch(() => {});
-    return result;
   }
   function structuredCopy<T>(v: T): T {
     return JSON.parse(JSON.stringify(v));
@@ -95,7 +92,8 @@ export function createMockRepository(
     });
   }
   const repository: WorkforceRepository = {
-    read: async () => structuredCopy(await load()),
+    read: () => withStorageLock(storage, DATABASE_KEY,
+      async () => structuredCopy(await load()), "read"),
     submitAttendance: (input) =>
       transaction((db) => {
         const previous = db.events.find(
@@ -121,17 +119,9 @@ export function createMockRepository(
         if (db.policy.requireSelfie && !input.selfieReference)
           throw new Error("A selfie is required by company policy.");
         const now = clock.now().toISOString();
-        const active = db.sessions.find(
-          (s) => s.employeeId === input.employeeId && s.clockIn && !s.clockOut,
-        );
-        const schedule = db.schedules.find(
-          (s) => s.employeeId === input.employeeId && s.date === dateKey(now),
-        );
-        let session =
-          active ||
-          db.sessions.find(
-            (s) => s.employeeId === input.employeeId && s.date === dateKey(now),
-          );
+        const context = attendanceContext(db.schedules, db.sessions, input.employeeId, now, organization.timezone);
+        const schedule = context.schedule;
+        let session = context.session;
         if (!session) {
           if (!schedule || schedule.dayOff)
             throw new Error("No working shift scheduled.");
@@ -219,17 +209,18 @@ export function createMockRepository(
             )
           )
             throw new Error("These dates overlap an existing leave request.");
-          const used = db.requests
-            .filter(
-              (r) =>
-                r.kind === "leave" &&
-                r.type === "Annual leave" &&
-                r.employeeId === request.employeeId &&
-                (r.status === "Approved" || r.status === "Pending"),
-            )
-            .reduce((n, r) => n + (r.kind === "leave" ? r.days : 0), 0);
-          if (request.type === "Annual leave" && used + days > 14)
-            throw new Error("Not enough annual leave remaining.");
+          if (request.type === "Annual leave") {
+            for (let year = Number(request.start.slice(0, 4)); year <= Number(request.end.slice(0, 4)); year++) {
+              const balance = annualLeaveBalance(db.requests, request.employeeId, year, organization.workweek);
+              const requested = workingDays(
+                request.start > `${year}-01-01` ? request.start : `${year}-01-01`,
+                request.end < `${year}-12-31` ? request.end : `${year}-12-31`,
+                organization.workweek,
+              );
+              if (requested > balance.available)
+                throw new Error(`Not enough annual leave remaining for ${year}.`);
+            }
+          }
           db.requests.unshift({ ...request, days, status: "Pending" });
         } else {
           correctionSchema.parse(request);
@@ -298,12 +289,10 @@ export function createMockRepository(
           if (n.employeeId === employeeId) n.read = true;
         });
       }),
-    reset: async () => {
-      await queue;
-      const next = seedDatabase();
+    reset: () => withStorageLock(storage, DATABASE_KEY, async () => {
+      const next = seedDatabase(clock.now());
       await storage.setItem(DATABASE_KEY, JSON.stringify(next));
-      database = next;
-    },
+    }),
   };
   return repository;
 }

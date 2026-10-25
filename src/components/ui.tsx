@@ -124,6 +124,7 @@ export function Button({
   variant = "primary",
   disabled = false,
   loading = false,
+  loadingLabel = "Please wait…",
   style,
   small = false,
 }: {
@@ -133,6 +134,7 @@ export function Button({
   variant?: "primary" | "secondary" | "ghost" | "danger" | "white";
   disabled?: boolean;
   loading?: boolean;
+  loadingLabel?: string;
   style?: StyleProp<ViewStyle>;
   small?: boolean;
 }) {
@@ -159,6 +161,8 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
+      aria-busy={loading}
       disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => [
@@ -190,7 +194,7 @@ export function Button({
         <Icon size={18} color={color} />
       ) : null}
       <T weight="semibold" color={color} size={small ? 12 : 14}>
-        {label}
+        {loading ? loadingLabel : label}
       </T>
     </Pressable>
   );
@@ -200,17 +204,21 @@ export function IconButton({
   onPress,
   label,
   badge,
+  disabled = false,
 }: {
   icon: LucideIcon;
   onPress: () => void;
   label: string;
   badge?: boolean;
+  disabled?: boolean;
 }) {
   const c = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => ({
         height: 44,
@@ -219,6 +227,7 @@ export function IconButton({
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: pressed ? c.subtle : "transparent",
+        opacity: disabled ? 0.45 : 1,
       })}
     >
       <Icon size={21} color={c.muted} strokeWidth={1.8} />
@@ -362,12 +371,14 @@ export function Sheet({
   title,
   children,
   wide = false,
+  busy = false,
 }: {
   visible: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   wide?: boolean;
+  busy?: boolean;
 }) {
   const c = useTheme();
   const insets = useSafeAreaInsets();
@@ -381,7 +392,7 @@ export function Sheet({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={() => { if (!busy) onClose(); }}
       statusBarTranslucent
       navigationBarTranslucent
     >
@@ -403,13 +414,16 @@ export function Sheet({
         >
           <Pressable
             accessibilityLabel="Close dialog backdrop"
+            disabled={busy}
             onPress={onClose}
             style={{ position: "absolute", inset: 0 }}
           />
           <View
             testID="sheet-panel"
-            accessibilityRole="dialog"
+            accessibilityRole={Platform.OS === "web" ? "dialog" : undefined}
             accessibilityLabel={title}
+            accessibilityState={{ busy }}
+            aria-busy={busy}
             accessibilityViewIsModal
             style={{
               width: "100%",
@@ -434,7 +448,7 @@ export function Sheet({
               <T size={19} weight="bold" style={{ flex: 1 }}>
                 {title}
               </T>
-              <IconButton icon={X} label="Close dialog" onPress={onClose} />
+              <IconButton icon={X} label="Close dialog" onPress={onClose} disabled={busy} />
             </Row>
             <ScrollView
               testID="sheet-scroll"
