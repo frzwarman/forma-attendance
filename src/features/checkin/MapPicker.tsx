@@ -71,7 +71,6 @@ export function MapPicker({ value, onChange }: { value: Pin | null; onChange: (p
       map.current = null;
       marker.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function locate() {
