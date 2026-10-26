@@ -1,192 +1,112 @@
-# Nusantara — Workforce Attendance
+# Buku Tamu — event check-in (Bawaslu)
 
-A mobile-first, universal workforce attendance prototype for the fictional Northstar Technologies in Jakarta. Built with Expo and React Native primitives. The employee experience keeps a phone layout (up to 480px) with bottom tabs, including on desktop previews; the HR workspace adapts to wider screens. No backend credentials required.
+A one-event guest book on the web, in Bahasa Indonesia. Attendees open the link on their own phone, fill in one form (Nama, Nomor Telepon, E-mail, Jabatan, Alamat with a map pin, an optional file, Tanggal Check In/Check Out) and tap **Kirim**. Admins sign in at `/admin` to watch check-ins arrive, search them, export the full list to Excel or CSV, run a lucky draw, and change the event name, texts, logo, background and colours. The default look is Bawaslu's, measured from the supplied key visual and https://www.bawaslu.go.id/id (see `assets/brand/README.md`).
 
-## Run
+Built with Expo Router on React Native Web (web only), TanStack Query, react-hook-form + zod, Leaflet with OpenStreetMap tiles, SheetJS for Excel, and Supabase (Postgres, Auth, Storage).
 
-Use Node **24 LTS (24.3+)** or supported Node 22 (22.13+).
+The previous workforce-attendance prototype is preserved on the `workforce-app` branch and the `workforce-app-final` tag.
+
+## Run locally
+
+Use Node 24 LTS (24.3+) or 22.13+.
 
 ```sh
 npm ci
+cp .env.example .env.local   # fill in both values from Supabase → Project Settings → API
 npm run web
 ```
 
-Expo prints a local URL (normally http://localhost:8081). Open it on desktop or use your browser’s mobile device mode. On a physical phone, use an HTTPS deployment for camera and geolocation; plain HTTP LAN URLs do not satisfy browser permission requirements.
+`.env.local` holds only the project URL and the publishable key; both are public client values and are embedded at build time. Never put the database password, CLI token, secret key or service-role key in an `EXPO_PUBLIC_` variable.
 
 ```sh
 npm run typecheck
 npm run lint
-npm test
-npm run build:web
+npm test           # domain unit tests (theme, phone, time, validation, export)
+npm run db:test    # the real migrations in embedded Postgres (RLS, RPCs, storage policies)
+npm run build:web  # production build into dist/
+npm run weight     # public page weight gate (needs the dist/ build)
 ```
 
-The web build is written to `dist/`. Hosting services can use `npm run build` (an alias for `npm run build:web`) as the build command and publish `dist/`. Deploy to an HTTPS static host with an SPA fallback rewriting non-asset routes to `/index.html`.
+## Supabase setup
 
-### iOS / Android later
+The app uses the `guestbook_` tables, RPCs and buckets created by `supabase/migrations/20261026000000_guestbook.sql` in the linked project `dzzufvejzbhgwiemcxwz`. Migrations are additive; never run `db reset --linked`.
 
 ```sh
-npx expo run:ios
-npx expo run:android
-```
-
-These generate native projects and require Xcode / Android tooling. Native packaging has not been verified in this initial web phase. Use an Expo development build compatible with SDK 58; store Expo Go support may lag the SDK release. Permissions are configured in `app.json`.
-
-### Installable Android APK
-
-```sh
-npm run build:apk
-```
-
-This starts an EAS cloud build using the `preview` profile, which explicitly produces a signed `.apk` for direct installation. It uses the configured Expo account and Android signing credentials. When the build finishes, open its download link on an Android phone, download the APK, and allow installation from that browser when Android prompts. This standalone preview does not require a running development server or a Google Play developer account.
-
-The `preview` profile sets `autoIncrement` with EAS remote app versions, so every preview build receives a higher Android `versionCode` and installs over the previous APK with the same signing key. Install the new APK over the old one; uninstalling or clearing app data is not required and would discard saved demo data.
-
-The APK uses the same local demo repository as the web app. Supabase database setup does not yet enable cloud data or real employee sign-in.
-
-## Demo access
-
-The first launch opens the employee demo, clearly labeled in the header. Log out to explore the sign-in experience, or use the workspace badge / workspace selector to change roles.
-
-| Role | Email | Password |
-| --- | --- | --- |
-| Employee, Alex Morgan | alex@northstar.demo | Forma2026! |
-| HR, Kevin Santoso | hr@northstar.demo | Forma2026! |
-
-These are fictional demo identities, not secure authentication. Preferences and a demo identity are stored locally; no real access tokens are stored. Profile → Reset demo data restores the seed.
-
-## Stack and compatibility
-
-Expo SDK 58, Expo Router, React 19.3, React Native 0.88, React Native Web 0.21; TypeScript; stable NativeWind v4 / Tailwind v3; SDK-pinned Reanimated 4 and Worklets; Lucide React Native and react-native-svg; Expo Camera, Location, Image, Linear Gradient, Haptics, Document Picker, SecureStore; AsyncStorage; Zustand; TanStack Query; React Hook Form and Zod. Typography matches the reference with Arial on web/iOS and the native sans-serif family on Android; remote font loading is not required.
-
-Expo dependencies follow SDK 58’s `bundledNativeModules.json`, rather than independently selecting incompatible platform versions. NativeWind v4 is used instead of the v5 release candidate. Semantic dynamic themes use a context and native styles, with NativeWind configured for universal utilities. Charts are built from React Native views for web/native compatibility. There is no browser-only chart dependency.
-
-References checked before implementation:
-
-- [Expo SDK 58 release](https://expo.dev/changelog/sdk-58)
-- [Expo SDK reference](https://docs.expo.dev/versions/v58.0.0/)
-- [NativeWind installation](https://www.nativewind.dev/docs/getting-started/installation)
-- [Talenta attendance workflows](https://www.talenta.co/en/features/attendance-app/)
-- [Talenta configurable branch radius](https://help-center.talenta.co/hc/en-us/articles/12173252263833-How-to-Activate-Live-Attendance-per-Branch)
-
-Talenta informed the GPS/office-radius, shift, selfie, and approval workflows. Visual branding follows the user-provided [Nusantara Jotform reference](https://form.jotform.com/241414717939059): the original gold logo and aerial background, `#DBAF6D`, translucent charcoal surfaces, Arial typography, 6px field corners, and gold-bordered pill buttons. Original assets and source URLs are documented in [assets/brand/README.md](assets/brand/README.md). Attendance workflows remain intact; no Talenta assets or live Jotform submission endpoint are used.
-
-## Architecture
-
-```text
-src/
-  app/                  Expo Router layout and routes
-  components/           Theme-aware universal primitives, calendar, responsive shell
-  features/             Employee and HR screens
-    attendance/         Location/camera/confirmation/success flow
-  domain/               Pure attendance rules, geofence math, request validation
-  services/
-    data.tsx             TanStack Query data boundary
-    repository.ts        Typed repository/auth interfaces and transactional mock
-    seed.ts              36 employees, 3 months of records, schedules, offices
-    location.ts          On-demand Expo Location and labeled simulations
-    storage.ts           AsyncStorage, shared storage locks, native secure-token boundary
-    chunkedStorage.ts    Native row-size-safe workspace storage with recovery
-  stores/                Persisted Zustand preferences and demo session
-  theme/                 Semantic light/dark tokens and typography
-  types/                 Domain entities, raw events, sessions, policies, audit
-```
-
-Presentation uses the repository/query boundary. It does not seed or mutate hardcoded screen data. Raw attendance events and calculated sessions are separate. Mock writes serialize through a storage lock shared by every repository instance in the JavaScript runtime (browser tabs also take a Web Lock), re-read saved data inside each transaction, persist before publishing, and reject duplicate transitions. A submission key makes attendance retries idempotent. Timestamps are UTC; company date/time uses Asia/Jakarta (id-ID date keys, English interface). Schedules contain explicit UTC instants so overnight durations are computed from actual elapsed timestamps, independent of wall-clock changes. Future timezone-aware schedule creation belongs on the backend; do not construct other timezones with Jakarta’s fixed offset.
-
-## Implemented
-
-- Employee overview with live clock, scheduled shift, attendance state, elapsed time, metrics, shortcuts, history and upcoming items.
-- Attendance clock-in/out with inside/outside/unavailable simulations and real, foreground-only GPS. Haversine distance and accuracy uncertainty block unverifiable submissions. Active overnight sessions remain available for clock-out.
-- Optional front-camera selfie with live view, camera-ready state, full-size captured preview, retake, explicit Use photo confirmation, and recoverable permission errors. No face recognition or identity claims. Selfie previews stay in memory; persisted events record capture metadata, not biometric photos.
-- Smooth confirmation/success states, press feedback, reduced-motion handling and native haptic success.
-- Searchable, filterable, monthly attendance calendar/list and daily details. Several months of sample records.
-- Mobile schedule with today’s plan first, a swipeable week strip, expandable month calendar, arrangements, rest days and configurable shifts.
-- Annual/sick/personal/unpaid leave with working-day calculations, balance and overlap validation. Attendance correction requests with dates, times, reason, optional supporting filename.
-- Persistent request history, HR decisions, notifications and audit records.
-- Compact employee profile with content-sized cards, a single-row appearance selector, notification preferences, light/dark/system themes, sign-out and demo reset.
-- HR dashboard, native-view weekly charts, department attendance, employee search/filter/detail, attendance monitoring with date/department/status filters, approval/rejection confirmation and geofence editing.
-- Employee bottom tabs at every preview width; adaptive HR sidebar/mobile tabs. Content scrolls clear of the bottom navigation. 44px minimum primary touch targets; keyboard-friendly forms and focus outlines.
-- Native dialogs have an explicit bounded height, safe-area spacing, keyboard avoidance and scrollable forms. Android uses keyboard resize mode. Gold vector ribbon accents echo the supplied Nusantara pattern on attendance and leave cards.
-- Branded skeletons cover initial workspace reads and lazy section downloads. Background refreshes retain loaded content and show progress or a retry message. Every asynchronous form/action has pending feedback; submission dialogs, conflicting inputs and repeated actions are disabled until completion. Attendance uses separate location, camera permission, capture and submission states so only the active step shows a spinner. Loading states include native accessibility state and web busy attributes.
-- Rest days, approved leave and unassigned shifts show attendance availability before an action is offered; active overnight sessions still allow clock-out. Leave dates start on the next configured working day. Company date keys are assembled from Intl date parts to avoid locale-specific separators across runtimes.
-- Android dialogs: the shared `Sheet` applies the `dialog` accessibility role on web only. The installed React Native Android build has no such role and `AccessibilityRole.fromValue` throws `IllegalArgumentException`, which force-closed the previous APK as soon as Clock in or Request leave opened a dialog. Native dialogs keep their accessibility label and modal flag. A unit test executes the real component with native host primitives and checks every role against the installed Android enum.
-- Native workspace storage: the demo database JSON is about 2.3 MB, more than Android AsyncStorage can read back from one row. On iOS/Android the workspace is saved as 128K-character chunks with a manifest written last, integrity checks, failed-write cleanup and automatic migration of older single-row data. If an older row cannot be read, the app keeps it, shows “Couldn’t open your workspace” with Try again, and offers a separate Restore demo workspace confirmation that writes a fresh chunked workspace (preferences are kept; demo attendance and requests are replaced only after confirmation).
-- Shared storage locks: every repository instance in a runtime queues through one lock per storage key, browser tabs also hold a Web Lock, and each transaction re-reads saved data, so one tab or screen cannot overwrite another’s save. The web app refreshes when another tab changes storage or the window regains focus; native refreshes on return to the foreground. Browsers without Web Locks (for example plain HTTP LAN pages) can read but refuse writes with an explanation.
-- Attendance context: an open session, then an ongoing shift (including yesterday’s overnight shift), then today’s schedule decide which shift a clock-in or clock-out belongs to. The repository, Overview and attendance dialog share this rule.
-- Annual leave balances count actual working days per entitlement year, reserve pending requests, and validate each calendar year of a cross-year request separately. Demo schedules extend themselves 35 days ahead without replacing edited assignments, attendance history or requests.
-- Overview: the attendance action is a full-width row below the clock-in/clock-out times. It stays labelled Clock in when unavailable, with the reason shown separately. The upcoming-leave card shows the next approved leave’s real dates, or says there is none. HR users on phones reach profile and log out from the header avatar. Office coordinate fields keep partial text such as “-” or “6.” while typing and are parsed on save. History’s List view hides the calendar; the selected calendar day uses contrasting text.
-
-## Known prototype limitations
-
-- **Demo security only.** The role switcher and local identity do not enforce production authorization. Users can change local data. Never use this mock with real employee information.
-- Mock authoritative timestamps use device time behind an injectable clock. Production must use database timestamps and server validation. Offline multi-device conflict resolution is not implemented.
-- Leave/correction approvals update request status, audit trail and notifications. They do not yet apply corrections to raw attendance or update future leave schedules/payroll; preserving original events is deliberate.
-- Leave cancellations, full localization, rotating-shift assignment UI, holiday calendars, absence reconciliation, and automated missing-clock-out reminders are future work. Seed contains rest days, leave, late and absent examples.
-- No email is sent by password reset. No native push notifications. Personal identity/work details are read-only; appearance and notification preferences persist.
-- Attachments store the filename only; no files are uploaded. Selfie capture is not identity verification. Photos are not persisted to browser storage.
-- Location preview is an illustrative diagram, not a live map. A real map provider can be added behind a platform adapter.
-- Demo seeds today as a working shift even on a weekend to make attendance immediately testable. Other dates use the organization’s configured workweek. Demo office policy still requires a geofence check for all attendance actions; production remote/field rules should be enforced per shift on the server.
-- Office coordinate fields are numeric inputs; a map picker and richer native date pickers are future polish. Current request forms use explicitly labeled ISO dates and 24-hour times.
-- Demo portraits are bundled locally from Pravatar (https://pravatar.cc). Replace them with organization-controlled employee assets for production.
-
-## Supabase database setup
-
-The Supabase database foundation is in `supabase/`: an additive migration for 15 organization-scoped tables, Row Level Security, explicit client permissions, and PostgreSQL policy tests. The application still uses its local mock repository; database deployment alone does not enable real sign-in or cloud persistence. No demo data is seeded into Supabase.
-
-See [Supabase setup and integration status](supabase/README.md) for account login, project linking, credentials, deployment, and the remaining integration work.
-
-```sh
-npm run db:test
-npm run db:link
-npm run db:plan
+npm run db:plan    # dry run (loads SUPABASE_DB_PASSWORD from .env.supabase.local, see supabase/README.md)
 npm run db:push
 npm run db:status
 ```
 
-## Backend integration roadmap
+What the migration enforces: attendees can only call `guestbook_check_in` (validation, honeypot, one row per normalised phone number and per e-mail, duplicate reports with the earlier time) and upload into `guestbook-uploads/checkins/`; only users listed in `guestbook_admins` can read check-ins, draw winners, update settings or read uploads. Settings are public so the page can render the theme.
 
-1. Implement `AuthRepository` using Supabase Auth. For web, use a server/BFF session with secure HttpOnly cookies; for native, SecureStore is the provided token boundary. Do not store production bearer tokens in AsyncStorage/localStorage.
-2. Replace `WorkforceRepository` with Supabase reads and server RPCs. Use organization-scoped foreign keys and indexes, UTC `timestamptz`, transactional attendance transitions, unique organization/employee/idempotency constraints, database timestamps and immutable audit logs.
-3. Enable Row Level Security on every table. Derive organization/employee membership from `auth.uid()`. Employees may read only their own records and submit their own requests. HR reads only their organization. Validate HR membership inside privileged RPCs, never from the client role flag. No direct client writes to calculated attendance or approval/audit tables.
-4. Store selfie/attachment assets in private organization-scoped buckets with restricted policies and short-lived signed URLs. Apply consent, retention, deletion, and access-audit policies before collecting real photos.
-5. Enforce schedules, office activation, GPS uncertainty, selfie policy, grace periods, overlapping leave and balances on the server. GPS and selfies alone do not establish identity. Integrate an approved verification provider separately if needed.
-6. Apply approved corrections through append-only adjustment events and approval transactions; reconcile leave/holidays/absences/missed clock-outs with scheduled jobs. Add conflict/retry UX, monitoring, recovery and organization onboarding.
+**Owner checklist (Supabase dashboard, once):**
 
-`.env.example` documents future public configuration. No Supabase SDK or unused credentials are required in this mock. Never expose a Supabase service-role secret in an `EXPO_PUBLIC_` variable.
+1. Authentication → Providers → Email: turn off *Allow new users to sign up*. (Even if left on, a self-registered user gets nothing: admin rights come only from the table below.)
+2. Authentication → Users → *Add user* with the admin's e-mail and password.
+3. SQL editor, with the admin's e-mail:
 
-## Verification
+   ```sql
+   insert into public.guestbook_admins (auth_user_id)
+   select id from auth.users where email = 'admin@example.com';
+   ```
 
-Verified in this workspace:
+Repeat 2–3 for each admin. The two buckets (`guestbook-brand`, public; `guestbook-uploads`, private, 5 MB per file) are created by the migration.
 
-- TypeScript: passes.
-- ESLint: passes without warnings.
-- Domain/service suite: **47 tests pass**, including transitions, concurrent duplicates, overnight timestamps, geofence uncertainty, malformed coordinates, permission denial/timeouts, leave dates, rest-day availability, configurable next working days, persistence, approval audit history, and storage failures. New tests execute the real `Sheet` with native host primitives and check its roles against the installed Android enum, round-trip the full workspace through chunked native storage (write failures, corruption, migration, oversized legacy row recovery, leave persistence), and cover overnight shift context, cross-year leave balances, schedule extension and shared-lock serialization.
-- Supabase policy suite (`npm run db:test`): **9 tests pass**.
-- Production web export: passes.
-- Playwright: **26 end-to-end tests pass** against the built web application, including original Nusantara logo dimensions, Arial typography, gold form styling, clock-in/out, invalid location blocking, reload persistence, leave/correction submissions, HR approval, employee search, office editing, light/dark settings, selfie preview/retake, camera permission denial, and non-remembered login sessions. Delayed-storage tests cover initial loading, fetch retry, notification failure/recovery, and pending/disabled states for every data submission; a delayed route download verifies section skeletons. These delays exist only in tests. Review checks cover the full-width Clock in action at 320px, opening the attendance and leave dialogs, explicit storage recovery after an unreadable workspace, truthful upcoming leave, mobile HR account access and log out, per-keystroke coordinate editing, and History view modes and calendar contrast. Attendance and leave submission also pass at 320 × 500, and persisted rest days show a disabled Clock in with the reason and the next shift. All employee and HR screens pass a 320px overflow check; the dashboard is additionally checked at 375, 390, 430 and 1440px.
-- Android Hermes bundle export passes. This is a JavaScript/assets compatibility check, not an installed APK test. The dialog crash and the storage row limit were diagnosed from the installed React Native Android source and reproduced in unit tests, not on a phone: adb and an emulator are not installed in this workspace, so permission dialogs, the physical keyboard, native modal behavior and the storage fix still require confirmation on a device. Rebuild with `npm run build:apk` and install the new APK over the previous one to receive native changes.
-- Clean installation (`npm ci`) and a subsequent `npm install` pass using an offline package cache. All lockfile package entries have valid versions.
-- Expo's offline compatibility check reports dependencies up to date; it warns that offline dependency validation is less reliable.
-
-To repeat browser verification:
+## Deploy
 
 ```sh
 npm run build:web
-npx playwright install chromium
-npm run test:e2e
 ```
 
-To test Expo development startup and theme switching (including absence of the Expo error overlay):
+Publish `dist/` to any HTTPS static host (HTTPS is required for the map's geolocation). Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` wherever the build runs. The site is a single-page app, so `/admin` and its sub-pages need a fallback to `index.html`:
+
+- Netlify or Cloudflare Pages: a `_redirects` file in `dist/` containing `/*    /index.html   200`
+- Vercel: `vercel.json` with `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }`
+- Firebase Hosting: `"rewrites": [{ "source": "**", "destination": "/index.html" }]`
+
+Share the public link (or a QR code of it) with attendees; keep `/admin` for the organisers.
+
+## Admin guide
+
+- **Daftar Check-in** (`/admin`): running total, search by name, phone or e-mail, newest first, refreshed every 10 seconds. *Lihat berkas* opens an attendee's upload through a short-lived signed link. The list pages through PostgREST in blocks of 1,000, so a 4,000-row event loads completely.
+- **Ekspor Excel / Ekspor CSV**: one file with every check-in (WIB times, all fields, prize and draw time). Excel keeps phone numbers as text so leading zeros survive; CSV is UTF-8 with a BOM.
+- **Undian**: type a prize name, press *Undi*. The database picks one attendee who has not won yet, atomically, and shows the name large with the phone masked (`0812******22`). Previous winners are listed; *Hapus* releases a no-show so the prize can be redrawn.
+- **Tampilan**: event name, welcome text, organiser WhatsApp number (shows a *Hubungi Panitia via WhatsApp* button after check-in), logo, background image and four colours (accent, background, surface, text), with a live preview and a one-tap Bawaslu preset. Uploaded images are resized in the browser (logo 1200 px, background 1920 px).
+
+## Data and privacy
+
+Exports contain personal data; store and share them accordingly. After the event, delete the data from the Supabase SQL editor and empty the `guestbook-uploads` bucket in Storage:
+
+```sql
+delete from public.guestbook_draw_winners;
+delete from public.guestbook_checkins;
+```
+
+Attendee images are compressed to a 1600 px JPEG before upload and PDFs are capped at 5 MB, so 4,000 uploads stay around 1–2 GB. The free Supabase plan includes 1 GB of storage; upgrade if most attendees are expected to upload.
+
+## Verification
+
+Checked in this workspace on 2026-10-26:
+
+- TypeScript and ESLint: clean.
+- `npm test`: **14 unit tests** pass (theme derivation and contrast, phone normalisation/masking/WhatsApp links, WIB formatting, check-in validation messages, CSV/Excel export incl. text phone cells and file naming).
+- `npm run db:test`: **16 tests** pass against the real migrations in embedded Postgres: RLS and grants, phone-key normalisation, anonymous check-in and duplicate reporting, input rejection, admin-only reads and settings updates, draws that never repeat a winner, and storage policies.
+- `npm run test:e2e`: **18 browser tests** pass against the built site with every Supabase endpoint stubbed by Playwright routes: public page and defaults, check-in success/duplicate/validation/honeypot, map pin and compressed upload (unsupported files refused), admin sign-in and reload, paged list with exactly 2,000 rows, search, signed file links, CSV and Excel downloads, the lucky draw, theme changes reflected on the public page, the Bawaslu preset and logo upload, plus reference screenshots in `artifacts/`.
+- `npm run weight`: the public page downloads **473 KB** of gzipped JavaScript and **135 KB** of images on first load (budget 500 KB and 300 KB).
+
+To repeat the browser suite:
 
 ```sh
-npm run test:e2e:dev
+EXPO_PUBLIC_SUPABASE_URL=https://stub.supabase.co EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=stub-key npm run build:web
+npm run test:e2e      # set PLAYWRIGHT_CHROMIUM_EXECUTABLE to an installed Chrome if Playwright's Chromium is missing
 ```
 
-This starts or reuses the Expo web server on port 8081. The **10 development browser tests** cover initial load, reload, manual Light/Dark selection, system appearance changes, empty form/feedback states without React Native text-node console errors, selfie live view/capture/preview/retake/selection, permission denial, vertical card containment, visible profile actions, repeated tab navigation at 320/375/390/430px, and a phone-sized employee preview on desktop. Camera tests use Chromium’s simulated webcam with explicit test permissions, never a physical camera.
+Not yet verified: a real check-in on a phone against the hosted project, and the admin pages against the hosted project (they need the owner checklist above first). Do that smoke test before the event: check in, repeat the same phone number, sign in, export, and open the Excel file.
 
-The production Playwright suite starts a local static preview on port 4173. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use an existing compatible Chromium binary. Review screenshots in `artifacts/` (Nusantara login and overview, clock-in success, HR dashboard, dark profile and mobile viewports).
+## Limitations
 
-Physical-device iOS/Android builds, Safari, real GPS, and camera capture on physical devices have not been validated. Permission failure behavior is covered by injected location-provider tests. The host provided Node 25.8; checks passed, but use the supported Node versions above for development and CI.
-# forma-attendance
-# forma-attendance
-# forma-attendance
+- One event at a time; re-theming replaces the previous look, history is not kept.
+- Spam protection is a hidden honeypot only; add a captcha if abuse appears.
+- OpenStreetMap's public tile servers are meant for light use; for a very large audience switch the tile URL in `src/features/checkin/MapPicker.tsx` to a provider with an API key.
+- Attendee uploads that fail before the check-in RPC are left in the bucket; clear them with the post-event cleanup.
+- `npm audit` reports advisories in `node-forge`, used only by Expo's build tooling.
