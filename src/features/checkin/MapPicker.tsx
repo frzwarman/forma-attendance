@@ -1,61 +1,73 @@
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { Button, Row, T } from "../../components/ui";
+import { loadGoogleMaps } from "../../services/googleMaps";
 import { useTheme } from "../../theme";
 
 export type Pin = { latitude: number; longitude: number };
-const JAKARTA: L.LatLngTuple = [-6.2, 106.816667];
-const UNAVAILABLE = "Lokasi tidak tersedia. Anda tetap bisa mengisi alamat.";
+const JAKARTA = { lat: -6.2, lng: 106.816667 };
+const LOCATION_UNAVAILABLE = "Lokasi tidak tersedia. Anda tetap bisa mengisi alamat.";
+const MAP_UNAVAILABLE = "Peta tidak dapat dimuat. Anda tetap bisa mengisi alamat.";
 
+// Google Maps with a draggable pin; the address and the pin both stay optional
+// so the form keeps working when the map cannot load.
 export function MapPicker({ value, onChange }: { value: Pin | null; onChange: (pin: Pin | null) => void }) {
   const c = useTheme();
   const container = useRef<HTMLDivElement>(null);
-  const map = useRef<L.Map | null>(null);
-  const marker = useRef<L.Marker | null>(null);
+  const map = useRef<google.maps.Map | null>(null);
+  const marker = useRef<google.maps.Marker | null>(null);
   const latest = useRef(onChange);
+  const [status, setStatus] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [error, setError] = useState("");
+  const [locating, setLocating] = useState(false);
   useEffect(() => {
     latest.current = onChange;
   });
-  const [error, setError] = useState("");
-  const [locating, setLocating] = useState(false);
 
   function place(latitude: number, longitude: number, zoom?: number) {
+    latest.current({ latitude, longitude });
     const current = map.current;
     if (!current) return;
+    const position = { lat: latitude, lng: longitude };
     if (!marker.current) {
-      marker.current = L.marker([latitude, longitude], {
-        draggable: true,
-        icon: L.divIcon({
-          className: "guestbook-pin",
-          html: `<div style="width:18px;height:18px;border-radius:50%;background:${c.accent};border:3px solid #fff;box-shadow:0 0 0 2px ${c.accent}"></div>`,
-          iconSize: [18, 18],
-          iconAnchor: [9, 9],
-        }),
-      }).addTo(current);
-      marker.current.on("dragend", () => {
-        const position = marker.current!.getLatLng();
-        latest.current({ latitude: position.lat, longitude: position.lng });
+      marker.current = new google.maps.Marker({ map: current, position, draggable: true, title: "Lokasi Anda" });
+      marker.current.addListener("dragend", () => {
+        const moved = marker.current?.getPosition();
+        if (moved) latest.current({ latitude: moved.lat(), longitude: moved.lng() });
       });
     } else {
-      marker.current.setLatLng([latitude, longitude]);
+      marker.current.setPosition(position);
     }
-    if (zoom) current.setView([latitude, longitude], zoom);
-    latest.current({ latitude, longitude });
+    if (zoom) {
+      current.setCenter(position);
+      current.setZoom(zoom);
+    }
   }
 
   useEffect(() => {
-    if (!container.current || map.current) return;
-    const created = L.map(container.current, { center: JAKARTA, zoom: 11 });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors",
-      maxZoom: 19,
-    }).addTo(created);
-    created.on("click", (event: L.LeafletMouseEvent) => place(event.latlng.lat, event.latlng.lng));
-    map.current = created;
+    let cancelled = false;
+    loadGoogleMaps()
+      .then((maps) => {
+        if (cancelled || !container.current) return;
+        const created = new maps.Map(container.current, {
+          center: JAKARTA,
+          zoom: 11,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+        });
+        created.addListener("click", (event: google.maps.MapMouseEvent) => {
+          if (event.latLng) place(event.latLng.lat(), event.latLng.lng());
+        });
+        map.current = created;
+        setStatus("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setStatus("unavailable");
+      });
     return () => {
-      created.remove();
+      cancelled = true;
       map.current = null;
       marker.current = null;
     };
@@ -64,7 +76,7 @@ export function MapPicker({ value, onChange }: { value: Pin | null; onChange: (p
 
   function locate() {
     setError("");
-    if (!navigator.geolocation) return setError(UNAVAILABLE);
+    if (!navigator.geolocation) return setError(LOCATION_UNAVAILABLE);
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -73,7 +85,7 @@ export function MapPicker({ value, onChange }: { value: Pin | null; onChange: (p
       },
       () => {
         setLocating(false);
-        setError(UNAVAILABLE);
+        setError(LOCATION_UNAVAILABLE);
       },
       { enableHighAccuracy: true, timeout: 10000 },
     );
@@ -81,16 +93,27 @@ export function MapPicker({ value, onChange }: { value: Pin | null; onChange: (p
 
   return (
     <View style={{ gap: 10 }}>
-      <div
-        ref={container}
-        role="img"
-        aria-label="Peta lokasi"
-        style={{ height: 240, borderRadius: 12, overflow: "hidden", border: `1px solid ${c.border}` }}
-      />
+      {status !== "unavailable" && (
+        <div
+          ref={container}
+          role="img"
+          aria-label="Peta lokasi"
+          style={{ height: 240, borderRadius: 12, overflow: "hidden", border: `1px solid ${c.border}`, backgroundColor: c.inputSurface }}
+        />
+      )}
+      {status === "unavailable" && (
+        <T size={13} color={c.muted}>
+          {MAP_UNAVAILABLE}
+        </T>
+      )}
       <Row style={{ gap: 12, flexWrap: "wrap" }}>
         <Button small variant="secondary" label="Gunakan lokasi saya" loading={locating} loadingLabel="Mencari lokasi…" onPress={locate} />
         <T size={12} color={c.muted} style={{ flex: 1 }}>
-          {value ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : "Ketuk peta untuk menandai lokasi (opsional)."}
+          {value
+            ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}`
+            : status === "ready"
+              ? "Ketuk peta untuk menandai lokasi (opsional)."
+              : "Titik lokasi bersifat opsional."}
         </T>
       </Row>
       {!!error && (

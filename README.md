@@ -2,7 +2,7 @@
 
 A one-event guest book on the web, in Bahasa Indonesia. Attendees open the link on their own phone, fill in one form (Nama, Nomor Telepon, E-mail, Jabatan, Alamat with a map pin, an optional file, Tanggal Check In/Check Out) and tap **Kirim**. Admins sign in at `/admin` to watch check-ins arrive, search them, export the full list to Excel or CSV, run a lucky draw, and change the event name, texts, logo, background and colours. The default look is Bawaslu's, measured from the supplied key visual and https://www.bawaslu.go.id/id (see `assets/brand/README.md`).
 
-Built with Expo Router on React Native Web (web only), TanStack Query, react-hook-form + zod, Leaflet with OpenStreetMap tiles, SheetJS for Excel, and Supabase (Postgres, Auth, Storage).
+Built with Expo Router on React Native Web (web only), TanStack Query, react-hook-form + zod, the Google Maps JavaScript API for the location pin, SheetJS for Excel, and Supabase (Postgres, Auth, Storage).
 
 The interface uses Plus Jakarta Sans (loaded from Google Fonts with system fallbacks), the official Bawaslu logo on a white capsule over the navy key visual, a navy sidebar for the admin area, and inline SVG icons generated from lucide (`scripts/generate-icons.cjs`), so no icon library ships to the browser.
 
@@ -14,11 +14,11 @@ Use Node 24 LTS (24.3+) or 22.13+.
 
 ```sh
 npm ci
-cp .env.example .env.local   # fill in both values from Supabase → Project Settings → API
+cp .env.example .env.local   # Supabase URL and publishable key from Project Settings → API, plus a Google Maps key
 npm run web
 ```
 
-`.env.local` holds only the project URL and the publishable key; both are public client values and are embedded at build time. Never put the database password, CLI token, secret key or service-role key in an `EXPO_PUBLIC_` variable. Keep private CLI credentials in `supabase/.env.cli.local`, not in a root `.env.*` file: Expo's development server bundles every root file that starts with `.env` and only understands the standard names, so a file such as `.env.supabase.local` breaks `npm run web` with a 500 on the entry bundle.
+`.env.local` holds the Supabase project URL and publishable key plus `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`; all three are public client values embedded at build time. Create the Maps key in Google Cloud with the Maps JavaScript API enabled and restrict it to your site's domain (HTTP referrers). Without a key the form still works; the map area shows a short note and attendees can still share their position with *Gunakan lokasi saya*. Never put the database password, CLI token, secret key or service-role key in an `EXPO_PUBLIC_` variable. Keep private CLI credentials in `supabase/.env.cli.local`, not in a root `.env.*` file: Expo's development server bundles every root file that starts with `.env` and only understands the standard names, so a file such as `.env.supabase.local` breaks `npm run web` with a 500 on the entry bundle.
 
 ```sh
 npm run typecheck
@@ -61,7 +61,7 @@ Repeat 2–3 for each admin. The two buckets (`guestbook-brand`, public; `guestb
 npm run build:web
 ```
 
-Publish `dist/` to any HTTPS static host (HTTPS is required for the map's geolocation). Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` wherever the build runs. The site is a single-page app, so `/admin` and its sub-pages need a fallback to `index.html`:
+Publish `dist/` to any HTTPS static host (HTTPS is required for the map's geolocation). Set `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` wherever the build runs. The site is a single-page app, so `/admin` and its sub-pages need a fallback to `index.html`:
 
 - Netlify or Cloudflare Pages: a `_redirects` file in `dist/` containing `/*    /index.html   200`
 - Vercel: `vercel.json` with `{ "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }`
@@ -112,6 +112,6 @@ Not yet verified: a real check-in on a phone against the hosted project, and the
 
 - One event at a time; re-theming replaces the previous look, history is not kept.
 - Spam protection is a hidden honeypot only; add a captcha if abuse appears.
-- OpenStreetMap's public tile servers are meant for light use; for a very large audience switch the tile URL in `src/features/checkin/MapPicker.tsx` to a provider with an API key.
+- The map depends on Google Maps availability and the key's quota; the form never blocks on it.
 - Attendee uploads that fail before the check-in RPC are left in the bucket; clear them with the post-event cleanup.
 - `npm audit` reports advisories in `node-forge`, used only by Expo's build tooling.
