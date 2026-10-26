@@ -205,7 +205,9 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
   await page.route("**/auth/v1/user*", (route) => json(route, session(adminUser).user));
   await page.route("**/auth/v1/logout*", (route) => route.fulfill({ status: 204, body: "" }));
 
-  await page.route(/\/storage\/v1\/object\/sign\//, async (route, request) => {
+  // Registered on the context so the tab opened for a signed file is served too.
+  await page.context().route(/\/storage\/v1\/object\/sign\//, async (route, request) => {
+    if (request.method() !== "POST") return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1x1 });
     const path = request.url().split("/storage/v1/object/sign/")[1].split("?")[0];
     state.signedPaths.push(path.split("/").slice(1).join("/"));
     return json(route, { signedURL: `/object/sign/${path}?token=stub` });
