@@ -2,15 +2,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { TextInput, View, useWindowDimensions } from "react-native";
-import { DateInput, FileInput } from "../components/NativeInput";
+import { DateInput } from "../components/NativeInput";
 import { Button, Card, Divider, Field, Row, SectionTitle, T } from "../components/ui";
 import { checkInSchema, type CheckInInput } from "../domain/checkin";
 import { whatsappLink } from "../domain/phone";
 import { formatDateRange, formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
 import { useSettings } from "../services/settings";
-import { ALLOWED_TYPES, UNSUPPORTED_FILE, uploadCheckInFile } from "../services/uploads";
+import { uploadCheckInFile } from "../services/uploads";
 import { FONT_STACK, useTheme } from "../theme";
+import { Attachment } from "./checkin/Attachment";
 import { MapPicker, type Pin } from "./checkin/MapPicker";
 
 const empty: CheckInInput = {
@@ -197,20 +198,17 @@ export function CheckIn() {
       {text("address", "Alamat", { multiline: true, placeholder: "Jalan, kota, provinsi", style: { minHeight: 88, textAlignVertical: "top" } })}
       <MapPicker value={pin} onChange={setPin} />
       <Divider />
-      <SectionTitle title="Berkas pendukung" description="Opsional, misalnya surat tugas atau kartu identitas." />
-      <FileInput
-        label="Unggah Berkas (opsional)"
-        accept="image/*,application/pdf"
-        hint="Gambar atau PDF, maksimal 5 MB"
+      <SectionTitle title="Berkas pendukung" description="Opsional: foto surat tugas atau kartu identitas, atau berkas PDF." />
+      <Attachment
+        file={file}
         error={fileError}
         onChange={(chosen) => {
-          if (chosen && !ALLOWED_TYPES.includes(chosen.type)) {
-            setFileError(UNSUPPORTED_FILE);
-            setFile(null);
-          } else {
-            setFileError("");
-            setFile(chosen);
-          }
+          setFileError("");
+          setFile(chosen);
+        }}
+        onError={(message) => {
+          setFile(null);
+          setFileError(message);
         }}
       />
       <Divider />

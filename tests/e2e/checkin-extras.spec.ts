@@ -26,7 +26,7 @@ test("an image upload is compressed to JPEG and attached; unsupported files are 
   const fixtureBytes = fs.statSync(fixture).size;
   const state = await installSupabaseStub(page);
   await page.goto("/");
-  await page.getByLabel("Unggah Berkas (opsional)", { exact: true }).setInputFiles(fixture);
+  await page.getByLabel("Pilih berkas", { exact: true }).setInputFiles(fixture);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Terima kasih/ })).toBeVisible();
@@ -36,7 +36,7 @@ test("an image upload is compressed to JPEG and attached; unsupported files are 
   expect(state.uploads[0].bytes).toBeLessThan(fixtureBytes);
   expect(state.rpcCalls[0].body.p_file_path).toBe(state.uploads[0].path);
   await page.getByRole("button", { name: "Isi check-in lain", exact: true }).click();
-  await page.getByLabel("Unggah Berkas (opsional)", { exact: true }).setInputFiles({
+  await page.getByLabel("Pilih berkas", { exact: true }).setInputFiles({
     name: "surat.docx",
     mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: Buffer.from("x"),
