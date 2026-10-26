@@ -1,6 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { Platform, useColorScheme } from "react-native";
-import { usePreferences } from "../stores/preferences";
+import { Platform } from "react-native";
 
 // Measured from the supplied Nusantara Jotform reference.
 export const brand = {
@@ -35,32 +34,9 @@ export const light = {
   white: "#FFFFFF",
 };
 export type Theme = typeof light;
-const dark: Theme = {
-  ...light,
-  bg: "#151B16",
-  surface: "rgba(16, 23, 18, 0.94)",
-  text: "#F3E6D2",
-  muted: "#D6C6AC",
-  subtle: "rgba(10, 16, 12, 0.88)",
-  border: "rgba(219, 175, 109, 0.46)",
-  inputSurface: "rgba(9, 15, 11, 0.82)",
-  hero: "rgba(12, 20, 15, 0.92)",
-};
 const Context = createContext(light);
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const setting = usePreferences((s) => s.theme);
-  const system = useColorScheme();
-  return (
-    <Context.Provider
-      value={
-        setting === "dark" || (setting === "system" && system === "dark")
-          ? dark
-          : light
-      }
-    >
-      {children}
-    </Context.Provider>
-  );
+  return <Context.Provider value={light}>{children}</Context.Provider>;
 }
 export const useTheme = () => useContext(Context);
 const family = Platform.OS === "android" ? "sans-serif" : "Arial";

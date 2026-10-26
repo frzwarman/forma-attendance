@@ -1,21 +1,15 @@
-import { ChevronRight, X, type LucideIcon } from "lucide-react-native";
+import { ChevronRight, type LucideIcon } from "lucide-react-native";
 import React from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleProp,
   Text,
   TextInput,
   TextInputProps,
   View,
   ViewStyle,
-  useWindowDimensions,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fonts, fontWeights, useTheme } from "../theme";
 export function T({
   children,
@@ -83,37 +77,6 @@ export function Card({
       ]}
     >
       {children}
-    </View>
-  );
-}
-export function IconBox({
-  icon: Icon,
-  color,
-  bg,
-  size = 44,
-}: {
-  icon: LucideIcon;
-  color?: string;
-  bg?: string;
-  size?: number;
-}) {
-  const c = useTheme();
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 13,
-        backgroundColor: bg || c.lavender,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <Icon
-        size={size * 0.44}
-        color={color || c.primaryText}
-        strokeWidth={1.8}
-      />
     </View>
   );
 }
@@ -363,107 +326,6 @@ export function Field({
         </T>
       )}
     </View>
-  );
-}
-export function Sheet({
-  visible,
-  onClose,
-  title,
-  children,
-  wide = false,
-  busy = false,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-  wide?: boolean;
-  busy?: boolean;
-}) {
-  const c = useTheme();
-  const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
-  const native = Platform.OS !== "web";
-  const topPadding = Math.max(16, insets.top);
-  const bottomPadding = Math.max(16, insets.bottom);
-  const panelHeight = Math.max(0, Math.min(780, height - topPadding - bottomPadding));
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={() => { if (!busy) onClose(); }}
-      statusBarTranslucent
-      navigationBarTranslucent
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        enabled={native}
-        style={{ flex: 1 }}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: "#1D1B1ACC",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: 16,
-            paddingTop: topPadding,
-            paddingBottom: bottomPadding,
-          }}
-        >
-          <Pressable
-            accessibilityLabel="Close dialog backdrop"
-            disabled={busy}
-            onPress={onClose}
-            style={{ position: "absolute", inset: 0 }}
-          />
-          <View
-            testID="sheet-panel"
-            accessibilityRole={Platform.OS === "web" ? "dialog" : undefined}
-            accessibilityLabel={title}
-            accessibilityState={{ busy }}
-            aria-busy={busy}
-            accessibilityViewIsModal
-            style={{
-              width: "100%",
-              maxWidth: wide ? 720 : 480,
-              height: native ? panelHeight : undefined,
-              maxHeight: native ? "100%" : "92%",
-              backgroundColor: c.bg,
-              borderRadius: 24,
-              overflow: "hidden",
-            }}
-          >
-            <Row
-              style={{
-                paddingHorizontal: 24,
-                paddingTop: 18,
-                paddingBottom: 10,
-                justifyContent: "space-between",
-                flexShrink: 0,
-                gap: 12,
-              }}
-            >
-              <T size={19} weight="bold" style={{ flex: 1 }}>
-                {title}
-              </T>
-              <IconButton icon={X} label="Close dialog" onPress={onClose} disabled={busy} />
-            </Row>
-            <ScrollView
-              testID="sheet-scroll"
-              style={{ flexGrow: native ? 1 : 0, flexShrink: 1 }}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
-              nestedScrollEnabled
-              contentContainerStyle={{ padding: 24, paddingTop: 8, gap: 18 }}
-            >
-              {children}
-            </ScrollView>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
   );
 }
 export function Empty({ title, message }: { title: string; message: string }) {
