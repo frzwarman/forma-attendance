@@ -7,11 +7,17 @@ test("an attendee can check in and sees a thank-you with the organiser WhatsApp 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByLabel("Jabatan", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Tanggal Check In", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Tanggal Check Out", { exact: true })).toHaveCount(0);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Terima kasih, Budi Santoso!" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Hubungi Panitia via WhatsApp" })).toHaveAttribute("href", "https://wa.me/6281234567890");
   expect(state.rpcCalls[0].body.p_jabatan).toBeNull();
+  expect(state.rpcCalls[0].body.p_check_in_date).toBeNull();
+  expect(state.rpcCalls[0].body.p_check_out_date).toBeNull();
+  await expect(page.getByText("Waktu check-in", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/)).toBeVisible();
   expect(state.checkins).toHaveLength(1);
   expect(state.checkins[0].phone).toBe("0812 1111 2222");
 });
@@ -36,13 +42,9 @@ test("validation messages appear in Bahasa before anything is sent", async ({ pa
     "Nomor telepon tidak valid",
     "E-mail tidak valid",
     "Alamat wajib diisi",
-    "Tanggal check in wajib diisi",
   ]) {
     await expect(page.getByText(message, { exact: true })).toBeVisible();
   }
-  await fillForm(page, { out: "2026-11-01" });
-  await page.getByRole("button", { name: "Kirim", exact: true }).click();
-  await expect(page.getByText("Tanggal check out tidak boleh sebelum tanggal check in", { exact: true })).toBeVisible();
   expect(state.rpcCalls).toHaveLength(0);
 });
 

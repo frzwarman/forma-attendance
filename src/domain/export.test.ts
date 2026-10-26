@@ -36,15 +36,16 @@ it("maps check-ins and winners to export rows", () => {
   const rows = exportRows([checkin()], [winner()]);
   assert.deepEqual(rows[0], EXPORT_HEADERS);
   assert.equal(EXPORT_HEADERS.includes("Jabatan"), false);
+  assert.equal(EXPORT_HEADERS.some((header) => header.startsWith("Tanggal")), false);
   assert.equal(rows[1].includes("Staf"), false);
   assert.equal(rows[1][0], "26/10/2026 10:05 WIB");
   assert.equal(rows[1][2], "081234567890");
   assert.equal(rows[1][5], "-6.1754");
   assert.equal(rows[1][7], "checkins/abc.jpg");
-  assert.equal(rows[1][10], "Hadiah 1");
-  assert.equal(rows[1][11], "26/10/2026 11:00 WIB");
+  assert.equal(rows[1][8], "Hadiah 1");
+  assert.equal(rows[1][9], "26/10/2026 11:00 WIB");
   const none = exportRows([checkin({ latitude: null, longitude: null, file_path: null })], []);
-  assert.deepEqual(none[1].slice(5), ["", "", "", "2026-11-02", "2026-11-04", "", ""]);
+  assert.deepEqual(none[1].slice(5), ["", "", "", "", ""]);
 });
 
 it("keeps phone numbers as text cells in Excel", () => {

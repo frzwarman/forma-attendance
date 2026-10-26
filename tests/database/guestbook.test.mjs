@@ -32,7 +32,7 @@ before(async () => {
     grant usage on schema storage to anon, authenticated;
     grant all on storage.buckets, storage.objects to anon, authenticated;
   `);
-  for (const migration of ["20261026000000_guestbook.sql", "20261026120000_guestbook_optional_jabatan.sql"]) {
+  for (const migration of ["20261026000000_guestbook.sql", "20261026120000_guestbook_optional_jabatan.sql", "20261026180000_guestbook_automatic_checkin.sql"]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }
   await db.exec(`
@@ -220,5 +220,18 @@ test("jabatan is optional: missing or blank values are stored as null and long o
       { email: "nina@example.test", jabatan: null },
       { email: "rudi@example.test", jabatan: null },
     ]);
+  });
+});
+
+test("a check-in without dates gets today's Jakarta date and no check-out yet", async () => {
+  const result = await asRole(null, "anon", () =>
+    checkIn({ name: "Tono Wibowo", phone: "0821 1000 6000", email: "tono@example.test", in: null, out: null }),
+  );
+  assert.equal(result.status, "created");
+  await asUser(id(1), async () => {
+    const { rows } = await db.query(
+      "select check_in_date = (now() at time zone 'Asia/Jakarta')::date as today, check_out_date from public.guestbook_checkins where email = 'tono@example.test'",
+    );
+    assert.deepEqual(rows, [{ today: true, check_out_date: null }]);
   });
 });

@@ -11,8 +11,6 @@ export const EXPORT_HEADERS = [
   "Latitude",
   "Longitude",
   "Berkas",
-  "Tanggal Check In",
-  "Tanggal Check Out",
   "Hadiah",
   "Waktu Undian (WIB)",
 ];
@@ -33,8 +31,6 @@ export function exportRows(checkins: CheckIn[], winners: Winner[]): string[][] {
         row.latitude == null ? "" : String(row.latitude),
         row.longitude == null ? "" : String(row.longitude),
         row.file_path ?? "",
-        row.check_in_date,
-        row.check_out_date,
         winner?.prize ?? "",
         winner ? formatWib(winner.drawn_at) : "",
       ];

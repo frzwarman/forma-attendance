@@ -7,8 +7,6 @@ const valid = {
   phone: "0812 1111 2222",
   email: "budi@example.test",
   address: "Jl. MH Thamrin 14",
-  check_in_date: "2026-11-02",
-  check_out_date: "2026-11-04",
 };
 
 it("accepts a complete check-in", () => {
@@ -16,18 +14,10 @@ it("accepts a complete check-in", () => {
 });
 
 it("reports every invalid field in Bahasa", () => {
-  const result = checkInSchema.safeParse({ ...valid, name: "A", phone: "12", email: "x", check_out_date: "2026-11-01" });
+  const result = checkInSchema.safeParse({ ...valid, name: "A", phone: "12", email: "x" });
   assert.equal(result.success, false);
   assert.deepEqual(
     result.error!.issues.map((issue) => issue.message).sort(),
-    ["E-mail tidak valid", "Nama wajib diisi", "Nomor telepon tidak valid", "Tanggal check out tidak boleh sebelum tanggal check in"],
-  );
-});
-
-it("requires both dates", () => {
-  const result = checkInSchema.safeParse({ ...valid, check_in_date: "", check_out_date: "" });
-  assert.deepEqual(
-    result.error!.issues.map((issue) => issue.message).sort(),
-    ["Tanggal check in wajib diisi", "Tanggal check out wajib diisi"],
+    ["E-mail tidak valid", "Nama wajib diisi", "Nomor telepon tidak valid"],
   );
 });

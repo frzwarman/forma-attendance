@@ -20,25 +20,6 @@ textarea {
 table {
   border-collapse: collapse;
 }
-/* iOS gives date inputs an intrinsic width and centred text; reset both. Chrome's
-   picker button covers the whole field (invisible) so a tap anywhere opens it. */
-input[type="date"] {
-  -webkit-appearance: none;
-  appearance: none;
-  min-width: 0;
-  position: relative;
-}
-input[type="date"]::-webkit-date-and-time-value {
-  text-align: left;
-}
-input[type="date"]::-webkit-calendar-picker-indicator {
-  position: absolute;
-  inset: 0;
-  width: auto;
-  height: auto;
-  opacity: 0;
-  cursor: pointer;
-}
 .intro-track {
   scrollbar-width: none;
 }

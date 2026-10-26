@@ -3,7 +3,7 @@ import { useState, type CSSProperties } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { Badge, Button, Card, Empty, Field, Row, Stat, T } from "../../components/ui";
 import { exportFileName, exportRows, toCsv, toXlsx } from "../../domain/export";
-import { formatDateRange, formatWib } from "../../domain/time";
+import { formatWib } from "../../domain/time";
 import { useAdminApi, useCheckIns, useWinners } from "../../services/adminContext";
 import { downloadFile } from "../../services/download";
 import { useSettings } from "../../services/settings";
@@ -156,7 +156,7 @@ function CheckInTable({
     <table style={{ width: "100%", fontFamily: FONT_STACK }}>
       <thead>
         <tr>
-          {["Waktu", "Peserta", "Kontak", "Kunjungan", "Berkas"].map((label) => (
+          {["Waktu check-in", "Peserta", "Kontak", "Berkas"].map((label) => (
             <th key={label} style={head}>
               {label}
             </th>
@@ -181,7 +181,6 @@ function CheckInTable({
                 <div>{row.phone}</div>
                 <div style={sub}>{row.email}</div>
               </td>
-              <td style={{ ...cell, whiteSpace: "nowrap" }}>{formatDateRange(row.check_in_date, row.check_out_date)}</td>
               <td style={cell}>
                 {row.file_path ? (
                   <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />
@@ -214,9 +213,6 @@ function CheckInRow({ row, winner, onOpenFile }: { row: CheckIn; winner?: Winner
         {row.email}
       </T>
       <Row style={{ gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-        <T size={13} color={c.muted}>
-          {formatDateRange(row.check_in_date, row.check_out_date)}
-        </T>
         {winner && <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />}
         {!!row.file_path && (
           <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />

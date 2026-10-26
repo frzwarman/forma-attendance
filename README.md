@@ -1,6 +1,6 @@
 # Buku Tamu — event check-in (Bawaslu)
 
-A one-event guest book on the web, in Bahasa Indonesia. Attendees open the link on their own phone, fill in one form (Nama, Nomor Telepon, E-mail, Alamat with a map pin, an optional photo taken with the camera or a chosen image/PDF, Tanggal Check In/Check Out) and tap **Kirim**. A slideshow with the event information opens first (once per browser session); its first slide recreates the KV Bawaslu-01 title card and the rest are placeholder slides with free Unsplash photos, edited in `src/features/intro/slides.ts` (photos and credits in `assets/event/`). Admins sign in at `/admin` to watch check-ins arrive, search them, export the full list to Excel or CSV, run a lucky draw, and change the event name, texts, logo, background and colours. The default look is Bawaslu's, measured from the supplied key visual and https://www.bawaslu.go.id/id (see `assets/brand/README.md`).
+A one-event guest book on the web, in Bahasa Indonesia. Attendees open the link on their own phone, fill in one form (Nama, Nomor Telepon, E-mail, Alamat with a map pin, an optional photo taken with the camera or a chosen image/PDF); the check-in time is recorded by the server and shown in WIB and tap **Kirim**. A slideshow with the event information opens first (once per browser session); its first slide recreates the KV Bawaslu-01 title card and the rest are placeholder slides with free Unsplash photos, edited in `src/features/intro/slides.ts` (photos and credits in `assets/event/`). Admins sign in at `/admin` to watch check-ins arrive, search them, export the full list to Excel or CSV, run a lucky draw, and change the event name, texts, logo, background and colours. The default look is Bawaslu's, measured from the supplied key visual and https://www.bawaslu.go.id/id (see `assets/brand/README.md`).
 
 Built with Expo Router on React Native Web (web only), TanStack Query, react-hook-form + zod, Leaflet with OpenStreetMap tiles, SheetJS for Excel, and Supabase (Postgres, Auth, Storage).
 
@@ -31,7 +31,7 @@ npm run weight     # public page weight gate (needs the dist/ build)
 
 ## Supabase setup
 
-The app uses the `guestbook_` tables, RPCs and buckets created by `supabase/migrations/20261026000000_guestbook.sql` and `20261026120000_guestbook_optional_jabatan.sql` (Jabatan is no longer collected; the column became optional and existing values are kept) in the linked project `dzzufvejzbhgwiemcxwz`. Migrations are additive; never run `db reset --linked`. Apply pending migrations before deploying a client that depends on them.
+The app uses the `guestbook_` tables, RPCs and buckets created by `supabase/migrations/20261026000000_guestbook.sql` `20261026120000_guestbook_optional_jabatan.sql` (Jabatan is no longer collected; the column became optional and existing values are kept) and `20261026180000_guestbook_automatic_checkin.sql` (visit dates are no longer asked for: check-in rows get today's Jakarta date and check-out stays empty until check-out is built) in the linked project `dzzufvejzbhgwiemcxwz`. Migrations are additive; never run `db reset --linked`. Apply pending migrations before deploying a client that depends on them.
 
 ```sh
 set -a; . ./supabase/.env.cli.local; set +a   # exports SUPABASE_DB_PASSWORD for the CLI without printing it
@@ -50,8 +50,19 @@ What the migration enforces: attendees can only call `guestbook_check_in` (valid
 
    ```sql
    insert into public.guestbook_admins (auth_user_id)
-   select id from auth.users where email = 'admin@example.com';
+   select id from auth.users where lower(email) = lower('admin@example.com')
+   on conflict do nothing
+   returning auth_user_id;
    ```
+
+   The result must show one row. If it shows none, the e-mail does not match an existing Auth user. To see who has admin rights:
+
+   ```sql
+   select u.email, a.auth_user_id is not null as admin
+   from auth.users u left join public.guestbook_admins a on a.auth_user_id = u.id;
+   ```
+
+   An account that signs in without this grant sees "Akun ini belum menjadi admin" at `/admin`.
 
 Repeat 2–3 for each admin. The two buckets (`guestbook-brand`, public; `guestbook-uploads`, private, 5 MB per file) are created by the migration.
 
@@ -93,10 +104,10 @@ Attendee images are compressed to a 1600 px JPEG before upload and PDFs are capp
 Checked in this workspace on 2026-10-26:
 
 - TypeScript and ESLint: clean.
-- `npm test`: **16 unit tests** pass (theme derivation and contrast, phone normalisation/masking/WhatsApp links, WIB formatting, check-in validation messages, CSV/Excel export incl. text phone cells, formula neutralisation and file naming).
-- `npm run db:test`: **17 tests** pass against the real migrations in embedded Postgres: RLS and grants, phone-key normalisation, anonymous check-in and duplicate reporting, input rejection, admin-only reads and settings updates, draws that never repeat a winner, storage policies, and optional Jabatan (old clients that still send one keep working).
+- `npm test`: **14 unit tests** pass (theme derivation and contrast, phone normalisation/masking/WhatsApp links, WIB formatting, check-in validation messages, CSV/Excel export incl. text phone cells, formula neutralisation and file naming).
+- `npm run db:test`: **18 tests** pass against the real migrations in embedded Postgres: RLS and grants, phone-key normalisation, anonymous check-in and duplicate reporting, input rejection, admin-only reads and settings updates, draws that never repeat a winner, storage policies, optional Jabatan (old clients that still send one keep working), and check-ins without dates stamped with today's Jakarta date.
 - `npm run test:e2e:dev`: the public page renders on the Expo development server with no 5xx bundle responses.
-- `npm run test:e2e`: **30 browser tests** pass against the built site with every Supabase endpoint stubbed by Playwright routes: public page and defaults, check-in success/duplicate/validation/honeypot, map pin and compressed upload (unsupported files refused), camera capture with retake and a denied-camera message, the event slideshow (first visit, arrows and dots, Escape, Mulai check-in, not shown again on reload), the network sphere beside the logo, page scrolling over the map with the wheel and with one finger on phones, date fields that fit a phone with a hint, 16px inputs, admin sign-in and reload, paged list with exactly 2,000 rows and a row arriving between pages, search, signed file links, CSV and Excel downloads, the lucky draw, theme changes reflected on the public page, the Bawaslu preset and logo upload, plus reference screenshots in `artifacts/`.
+- `npm run test:e2e`: **32 browser tests** pass against the built site with every Supabase endpoint stubbed by Playwright routes: public page and defaults, check-in success/duplicate/validation/honeypot, map pin and compressed upload (unsupported files refused), camera capture with retake and a denied-camera message, the event slideshow (first visit, arrows and dots, Escape, Mulai check-in, not shown again on reload), the network sphere beside the logo, an account without admin rights being told so, a refused settings save, the draw waiting for the first check-in, page scrolling over the map with the wheel and with one finger on phones, 16px inputs, admin sign-in and reload, paged list with exactly 2,000 rows and a row arriving between pages, search, signed file links, CSV and Excel downloads, the lucky draw, theme changes reflected on the public page, the Bawaslu preset and logo upload, plus reference screenshots in `artifacts/`.
 - `npm run weight`: a first visit to the public page, with the slideshow open, downloads **482 KB** of gzipped JavaScript and **263 KB** of images (budget 500 KB and 300 KB).
 - The public form, date and check-in tests also pass in WebKit (Safari's engine) with iPhone 13 emulation; this is not a test on a real iPhone.
 - `wrangler dev` with `wrangler.jsonc` serves `/admin`, `/admin/undian` and `/admin/tampilan` as the app (HTTP 200) and still serves assets.

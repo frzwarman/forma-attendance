@@ -2,11 +2,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { TextInput, View, useWindowDimensions } from "react-native";
-import { DateInput } from "../components/NativeInput";
 import { Button, Card, Divider, Field, Row, SectionTitle, T } from "../components/ui";
 import { checkInSchema, type CheckInInput } from "../domain/checkin";
 import { whatsappLink } from "../domain/phone";
-import { formatDateRange, formatWib } from "../domain/time";
+import { formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
 import { useSettings } from "../services/settings";
 import { uploadCheckInFile } from "../services/uploads";
@@ -19,8 +18,6 @@ const empty: CheckInInput = {
   phone: "",
   email: "",
   address: "",
-  check_in_date: "",
-  check_out_date: "",
 };
 
 export function CheckIn() {
@@ -36,7 +33,7 @@ export function CheckIn() {
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState("");
   const [duplicateAt, setDuplicateAt] = useState("");
-  const [created, setCreated] = useState<CheckInInput>();
+  const [created, setCreated] = useState<CheckInInput & { at: string }>();
   const [pin, setPin] = useState<Pin | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
@@ -63,7 +60,7 @@ export function CheckIn() {
         longitude: pin?.longitude ?? null,
       });
       if (result.status === "duplicate") setDuplicateAt(result.created_at);
-      else setCreated(input);
+      else setCreated({ ...input, at: result.created_at });
     } catch (cause) {
       const message = (cause as Error).message;
       setError(message === "spam" ? "Pengiriman ditolak. Coba lagi." : message);
@@ -76,7 +73,7 @@ export function CheckIn() {
       ["Nomor Telepon", created.phone],
       ["E-mail", created.email],
       ["Alamat", created.address],
-      ["Kunjungan", formatDateRange(created.check_in_date, created.check_out_date)],
+      ["Waktu check-in", formatWib(created.at)],
     ];
     return (
       <Card elevated style={{ gap: 20 }}>
@@ -169,16 +166,6 @@ export function CheckIn() {
       )}
     />
   );
-  const date = (name: "check_in_date" | "check_out_date", label: string) => (
-    <Controller
-      control={control}
-      name={name}
-      render={({ field }) => (
-        <DateInput label={label} value={field.value} onChange={field.onChange} error={errors[name]?.message} />
-      )}
-    />
-  );
-
   return (
     <Card elevated style={{ gap: 22, padding: width < 400 ? 20 : 28 }}>
       <View style={{ gap: 4 }}>
@@ -211,10 +198,6 @@ export function CheckIn() {
           setFileError(message);
         }}
       />
-      <Divider />
-      <SectionTitle title="Tanggal kunjungan" />
-      {date("check_in_date", "Tanggal Check In")}
-      {date("check_out_date", "Tanggal Check Out")}
       <TextInput
         accessibilityLabel="Kosongkan kolom ini"
         aria-hidden

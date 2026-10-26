@@ -159,8 +159,9 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       latitude: (body.p_latitude as number | null) ?? null,
       longitude: (body.p_longitude as number | null) ?? null,
       file_path: (body.p_file_path as string | null) ?? null,
-      check_in_date: String(body.p_check_in_date),
-      check_out_date: String(body.p_check_out_date),
+      // Mirrors the RPC: the server stamps today's Jakarta date; check-out stays empty.
+      check_in_date: (body.p_check_in_date as string | null) ?? new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10),
+      check_out_date: (body.p_check_out_date as string | null) ?? null,
     });
     state.checkins.push(row);
     return json(route, { status: "created", created_at: row.created_at });

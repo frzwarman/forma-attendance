@@ -26,7 +26,8 @@ export type CheckIn = {
   longitude: number | null;
   file_path: string | null;
   check_in_date: string;
-  check_out_date: string;
+  // Set by the server; check-out is not recorded yet.
+  check_out_date: string | null;
 };
 
 export type Winner = {

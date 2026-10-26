@@ -21,8 +21,9 @@ export function submitCheckIn(input: CheckInInput, extra: CheckInExtra): Promise
     p_latitude: extra.latitude,
     p_longitude: extra.longitude,
     p_file_path: extra.file_path,
-    p_check_in_date: input.check_in_date,
-    p_check_out_date: input.check_out_date,
+    // The server stamps the check-in (created_at, shown in WIB); no visit dates are sent.
+    p_check_in_date: null,
+    p_check_out_date: null,
     p_honeypot: extra.honeypot || null,
   });
 }
