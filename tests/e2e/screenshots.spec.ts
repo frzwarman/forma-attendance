@@ -14,7 +14,9 @@ test("captures reference screenshots of the public form and the admin list", asy
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible();
-  await page.screenshot({ path: "artifacts/public-390.png", fullPage: true });
+  // A tall viewport instead of fullPage: the fixed background layer is captured only once per viewport.
+  await page.setViewportSize({ width: 390, height: 1500 });
+  await page.screenshot({ path: "artifacts/public-390.png" });
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/admin");
   await signInAsAdmin(page);
