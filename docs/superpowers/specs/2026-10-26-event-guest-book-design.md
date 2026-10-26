@@ -1,6 +1,6 @@
 # Event guest book (check-in) — design
 
-Date: 2026-10-26. Status: draft for review. Owner: Fariz. Written by Claude from the brainstorming conversation; anything marked *(my call)* was decided by Claude and can be overruled.
+Date: 2026-10-26. Status: awaiting owner approval. Owner: Fariz. Written by Claude from the brainstorming conversation; anything marked *(my call)* was decided by Claude and can be overruled.
 
 ## Intent
 
@@ -13,7 +13,7 @@ Why now: the previous app (employee attendance, schedules, leave, HR dashboard, 
 1. Anyone with the link can check in from a phone browser in under a minute, in Bahasa Indonesia, with the Jotform field set plus **Jabatan**.
 2. One person is recorded once: a repeat phone number or e-mail is told they are already registered (with the earlier time) instead of creating a second row.
 3. Admins, and only admins, can see the list live, search it, export it completely (Excel and CSV) and run a lucky draw that never picks the same person twice.
-4. Admins customise the event name, welcome text, logo, background image, colours and WhatsApp contact without touching code; the public page and the admin pages both follow that look.
+4. Admins customise the event name, welcome text, logo, background image, colours and WhatsApp contact without touching code; the public page and the admin pages both follow that look. Out of the box the site already looks like Bawaslu's.
 5. Everything is in Bahasa Indonesia, public and admin side.
 
 ## Non-goals
@@ -36,7 +36,7 @@ Why now: the previous app (employee attendance, schedules, leave, HR dashboard, 
 ## Constraints
 
 - Language: Bahasa Indonesia for every label, message and button, public and admin. Code and comments stay in English.
-- Default look: the Nusantara brand already in the repo (gold `#DBAF6D`, charcoal `#1D1B1A`, Arial, original logo and aerial background in `assets/brand/`). Admin customisation starts from these defaults.
+- Default look: the Bawaslu brand (Badan Pengawas Pemilihan Umum), matching https://www.bawaslu.go.id/id, with the logo and background taken from the owner-supplied key visual `KV Bawaslu-05.png`. The Nusantara assets are removed. Admin customisation starts from the Bawaslu defaults. See "Brand defaults" below.
 - Backend: the Supabase project already linked from this repo (reference `dzzufvejzbhgwiemcxwz`, Singapore). Schema changes are additive migrations under `supabase/migrations/`; never destructive, never `db reset --linked`.
 - Hosting: the existing static HTTPS host with SPA fallback, built by `npm run build:web` (Expo web export). HTTPS is required anyway for geolocation.
 - Secrets: only `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` reach the browser. Database password, CLI token and service-role key never appear in `EXPO_PUBLIC_` variables or in the repo. `.env.local` and `.env.supabase.local` stay ignored and are never printed.
@@ -46,15 +46,17 @@ Why now: the previous app (employee attendance, schedules, leave, HR dashboard, 
 
 ### Codebase and platform *(my call)*
 
-Keep the existing Expo Router + React Native Web project for its brand components, theme provider, UI primitives, hosting setup and test tooling. Remove the workforce features entirely: screens, the mock repository, seed data, chunked native storage, domain attendance rules and their tests, and the APK/EAS configuration. Before anything is deleted, the current working tree, including the uncommitted Android fixes, is committed on a branch named `workforce-app` and tagged, so that work stays retrievable. The guest book is then built on `main`.
+Keep the existing Expo Router + React Native Web project for its brand components, theme provider, UI primitives, hosting setup and test tooling. Remove the workforce features entirely: screens, the mock repository, seed data, chunked native storage, domain attendance rules and their tests, and the APK/EAS configuration. Before anything is deleted, the last workforce state (commit `600b0f3`, which already contains the Android fixes) is kept on a branch named `workforce-app` and tagged, so that work stays retrievable. The guest book is then built on `main`.
 
 The site is web only. Native-only dependencies that nothing uses afterwards (camera, location, secure store, haptics, document picker, reanimated) are removed to keep the public page light.
+
+**Weight budget for the public page** *(my call)*: at most 500 KB of JavaScript transferred (gzipped) and at most 300 KB of images on first load, measured on the built site. Today's build ships about 800 KB of gzipped JavaScript plus a 1 MB background JPEG, so the bundled background is re-encoded to fit and admin-uploaded backgrounds are resized client-side (longest side 1920 px, JPEG) before storing. If, after the workforce code is removed, the Expo/React Native Web build still cannot meet the JavaScript budget, the public form is instead a plain HTML/JavaScript page served from the same host and only the admin panel stays in Expo. The builder measures first and reports the number before choosing.
 
 ### Data (Supabase, decided)
 
 New additive migration, prefix `guestbook_` so nothing collides with the existing `forma_` tables, which stay untouched.
 
-- `guestbook_settings`: exactly one row (enforced with a check on a constant id). Columns: `event_name`, `welcome_text`, `logo_path`, `background_path`, `accent_color`, `background_color`, `text_color`, `whatsapp_number` (nullable), `updated_at`. Defaults reproduce the Nusantara look with the bundled assets. Readable by everyone (the public page needs it); updatable by admins only; never inserted or deleted by clients.
+- `guestbook_settings`: exactly one row (enforced with a check on a constant id). Columns: `event_name`, `welcome_text`, `logo_path`, `background_path`, `accent_color`, `background_color`, `surface_color`, `text_color`, `whatsapp_number` (nullable), `updated_at`. Defaults reproduce the Bawaslu look with the bundled assets. Readable by everyone (the public page needs it); updatable by admins only; never inserted or deleted by clients.
 - `guestbook_checkins`: `id`, `created_at` (database time), `name`, `phone` (as typed), `phone_key` (generated: digits only, a leading `62` becomes `0`), `email`, `email_key` (generated: trimmed, lower-cased), `jabatan`, `address`, `latitude`/`longitude` (nullable), `file_path` (nullable), `check_in_date`, `check_out_date` (not before check-in). Unique indexes on `phone_key` and `email_key`. Length and format checks on every text column. Clients never read, update or delete this table directly; admins read and delete through RLS; nobody inserts directly.
 - `guestbook_draw_winners`: `id`, `checkin_id` (unique, references check-ins), `prize` (free label such as "Hadiah 1", may be empty), `drawn_at`, `drawn_by` (auth user). Admins only.
 - `guestbook_admins`: `auth_user_id` referencing `auth.users`. A helper `guestbook_is_admin()` returns whether `auth.uid()` is in it. All admin RLS policies use this helper, so an accidentally enabled public sign-up still grants nothing.
@@ -69,6 +71,8 @@ New additive migration, prefix `guestbook_` so nothing collides with the existin
 
 Admins live at `/admin` on the same site. Behind it is a sign-in with e-mail and password through Supabase Auth. Admin users are created in the Supabase dashboard and added to `guestbook_admins` with a documented SQL snippet; public sign-up is disabled in the Auth settings and, independently, grants nothing because of the admins table. The session is kept by the Supabase client in browser storage, which is acceptable for this small admin panel. "Keluar" signs out.
 
+**Provisioning** *(my call)*: the migration is pushed from this repo with the Supabase CLI (`npm run db:push` after `db:plan`). Two steps exist only in the Supabase dashboard: disabling public sign-up in Auth settings and creating the first admin user. They are written as a short owner checklist in the README, together with the SQL snippet that adds the user to `guestbook_admins`. `supabase config push` is not used, because the local `config.toml` still points Auth at localhost. If the owner authorises the Supabase connector for Claude, Claude performs the dashboard steps and reports them; otherwise the admin pages are verified against the hosted project only after the owner completes the checklist.
+
 ### Public page (decided)
 
 Route `/`. Full-screen background image, logo, event name and welcome text from settings, then the form:
@@ -79,6 +83,7 @@ Route `/`. Full-screen background image, logo, event name and welcome text from 
 - **Unggah Berkas (opsional)**: one image or PDF up to 10 MB using the browser's native file input.
 - **Tanggal Check In**, **Tanggal Check Out**: native date inputs; check-out may not be earlier than check-in.
 - A hidden honeypot field that must stay empty.
+- Layout: the form sits in a white card on the navy key-visual background, like the website's white content on its red-accented pages; the logo pill and event name sit above the card.
 - **Kirim**: disabled while sending, with inline validation messages in Bahasa. Success shows "Terima kasih, {Nama}" with a short summary of what was recorded, and a WhatsApp button linking to the organiser's number when one is set in settings.
 - A duplicate phone or e-mail shows a clear message that this number or e-mail is already registered, with the earlier check-in time, and offers to fix a typo. No second row is created.
 
@@ -91,15 +96,25 @@ All under `/admin`, all in Bahasa, same theme as the public page.
 - **Masuk**: e-mail, kata sandi, error messages in Bahasa.
 - **Daftar Check-in** (default after sign-in): running total, search box matching name, phone or e-mail, rows newest first showing time (WIB), name, phone, e-mail, jabatan, check-in/out dates, a link that opens the uploaded file, and a winner badge where applicable. The list refreshes itself every few seconds while open *(my call: polling through TanStack Query, no Realtime setup)*. Two buttons: **Ekspor Excel** and **Ekspor CSV**, each downloading the complete list in one file. Excel stores phone numbers as text so leading zeros survive. CSV is UTF-8 with BOM. Both include the winner columns (prize, drawn at).
 - **Undian**: a prize label field, a big **Undi** button, and a winner display large enough to project: name in very large type, jabatan, and the phone number masked except the first four and last two digits. Below it, the list of previous winners with time and prize, each removable. Attendees who have already won are never drawn again.
-- **Tampilan**: event name, welcome text, WhatsApp number, logo upload, background image upload, and three colours (aksen, latar, teks) with the Nusantara preset as a one-tap reset. Changes are visible in a live preview of the public page before **Simpan**.
+- **Tampilan**: event name, welcome text, WhatsApp number, logo upload, background image upload, and four colours (aksen, latar, permukaan, teks) with the Bawaslu preset as a one-tap reset. Changes are visible in a live preview of the public page before **Simpan**.
+
+### Brand defaults (decided)
+
+Measured from the key visual (4536 × 2552 PNG) and the website on 2026-10-26:
+
+- Navy `#00243f` (page background behind the image; the key visual's dominant colour), Bawaslu red `#ec1c24` (accent: buttons, links, highlights, the headline red used on the website), gold `#d1aa67` (the logo's ballot-box gold and the bottom wave; used for the winner display and secondary highlights), white surfaces with near-black text `#1e1e1e` as on the website's content area.
+- Default background image: the key visual, cropped to remove the top strip that contains the baked-in logo pill (keep from about 400 px down in the original), re-encoded as JPEG at 1920 px wide and under 300 KB. On portrait phones it is positioned `cover`, anchored top-left, so the glow, the dotted Indonesia map and the red-gold wave remain visible.
+- Default logo: the white rounded pill with the Bawaslu mark and wordmark, cropped from the same key visual at full resolution (about x 130–830, y 130–350 in the original) and saved as a transparent PNG, so it reads on the navy background exactly as in the key visual. The website's transparent logo PNG is not used by default because the navy wordmark disappears on a navy page.
+- The original key visual is kept unmodified in `assets/brand/` with the crop commands documented in `assets/brand/README.md`, the same way the Nusantara sources were documented.
+- App icon and favicon are regenerated from the Bawaslu mark.
 
 ### Theme model (decided)
 
-Three stored colours: accent, background, text. Every other token (button text on accent, borders, translucent surfaces, muted text) is derived from these three in the theme provider so admin customisation needs no knowledge of the token set. Logo and background are URLs from the public brand bucket, falling back to the bundled Nusantara assets when unset.
+Four stored colours: accent, background, surface, text, defaulting to red, navy, white and near-black above. Every other token (text on accent chosen by contrast, text on the background image, borders, muted text, translucent overlays, the gold winner highlight) is derived from these four in the theme provider, so admin customisation needs no knowledge of the token set. Logo and background are URLs from the public brand bucket, falling back to the bundled Bawaslu defaults when unset. The Tampilan page offers a one-tap "Bawaslu" preset that restores all four colours and both images.
 
 ### Verification expected of the build
 
-- Database: PGlite tests for the migration as listed above.
+- Database: PGlite tests for the migration as listed above. Docker is not installed on the owner's machine, so embedded Postgres is the only local database check; the harness stubs `storage.buckets`/`storage.objects` the way it already stubs `auth.users`.
 - Browser: Playwright against the built site covering check-in success, duplicate message, validation messages, admin sign-in, list and search, export file contents (phone kept as text), draw excluding past winners, and theme change reflected on the public page. Network calls to Supabase are stubbed with Playwright route handlers; do not write a second data layer just for tests. If Docker is available, `supabase start` may be used for a fuller local run.
 - One manual smoke test against the hosted project on a real phone: check in, duplicate, admin export opens in Excel with phone numbers intact.
 - Public page bundle size is reported after the build; the native-only dependencies are gone from `package.json`.
@@ -115,4 +130,9 @@ Three stored colours: accent, background, text. Every other token (button text o
 
 ## Open questions for the owner
 
-None blocking at the time of writing. See the review notes appended after the builder check.
+Raised by the builder check on 2026-10-26. The owner confirmed the strict one-person-per-phone-or-e-mail rule (question 2). Questions 1, 3 and 4 were not answered, so the build proceeds on the defaults noted under each; the owner can change them at any time.
+
+1. Where is the site hosted and who deploys? Decides the SPA rewrite configuration for `/admin`, where `EXPO_PUBLIC_*` values are set at build time, and whether the plan ends with a deployment or with instructions. *Default (my call):* the plan ends with a verified `dist/` build and a README deploy section covering the SPA fallback for Netlify, Vercel and Cloudflare Pages; the owner deploys.
+2. Must one phone number or e-mail map to exactly one person? A protocol officer registering a whole delegation under their own number would be rejected by the current rule. *Answered: yes, strict.* The unique indexes and the duplicate response stand.
+3. Which Supabase plan is the project on, and what is the uploaded file for? Sets the per-file cap and whether images are compressed before upload. *Default (my call):* images are resized client-side to a longest side of 1600 px and re-encoded as JPEG (typically under 400 KB), PDFs are capped at 5 MB, so 4,000 uploads stay near 1–2 GB in the worst case; the README notes that the free plan's 1 GB may need upgrading if most attendees upload.
+4. When is the event, and when must the link go out? *Default (my call):* build order is check-in form, admin list and export first; then Undian; then Tampilan; the hosted smoke test happens as soon as the owner has completed the admin checklist.
