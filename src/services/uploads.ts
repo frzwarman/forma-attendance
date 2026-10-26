@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabase";
+import { uploadObject } from "./rest";
 
 export const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 export const MAX_PDF_BYTES = 5 * 1024 * 1024;
@@ -44,7 +44,10 @@ export async function prepareUpload(
 export async function uploadCheckInFile(file: File): Promise<string> {
   const { blob, extension, contentType } = await prepareUpload(file);
   const path = `checkins/${crypto.randomUUID()}.${extension}`;
-  const { error } = await getSupabase().storage.from("guestbook-uploads").upload(path, blob, { contentType, upsert: false });
-  if (error) throw new Error(`Gagal mengunggah berkas: ${error.message}`);
+  try {
+    await uploadObject("guestbook-uploads", path, blob, contentType);
+  } catch (cause) {
+    throw new Error(`Gagal mengunggah berkas: ${(cause as Error).message}`);
+  }
   return path;
 }

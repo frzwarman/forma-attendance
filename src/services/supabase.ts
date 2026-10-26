@@ -1,17 +1,11 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { CONFIG_ERROR, SUPABASE_KEY, SUPABASE_URL, supabaseConfigured } from "./config";
 
-// Only these two public values reach the browser; see .env.example.
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL || "";
-const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "";
-
-export const CONFIG_ERROR =
-  "Konfigurasi Supabase belum diisi: EXPO_PUBLIC_SUPABASE_URL dan EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY.";
-export const supabaseConfigured = () => Boolean(url && key);
-
+// Admin pages only; the public page uses rest.ts so it never downloads this client.
 let client: SupabaseClient | undefined;
 export function getSupabase(): SupabaseClient {
   if (!supabaseConfigured()) throw new Error(CONFIG_ERROR);
-  client ??= createClient(url, key, {
+  client ??= createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
   });
   return client;

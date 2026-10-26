@@ -6,7 +6,7 @@ import { View } from "react-native";
 import { Card, T } from "../components/ui";
 import { BAWASLU } from "../domain/theme";
 import { settingsColors, useSettings } from "../services/settings";
-import { CONFIG_ERROR, supabaseConfigured } from "../services/supabase";
+import { CONFIG_ERROR, supabaseConfigured } from "../services/config";
 import { ThemeProvider } from "../theme";
 
 const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30000, retry: 1 } } });

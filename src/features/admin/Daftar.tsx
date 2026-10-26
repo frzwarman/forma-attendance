@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { Badge, Button, Card, Empty, Field, Row, T } from "../../components/ui";
 import { exportFileName, exportRows, toCsv, toXlsx } from "../../domain/export";
 import { formatWib } from "../../domain/time";
-import { signedFileUrl, useCheckIns, useWinners } from "../../services/checkins";
+import { useAdminApi, useCheckIns, useWinners } from "../../services/adminContext";
 import { downloadFile } from "../../services/download";
 import { useSettings } from "../../services/settings";
 import { useTheme } from "../../theme";
@@ -13,6 +13,7 @@ const STEP = 200;
 
 export function Daftar() {
   const c = useTheme();
+  const api = useAdminApi();
   const checkins = useCheckIns();
   const winners = useWinners();
   const { settings } = useSettings();
@@ -30,7 +31,7 @@ export function Daftar() {
   async function openFile(path: string) {
     const tab = window.open("", "_blank");
     try {
-      const url = await signedFileUrl(path);
+      const url = await api.signedFileUrl(path);
       if (tab) tab.location.href = url;
       else window.open(url, "_blank");
     } catch (cause) {

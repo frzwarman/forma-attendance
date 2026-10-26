@@ -4,13 +4,14 @@ import { View } from "react-native";
 import { Button, Card, Field, Row, T } from "../../components/ui";
 import { maskPhone } from "../../domain/phone";
 import { formatWib } from "../../domain/time";
-import { useCheckIns, useWinners } from "../../services/checkins";
-import { drawWinner, removeWinner, type DrawResult } from "../../services/draw";
+import { useAdminApi, useCheckIns, useWinners } from "../../services/adminContext";
+import type { DrawResult } from "../../services/draw";
 import { useTheme } from "../../theme";
 
 export function Undian() {
   const c = useTheme();
   const client = useQueryClient();
+  const api = useAdminApi();
   const checkins = useCheckIns();
   const winners = useWinners();
   const [prize, setPrize] = useState("Hadiah 1");
@@ -24,7 +25,7 @@ export function Undian() {
     setBusy(true);
     setError("");
     try {
-      setResult(await drawWinner(prize.trim()));
+      setResult(await api.drawWinner(prize.trim()));
       await client.invalidateQueries({ queryKey: ["winners"] });
     } catch (cause) {
       setError((cause as Error).message);
@@ -36,7 +37,7 @@ export function Undian() {
   async function remove(id: string) {
     setError("");
     try {
-      await removeWinner(id);
+      await api.removeWinner(id);
       if (result?.status === "drawn" && result.winner.id === id) setResult(undefined);
       await client.invalidateQueries({ queryKey: ["winners"] });
     } catch (cause) {

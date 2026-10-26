@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { View } from "react-native";
 import { Backdrop, Logo } from "../../components/Brand";
 import { Button, Card, Row, T } from "../../components/ui";
-import { signOut } from "../../services/auth";
+import { signOut } from "../../services/adminApi";
 import { useSettings } from "../../services/settings";
 import { useTheme } from "../../theme";
 

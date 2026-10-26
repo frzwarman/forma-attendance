@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { Backdrop, Logo } from "../../components/Brand";
 import { Button, Card, Field, T } from "../../components/ui";
-import { signIn } from "../../services/auth";
+import { signIn } from "../../services/adminApi";
 import { useTheme } from "../../theme";
 
 export function Masuk() {

@@ -5,7 +5,8 @@ import { View } from "react-native";
 import { ColorInput, FileInput } from "../../components/NativeInput";
 import { Button, Card, Field, Row, T } from "../../components/ui";
 import { BAWASLU, isHexColor, type ThemeColors } from "../../domain/theme";
-import { brandImageUrl, settingsColors, updateSettings, uploadBrandImage, useSettings } from "../../services/settings";
+import { brandImageUrl, settingsColors, useSettings } from "../../services/settings";
+import { useAdminApi } from "../../services/adminContext";
 import { ThemeProvider, useTheme } from "../../theme";
 import type { Settings } from "../../types/guestbook";
 
@@ -50,6 +51,7 @@ export function Tampilan() {
 function TampilanForm({ initial }: { initial: Settings }) {
   const c = useTheme();
   const client = useQueryClient();
+  const api = useAdminApi();
   const [draft, setDraft] = useState<Draft>(() => fromSettings(initial));
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
@@ -83,10 +85,10 @@ function TampilanForm({ initial }: { initial: Settings }) {
         background_color: draft.background.toLowerCase(),
         surface_color: draft.surface.toLowerCase(),
         text_color: draft.text.toLowerCase(),
-        logo_path: logoFile ? await uploadBrandImage("logo", logoFile) : draft.logo_path,
-        background_path: backgroundFile ? await uploadBrandImage("background", backgroundFile) : draft.background_path,
+        logo_path: logoFile ? await api.uploadBrandImage("logo", logoFile) : draft.logo_path,
+        background_path: backgroundFile ? await api.uploadBrandImage("background", backgroundFile) : draft.background_path,
       };
-      const next = await updateSettings(patch);
+      const next = await api.updateSettings(patch);
       client.setQueryData(["settings"], next);
       setDraft(fromSettings(next));
       setLogoFile(null);

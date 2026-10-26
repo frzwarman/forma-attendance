@@ -1,6 +1,6 @@
 # Supabase database setup
 
-This is the database foundation for Forma. The running app **still uses the local demo repository** in `src/services/repository.ts`. Neither setting public environment variables nor running `db:push` changes that repository or enables real employee sign-in.
+The guest book application reads and writes the `guestbook_` tables created by `20261026000000_guestbook.sql` (settings, check-ins, draw winners, admins, two Storage buckets and the check-in and draw RPCs). The earlier `forma_` workforce tables from the first migration remain in place, unused and untouched; the sections below about them are kept for reference.
 
 The initial hosted project is [Forma Workforce](https://supabase.com/dashboard/project/dzzufvejzbhgwiemcxwz), reference `dzzufvejzbhgwiemcxwz`, in Singapore (`ap-southeast-1`). Its first migration is `20261024000000_workforce_foundation.sql`. Public connection settings are saved in the ignored `.env.local`; private CLI database credentials are in the separate ignored `.env.supabase.local`.
 
