@@ -227,7 +227,6 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     return json(route, { Key: `${bucket}/${path}`, Id: uuid() });
   });
   await page.route(/\/storage\/v1\/object\/public\//, (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG_1x1 }));
-  // Google Maps never loads in tests; the form must keep working without it.
-  await page.route(/maps\.googleapis\.com/, (route) => route.abort());
+  await page.route(/tile\.openstreetmap\.org/, (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG_1x1 }));
   return state;
 }

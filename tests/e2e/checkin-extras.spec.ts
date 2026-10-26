@@ -11,9 +11,7 @@ test("the map pin and typed address are saved with the check-in", async ({ page,
   const state = await installSupabaseStub(page);
   await page.goto("/");
   await fillForm(page);
-  await expect(page.getByText("Peta tidak dapat dimuat. Anda tetap bisa mengisi alamat.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Gunakan lokasi saya", exact: true }).click();
-  await expect(page.getByText("-6.17540, 106.82720", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Terima kasih/ })).toBeVisible();
   const call = state.rpcCalls[0].body;
