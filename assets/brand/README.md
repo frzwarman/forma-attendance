@@ -1,26 +1,18 @@
-# Nusantara reference assets
+# Bawaslu brand assets
 
-Original assets supplied through the user-provided reference:
-https://form.jotform.com/241414717939059
+Source: the owner-supplied key visual `bawaslu-kv.png` (4536 × 2552, kept unmodified) and
+the colours of https://www.bawaslu.go.id/id, measured on 2026-10-26.
 
-- `nusantara-logo.png`: original transparent Nusantara vertical logo, 1694 × 1035.
-  Source: https://www.jotform.com/uploads/ipungstr/form_files/01%20Nusantara-08-VerticalColor.6654f443542df6.74848471.png
-- `nusantara-background.jpg`: original aerial background with gold line motifs, 1920 × 1080.
-  Source: https://www.jotform.com/uploads/ipungstr/form_files/BG-01.jpg
+- Navy `#00243f` (page background behind the image), Bawaslu red `#ec1c24` (accent),
+  gold `#d1aa67` (logo mark and bottom wave; winner highlight), white surfaces with
+  near-black `#1e1e1e` text as on the website's content area.
+- `bawaslu-logo.png`: the white pill with mark and wordmark, cropped from the key visual at
+  x 130, y 130, 700 × 220 px. A few navy pixels remain outside the pill's rounded corners;
+  admins can upload their own logo for light backgrounds.
+- `bawaslu-background.jpg`: the key visual cropped below the pill (y ≥ 400), resized to
+  1600 px wide and saved as JPEG under 240 KB.
+- `app-icon.png`, `adaptive-icon.png`, `favicon.png`: the ballot-box mark cropped at
+  x 205, y 170, 145 × 145 px with the white pill background made transparent.
 
-Measured reference styling: gold `#DBAF6D`, Arial typography, 6px field corners,
-1px gold field borders, and input background `rgba(29, 27, 26, 0.54)`.
-The PNG logo and JPG background are preserved as supplied, without redrawing them.
-
-## Application icons
-
-The icons use the original logo's gold emblem, cropped above the wordmark so it
-remains legible at small sizes. Regenerate them with
-`node scripts/generate-brand-icons.cjs` after installing dependencies.
-
-- `app-icon.png`: opaque 1024 × 1024 charcoal square for iOS and legacy Android.
-- `adaptive-icon.png`: transparent 1024 × 1024 foreground with Android safe-zone
-  padding, paired with the charcoal background configured in `app.json`.
-- `favicon.png`: 64 × 64 browser icon; Expo exports it as `favicon.ico` for web.
-
-Native icon changes require a new app build; browser favicons may be cached.
+Regenerate everything with `node scripts/generate-brand-assets.cjs`. Native icon changes
+need a new build; browser favicons may be cached.

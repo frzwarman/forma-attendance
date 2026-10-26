@@ -1,4 +1,4 @@
-import { ChevronRight, type LucideIcon } from "lucide-react-native";
+import { type LucideIcon } from "lucide-react-native";
 import React from "react";
 import {
   ActivityIndicator,
@@ -11,6 +11,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { fonts, fontWeights, useTheme } from "../theme";
+
 export function T({
   children,
   size = 14,
@@ -42,25 +43,16 @@ export function T({
     </Text>
   );
 }
-export function Row({
-  children,
-  style,
-  ...props
-}: React.ComponentProps<typeof View>) {
+
+export function Row({ children, style, ...props }: React.ComponentProps<typeof View>) {
   return (
-    <View
-      {...props}
-      style={[{ flexDirection: "row", alignItems: "center", gap: 10 }, style]}
-    >
+    <View {...props} style={[{ flexDirection: "row", alignItems: "center", gap: 10 }, style]}>
       {children}
     </View>
   );
 }
-export function Card({
-  children,
-  style,
-  ...props
-}: React.ComponentProps<typeof View>) {
+
+export function Card({ children, style, ...props }: React.ComponentProps<typeof View>) {
   const c = useTheme();
   return (
     <View
@@ -80,6 +72,7 @@ export function Card({
     </View>
   );
 }
+
 export function Button({
   label,
   onPress,
@@ -87,14 +80,14 @@ export function Button({
   variant = "primary",
   disabled = false,
   loading = false,
-  loadingLabel = "Please wait…",
+  loadingLabel = "Mohon tunggu…",
   style,
   small = false,
 }: {
   label: string;
   onPress: () => void;
   icon?: LucideIcon;
-  variant?: "primary" | "secondary" | "ghost" | "danger" | "white";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
   disabled?: boolean;
   loading?: boolean;
   loadingLabel?: string;
@@ -103,23 +96,8 @@ export function Button({
 }) {
   const c = useTheme();
   const background =
-    variant === "primary"
-      ? c.buttonSurface
-      : variant === "secondary"
-        ? c.lavender
-        : variant === "white"
-          ? c.primary
-          : variant === "danger"
-            ? c.redBg
-            : "transparent";
-  const color =
-    variant === "primary"
-      ? c.primaryText
-      : variant === "white"
-        ? c.onPrimary
-        : variant === "danger"
-          ? c.red
-          : c.primaryText;
+    variant === "primary" ? c.accent : variant === "danger" ? c.danger : "transparent";
+  const color = variant === "primary" ? c.onAccent : variant === "danger" ? "#ffffff" : c.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -134,11 +112,7 @@ export function Button({
           borderRadius: 100,
           borderWidth: variant === "ghost" ? 0 : 1,
           borderColor:
-            variant === "danger"
-              ? c.red
-              : variant === "primary" || variant === "white"
-                ? c.primary
-                : c.border,
+            variant === "primary" ? c.accent : variant === "danger" ? c.danger : c.border,
           paddingHorizontal: small ? 14 : 20,
           backgroundColor: background,
           opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
@@ -151,28 +125,23 @@ export function Button({
         style,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator color={color} />
-      ) : Icon ? (
-        <Icon size={18} color={color} />
-      ) : null}
+      {loading ? <ActivityIndicator color={color} /> : Icon ? <Icon size={18} color={color} /> : null}
       <T weight="semibold" color={color} size={small ? 12 : 14}>
         {loading ? loadingLabel : label}
       </T>
     </Pressable>
   );
 }
+
 export function IconButton({
   icon: Icon,
   onPress,
   label,
-  badge,
   disabled = false,
 }: {
   icon: LucideIcon;
   onPress: () => void;
   label: string;
-  badge?: boolean;
   disabled?: boolean;
 }) {
   const c = useTheme();
@@ -186,118 +155,62 @@ export function IconButton({
       style={({ pressed }) => ({
         height: 44,
         width: 44,
-        borderRadius: 12,
+        borderRadius: 22,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: pressed ? c.subtle : "transparent",
+        backgroundColor: pressed ? c.inputSurface : "transparent",
         opacity: disabled ? 0.45 : 1,
       })}
     >
       <Icon size={21} color={c.muted} strokeWidth={1.8} />
-      {badge && (
-        <View
-          style={{
-            position: "absolute",
-            right: 10,
-            top: 9,
-            width: 6,
-            height: 6,
-            backgroundColor: c.primary,
-            borderRadius: 4,
-            borderWidth: 1,
-            borderColor: c.surface,
-          }}
-        />
-      )}
     </Pressable>
   );
 }
+
 export function Badge({
   label,
-  tone = "primary",
-  dot = false,
+  tone = "neutral",
 }: {
   label: string;
-  tone?: "primary" | "green" | "amber" | "red" | "blue" | "neutral";
-  dot?: boolean;
+  tone?: "neutral" | "success" | "danger" | "gold";
 }) {
   const c = useTheme();
   const color =
-    tone === "primary" ? c.primaryText : tone === "neutral" ? c.muted : c[tone];
-  const bg =
-    tone === "primary"
-      ? c.lavender
-      : tone === "neutral"
-        ? c.subtle
-        : c[`${tone}Bg`];
+    tone === "success" ? c.success : tone === "danger" ? c.danger : tone === "gold" ? c.gold : c.muted;
   return (
-    <Row
+    <View
       style={{
         alignSelf: "flex-start",
-        gap: 5,
-        backgroundColor: bg,
-        borderRadius: 6,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        borderRadius: 100,
+        borderWidth: 1,
+        borderColor: color,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
       }}
     >
-      {dot && (
-        <View
-          style={{
-            width: 5,
-            height: 5,
-            borderRadius: 3,
-            backgroundColor: color,
-          }}
-        />
-      )}
-      <T size={10} weight="semibold" color={color}>
+      <T size={11} weight="semibold" color={color}>
         {label}
       </T>
-    </Row>
+    </View>
   );
 }
-export function SectionTitle({
-  title,
-  action,
-  onPress,
-}: {
-  title: string;
-  action?: string;
-  onPress?: () => void;
-}) {
-  const c = useTheme();
+
+export function SectionTitle({ title, right }: { title: string; right?: React.ReactNode }) {
   return (
-    <Row style={{ justifyContent: "space-between", marginBottom: 19 }}>
-      <T size={16} weight="bold" style={{ flexShrink: 1 }}>
+    <Row style={{ justifyContent: "space-between", marginBottom: 14 }}>
+      <T size={16} weight="bold" accessibilityRole="header">
         {title}
       </T>
-      {!!action && (
-        <Pressable
-          accessibilityRole="button"
-          onPress={onPress}
-          style={{ minHeight: 36, justifyContent: "center" }}
-        >
-          <Row style={{ gap: 4 }}>
-            <T color={c.primaryText} size={12} weight="semibold">
-              {action}
-            </T>
-            <ChevronRight size={14} color={c.primaryText} />
-          </Row>
-        </Pressable>
-      )}
+      {right}
     </Row>
   );
 }
-export function Field({
-  label,
-  error,
-  ...props
-}: TextInputProps & { label: string; error?: string }) {
+
+export function Field({ label, error, ...props }: TextInputProps & { label: string; error?: string }) {
   const c = useTheme();
   return (
-    <View style={{ gap: 10 }}>
-      <T size={15} weight="regular">
+    <View style={{ gap: 8 }}>
+      <T size={14} weight="medium">
         {label}
       </T>
       <TextInput
@@ -309,10 +222,10 @@ export function Field({
             minHeight: 44,
             borderRadius: 6,
             borderWidth: 1,
-            borderColor: error ? c.red : c.primary,
+            borderColor: error ? c.danger : c.border,
             paddingHorizontal: 14,
             paddingVertical: 10,
-            color: c.white,
+            color: c.text,
             backgroundColor: c.inputSurface,
             fontFamily: fonts.regular,
             fontSize: 15,
@@ -321,13 +234,14 @@ export function Field({
         ]}
       />
       {!!error && (
-        <T size={11} color={c.red}>
+        <T size={12} color={c.danger} accessibilityRole="alert">
           {error}
         </T>
       )}
     </View>
   );
 }
+
 export function Empty({ title, message }: { title: string; message: string }) {
   const c = useTheme();
   return (
