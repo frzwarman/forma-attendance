@@ -48,3 +48,13 @@ test("the settings form is withheld when settings failed to load", async ({ page
   await expect(page.getByRole("alert")).toContainText("Pengaturan gagal dimuat");
   await expect(page.getByRole("button", { name: "Simpan", exact: true })).toHaveCount(0);
 });
+
+test("a settings save the database refuses explains the missing admin right", async ({ page }) => {
+  await installSupabaseStub(page, { settingsWriteDenied: true });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "Tampilan" }).click();
+  await page.getByLabel("Nomor WhatsApp panitia", { exact: true }).fill("082113028803");
+  await page.getByRole("button", { name: "Simpan", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("tidak memiliki izin admin");
+});

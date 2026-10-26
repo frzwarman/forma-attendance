@@ -24,3 +24,14 @@ test("the admin area survives a reload while signed in", async ({ page }) => {
   await page.reload();
   await expect(page.getByRole("heading", { name: "Daftar Check-in" })).toBeVisible();
 });
+
+test("an account without admin rights is told how to get access instead of an empty dashboard", async ({ page }) => {
+  await installSupabaseStub(page, { admin: { email: "admin@bawaslu.test", password: "rahasia123", isAdmin: false } });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await expect(page.getByRole("heading", { name: "Akun ini belum menjadi admin" })).toBeVisible();
+  await expect(page.getByText(/admin@bawaslu\.test/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Daftar Check-in" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Keluar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Masuk Admin" })).toBeVisible();
+});

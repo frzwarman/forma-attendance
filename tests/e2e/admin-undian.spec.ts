@@ -33,3 +33,12 @@ test("the draw picks each attendee once, masks the phone and can be redrawn afte
   await expect(winnerName).toHaveText(first);
   expect(state.winners).toHaveLength(2);
 });
+
+test("the draw waits until someone has checked in", async ({ page }) => {
+  await installSupabaseStub(page);
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "Undian" }).click();
+  await expect(page.getByText("Belum ada peserta yang check-in.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Undi", exact: true })).toBeDisabled();
+});

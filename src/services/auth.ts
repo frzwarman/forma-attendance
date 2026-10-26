@@ -28,3 +28,10 @@ export function useSession(): { session: Session | null; loading: boolean } {
   }, []);
   return { session, loading };
 }
+
+// True when the signed-in account is listed in guestbook_admins.
+export async function isAdmin(): Promise<boolean> {
+  const { data, error } = await getSupabase().rpc("guestbook_is_admin");
+  if (error) throw new Error(error.message);
+  return data === true;
+}

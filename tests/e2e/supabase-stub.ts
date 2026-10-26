@@ -14,7 +14,9 @@ type Seed = {
   settings?: Partial<Settings>;
   checkins?: CheckIn[];
   winners?: Winner[];
-  admin?: { email: string; password: string };
+  admin?: { email: string; password: string; isAdmin?: boolean };
+  // Simulates RLS refusing the settings update (zero rows updated).
+  settingsWriteDenied?: boolean;
   failSettings?: boolean;
   newRowAfterFirstPage?: boolean;
   // The event slideshow opens on a first visit; tests opt in to see it.
@@ -125,6 +127,10 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
   const adminUser = { id: "00000000-0000-4000-8000-00000000adm1", email: admin.email };
 
   await page.route("**/rest/v1/guestbook_settings*", async (route, request) => {
+    if (request.method() === "PATCH" && seed.settingsWriteDenied) {
+      if (wantsObject(request)) return json(route, { code: "PGRST116", message: "Cannot coerce the result to a single JSON object" }, 406);
+      return json(route, []);
+    }
     if (request.method() === "PATCH") {
       Object.assign(state.settings, parseBody(request), { updated_at: new Date().toISOString() });
     } else if (seed.failSettings) {
@@ -159,6 +165,8 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     state.checkins.push(row);
     return json(route, { status: "created", created_at: row.created_at });
   });
+
+  await page.route("**/rest/v1/rpc/guestbook_is_admin", (route) => json(route, admin.isAdmin ?? true));
 
   await page.route("**/rest/v1/rpc/guestbook_draw_winner", async (route, request) => {
     const body = parseBody(request);

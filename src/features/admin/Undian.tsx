@@ -51,7 +51,8 @@ export function Undian() {
   }
 
   const list = winners.data ?? [];
-  const remaining = Math.max(0, (checkins.data ?? []).length - list.length);
+  const total = (checkins.data ?? []).length;
+  const remaining = Math.max(0, total - list.length);
   const stage = (
     <div
       style={{
@@ -87,9 +88,13 @@ export function Undian() {
         </div>
       ) : (
         <T size={16} color={c.onBackgroundMuted} style={{ textAlign: "center", maxWidth: 360 }}>
-          {result?.status === "empty"
-            ? "Semua peserta sudah mendapat hadiah."
-            : `Tekan Undi untuk memilih satu dari ${remaining.toLocaleString("id-ID")} peserta secara acak.`}
+          {checkins.isLoading
+            ? "Memuat peserta…"
+            : total === 0
+              ? "Belum ada peserta yang check-in."
+              : result?.status === "empty"
+                ? "Semua peserta sudah mendapat hadiah."
+                : `Tekan Undi untuk memilih satu dari ${remaining.toLocaleString("id-ID")} peserta secara acak.`}
         </T>
       )}
     </div>
@@ -108,7 +113,15 @@ export function Undian() {
       <Row style={{ gap: 20, alignItems: "stretch", flexDirection: wide ? "row" : "column" }}>
         <Card style={{ gap: 16, width: wide ? 340 : undefined, alignSelf: wide ? "flex-start" : "stretch" }}>
           <Field label="Nama hadiah" value={prize} onChangeText={setPrize} editable={!busy} placeholder="Hadiah 1" />
-          <Button large icon={Gift} label="Undi" loading={busy} loadingLabel="Mengundi…" onPress={() => void draw()} />
+          <Button
+            large
+            icon={Gift}
+            label="Undi"
+            loading={busy}
+            loadingLabel="Mengundi…"
+            disabled={checkins.isLoading || total === 0}
+            onPress={() => void draw()}
+          />
           <T size={13} color={c.muted}>
             Sisa peserta yang belum menang: {remaining.toLocaleString("id-ID")}
           </T>

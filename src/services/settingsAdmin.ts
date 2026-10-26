@@ -4,9 +4,12 @@ import { getSupabase } from "./supabase";
 import { compressImage } from "./uploads";
 
 export async function updateSettings(patch: Partial<Omit<Settings, "id" | "updated_at">>): Promise<Settings> {
-  const { data, error } = await getSupabase().from("guestbook_settings").update(patch).eq("id", 1).select().single();
+  const { data, error } = await getSupabase().from("guestbook_settings").update(patch).eq("id", 1).select();
   if (error) throw new Error(error.message);
-  return { ...DEFAULT_SETTINGS, ...(data as Settings) };
+  // Row-level security turns a non-admin update into zero updated rows, not an error.
+  const row = (data ?? [])[0] as Settings | undefined;
+  if (!row) throw new Error("Tampilan tidak tersimpan: akun ini tidak memiliki izin admin.");
+  return { ...DEFAULT_SETTINGS, ...row };
 }
 
 // Logos keep PNG/WebP transparency when small; everything else is re-encoded as JPEG.
