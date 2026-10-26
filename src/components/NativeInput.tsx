@@ -1,7 +1,7 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { View } from "react-native";
 import { useTheme } from "../theme";
-import { T } from "./ui";
+import { Row, T } from "./ui";
 
 // Web-only native inputs (date, file, colour) styled like Field.
 export function useInputStyle(error?: string): CSSProperties {
@@ -39,6 +39,72 @@ export function DateInput({
         {label}
       </T>
       <input type="date" aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} style={style} />
+      {!!error && (
+        <T size={12} color={c.danger} accessibilityRole="alert">
+          {error}
+        </T>
+      )}
+    </View>
+  );
+}
+
+export function FileInput({
+  label,
+  accept,
+  onChange,
+  error,
+  hint,
+}: {
+  label: string;
+  accept: string;
+  onChange: (file: File | null) => void;
+  error?: string;
+  hint?: string;
+}) {
+  const c = useTheme();
+  const [name, setName] = useState("");
+  return (
+    <View style={{ gap: 8 }}>
+      <T size={14} weight="medium">
+        {label}
+      </T>
+      <Row style={{ gap: 12 }}>
+        <label
+          style={{
+            position: "relative",
+            display: "inline-block",
+            padding: "10px 16px",
+            borderRadius: 100,
+            border: `1px solid ${c.border}`,
+            cursor: "pointer",
+            fontFamily: "Arial",
+            fontSize: 14,
+            color: c.text,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Pilih berkas
+          <input
+            type="file"
+            accept={accept}
+            aria-label={label}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              setName(file?.name ?? "");
+              onChange(file);
+            }}
+            style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, opacity: 0, overflow: "hidden" }}
+          />
+        </label>
+        <T size={13} color={c.muted} style={{ flex: 1 }}>
+          {name || "Belum ada berkas"}
+        </T>
+      </Row>
+      {!!hint && (
+        <T size={12} color={c.muted}>
+          {hint}
+        </T>
+      )}
       {!!error && (
         <T size={12} color={c.danger} accessibilityRole="alert">
           {error}

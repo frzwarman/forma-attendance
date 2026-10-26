@@ -2,12 +2,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { TextInput, View } from "react-native";
-import { DateInput } from "../components/NativeInput";
+import { DateInput, FileInput } from "../components/NativeInput";
 import { Button, Card, Field, Row, T } from "../components/ui";
 import { checkInSchema, type CheckInInput } from "../domain/checkin";
 import { whatsappLink } from "../domain/phone";
 import { formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
+import { ALLOWED_TYPES, UNSUPPORTED_FILE, uploadCheckInFile } from "../services/uploads";
+import { MapPicker, type Pin } from "./checkin/MapPicker";
 import { useSettings } from "../services/settings";
 import { useTheme } from "../theme";
 
@@ -34,12 +36,30 @@ export function CheckIn() {
   const [error, setError] = useState("");
   const [duplicateAt, setDuplicateAt] = useState("");
   const [created, setCreated] = useState<CheckInInput>();
+  const [pin, setPin] = useState<Pin | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const submit = handleSubmit(async (input) => {
     setError("");
     setDuplicateAt("");
     try {
-      const result = await submitCheckIn(input, { file_path: null, honeypot, latitude: null, longitude: null });
+      let file_path: string | null = null;
+      if (file) {
+        setUploading(true);
+        try {
+          file_path = await uploadCheckInFile(file);
+        } finally {
+          setUploading(false);
+        }
+      }
+      const result = await submitCheckIn(input, {
+        file_path,
+        honeypot,
+        latitude: pin?.latitude ?? null,
+        longitude: pin?.longitude ?? null,
+      });
       if (result.status === "duplicate") setDuplicateAt(result.created_at);
       else setCreated(input);
     } catch (cause) {
@@ -96,6 +116,9 @@ export function CheckIn() {
           label="Isi check-in lain"
           onPress={() => {
             reset(empty);
+            setPin(null);
+            setFile(null);
+            setFileError("");
             setCreated(undefined);
           }}
         />
@@ -144,6 +167,22 @@ export function CheckIn() {
       {text("email", "E-mail", { keyboardType: "email-address", autoCapitalize: "none", autoComplete: "email" })}
       {text("jabatan", "Jabatan")}
       {text("address", "Alamat", { multiline: true, style: { minHeight: 88, textAlignVertical: "top" } })}
+      <MapPicker value={pin} onChange={setPin} />
+      <FileInput
+        label="Unggah Berkas (opsional)"
+        accept="image/*,application/pdf"
+        hint="Gambar atau PDF, maksimal 5 MB"
+        error={fileError}
+        onChange={(chosen) => {
+          if (chosen && !ALLOWED_TYPES.includes(chosen.type)) {
+            setFileError(UNSUPPORTED_FILE);
+            setFile(null);
+          } else {
+            setFileError("");
+            setFile(chosen);
+          }
+        }}
+      />
       {date("check_in_date", "Tanggal Check In")}
       {date("check_out_date", "Tanggal Check Out")}
       <TextInput
@@ -166,7 +205,12 @@ export function CheckIn() {
         </T>
       )}
       <View style={{ marginTop: 6 }}>
-        <Button label="Kirim" loading={isSubmitting} loadingLabel="Mengirim…" onPress={submit} />
+        <Button
+          label="Kirim"
+          loading={isSubmitting}
+          loadingLabel={uploading ? "Mengunggah berkas…" : "Mengirim…"}
+          onPress={submit}
+        />
       </View>
     </Card>
   );
