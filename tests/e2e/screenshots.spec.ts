@@ -21,5 +21,5 @@ test("captures reference screenshots of the public form and the admin list", asy
   await page.goto("/admin");
   await signInAsAdmin(page);
   await expect(page.getByText("Total check-in: 3", { exact: true })).toBeVisible();
-  await page.screenshot({ path: "artifacts/admin-daftar-1280.png", fullPage: true });
+  await page.screenshot({ path: "artifacts/admin-daftar-1280.png" });
 });

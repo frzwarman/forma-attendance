@@ -18,17 +18,25 @@ test("the public page renders the Bawaslu defaults when settings cannot be loade
   await expect(page.getByText("Formulir Check-in")).toBeVisible();
 });
 
-test("the background image keeps covering the viewport when a long form is scrolled", async ({ page }) => {
+test("the public page scrolls to the bottom with the wheel while the background keeps covering the viewport", async ({ page }) => {
   await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible();
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  const box = await page.getByTestId("backdrop-image").evaluate((element) => {
+  const kirim = page.getByRole("button", { name: "Kirim", exact: true });
+  await expect(kirim).toBeAttached();
+  expect((await kirim.boundingBox())!.y).toBeGreaterThan(844);
+  await page.mouse.move(195, 400);
+  await page.mouse.wheel(0, 5000);
+  await expect
+    .poll(async () => {
+      const box = await kirim.boundingBox();
+      return box ? box.y + box.height : Infinity;
+    })
+    .toBeLessThanOrEqual(844);
+  const layer = await page.getByTestId("backdrop-image").evaluate((element) => {
     const rect = element.getBoundingClientRect();
-    return { top: rect.top, bottom: rect.bottom, height: window.innerHeight, scrollY: window.scrollY };
+    return { top: rect.top, bottom: rect.bottom, height: window.innerHeight };
   });
-  expect(box.scrollY).toBeGreaterThan(200);
-  expect(box.top).toBeLessThanOrEqual(0);
-  expect(box.bottom).toBeGreaterThanOrEqual(box.height);
+  expect(layer.top).toBeLessThanOrEqual(0);
+  expect(layer.bottom).toBeGreaterThanOrEqual(layer.height);
 });

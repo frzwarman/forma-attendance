@@ -1,6 +1,6 @@
 import { Asset } from "expo-asset";
 import type { ReactNode } from "react";
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { brandImageUrl, useSettings } from "../services/settings";
 import { useTheme } from "../theme";
 import { T } from "./ui";
@@ -16,13 +16,15 @@ export function Backdrop({ children }: { children: ReactNode }) {
   const c = useTheme();
   const { settings } = useSettings();
   const image = brandImageUrl(settings.background_path) ?? bundledUri(bundled.background);
+  // Expo's web shell keeps the document itself unscrollable (body overflow hidden),
+  // so pages scroll inside this ScrollView; the image layer fills the container behind it.
   return (
-    <div style={{ position: "relative", minHeight: "100vh", backgroundColor: c.background }}>
+    <View style={{ flex: 1, backgroundColor: c.background }}>
       <div
         data-testid="backdrop-image"
         aria-hidden
         style={{
-          position: "fixed",
+          position: "absolute",
           inset: 0,
           backgroundColor: c.background,
           backgroundImage: `url(${image})`,
@@ -31,8 +33,10 @@ export function Backdrop({ children }: { children: ReactNode }) {
           backgroundRepeat: "no-repeat",
         }}
       />
-      <div style={{ position: "relative" }}>{children}</div>
-    </div>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
