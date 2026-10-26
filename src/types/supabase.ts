@@ -763,6 +763,146 @@ export type Database = {
           },
         ]
       }
+      guestbook_admins: {
+        Row: {
+          auth_user_id: string
+          created_at: string
+        }
+        Insert: {
+          auth_user_id: string
+          created_at?: string
+        }
+        Update: {
+          auth_user_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      guestbook_checkins: {
+        Row: {
+          address: string
+          check_in_date: string
+          check_out_date: string
+          created_at: string
+          email: string
+          email_key: string | null
+          file_path: string | null
+          id: string
+          jabatan: string
+          latitude: number | null
+          longitude: number | null
+          name: string
+          phone: string
+          phone_key: string | null
+        }
+        Insert: {
+          address: string
+          check_in_date: string
+          check_out_date: string
+          created_at?: string
+          email: string
+          email_key?: string | null
+          file_path?: string | null
+          id?: string
+          jabatan: string
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          phone: string
+          phone_key?: string | null
+        }
+        Update: {
+          address?: string
+          check_in_date?: string
+          check_out_date?: string
+          created_at?: string
+          email?: string
+          email_key?: string | null
+          file_path?: string | null
+          id?: string
+          jabatan?: string
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          phone?: string
+          phone_key?: string | null
+        }
+        Relationships: []
+      }
+      guestbook_draw_winners: {
+        Row: {
+          checkin_id: string
+          drawn_at: string
+          drawn_by: string | null
+          id: string
+          prize: string
+        }
+        Insert: {
+          checkin_id: string
+          drawn_at?: string
+          drawn_by?: string | null
+          id?: string
+          prize?: string
+        }
+        Update: {
+          checkin_id?: string
+          drawn_at?: string
+          drawn_by?: string | null
+          id?: string
+          prize?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guestbook_draw_winners_checkin_id_fkey"
+            columns: ["checkin_id"]
+            isOneToOne: true
+            referencedRelation: "guestbook_checkins"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guestbook_settings: {
+        Row: {
+          accent_color: string
+          background_color: string
+          background_path: string | null
+          event_name: string
+          id: number
+          logo_path: string | null
+          surface_color: string
+          text_color: string
+          updated_at: string
+          welcome_text: string
+          whatsapp_number: string | null
+        }
+        Insert: {
+          accent_color?: string
+          background_color?: string
+          background_path?: string | null
+          event_name?: string
+          id?: number
+          logo_path?: string | null
+          surface_color?: string
+          text_color?: string
+          updated_at?: string
+          welcome_text?: string
+          whatsapp_number?: string | null
+        }
+        Update: {
+          accent_color?: string
+          background_color?: string
+          background_path?: string | null
+          event_name?: string
+          id?: number
+          logo_path?: string | null
+          surface_color?: string
+          text_color?: string
+          updated_at?: string
+          welcome_text?: string
+          whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -780,6 +920,25 @@ export type Database = {
         Args: { target_organization: string }
         Returns: boolean
       }
+      guestbook_check_in: {
+        Args: {
+          p_address: string
+          p_check_in_date: string
+          p_check_out_date: string
+          p_email: string
+          p_file_path: string
+          p_honeypot?: string
+          p_jabatan: string
+          p_latitude: number
+          p_longitude: number
+          p_name: string
+          p_phone: string
+        }
+        Returns: Json
+      }
+      guestbook_draw_winner: { Args: { p_prize?: string }; Returns: Json }
+      guestbook_is_admin: { Args: never; Returns: boolean }
+      guestbook_phone_key: { Args: { input: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never
