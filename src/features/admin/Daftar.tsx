@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { Badge, Button, Card, Empty, Field, Row, T } from "../../components/ui";
+import { exportFileName, exportRows, toCsv, toXlsx } from "../../domain/export";
 import { formatWib } from "../../domain/time";
 import { signedFileUrl, useCheckIns, useWinners } from "../../services/checkins";
+import { downloadFile } from "../../services/download";
+import { useSettings } from "../../services/settings";
 import { useTheme } from "../../theme";
 import type { CheckIn, Winner } from "../../types/guestbook";
 
@@ -12,6 +15,7 @@ export function Daftar() {
   const c = useTheme();
   const checkins = useCheckIns();
   const winners = useWinners();
+  const { settings } = useSettings();
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(STEP);
   const [error, setError] = useState("");
@@ -35,6 +39,17 @@ export function Daftar() {
     }
   }
 
+  function exportAs(ext: "csv" | "xlsx") {
+    const table = exportRows(rows, winners.data ?? []);
+    const name = exportFileName(settings.event_name, ext);
+    if (ext === "csv") downloadFile(name, new Blob([toCsv(table)], { type: "text/csv;charset=utf-8" }));
+    else
+      downloadFile(
+        name,
+        new Blob([toXlsx(table)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+      );
+  }
+
   return (
     <Card style={{ gap: 16 }}>
       <Row style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
@@ -42,6 +57,10 @@ export function Daftar() {
           Daftar Check-in
         </T>
         <T weight="medium">Total check-in: {rows.length.toLocaleString("id-ID")}</T>
+      </Row>
+      <Row style={{ gap: 10, flexWrap: "wrap" }}>
+        <Button small label="Ekspor Excel" disabled={checkins.isLoading} onPress={() => exportAs("xlsx")} />
+        <Button small variant="secondary" label="Ekspor CSV" disabled={checkins.isLoading} onPress={() => exportAs("csv")} />
       </Row>
       {checkins.isError && (
         <T accessibilityRole="alert" color={c.danger}>
