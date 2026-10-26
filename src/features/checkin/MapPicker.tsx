@@ -47,7 +47,15 @@ export function MapPicker({ value, onChange }: { value: Pin | null; onChange: (p
 
   useEffect(() => {
     if (!container.current || map.current) return;
-    const created = L.map(container.current, { center: JAKARTA, zoom: 11 });
+    // The map sits inside a long scrolling form: the wheel and one-finger swipes must
+    // scroll the page. Desktop users still drag to pan; phones pinch to zoom, tap to
+    // place the pin and drag the pin itself.
+    const created = L.map(container.current, {
+      center: JAKARTA,
+      zoom: 11,
+      scrollWheelZoom: false,
+      dragging: !L.Browser.mobile,
+    });
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap contributors",
       maxZoom: 19,
