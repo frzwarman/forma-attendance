@@ -17,3 +17,18 @@ test("the public page renders the Bawaslu defaults when settings cannot be loade
   await expect(page.getByRole("heading", { name: "Buku Tamu" })).toBeVisible();
   await expect(page.getByText("Formulir Check-in")).toBeVisible();
 });
+
+test("the background image keeps covering the viewport when a long form is scrolled", async ({ page }) => {
+  await installSupabaseStub(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible();
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const box = await page.getByTestId("backdrop-image").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { top: rect.top, bottom: rect.bottom, height: window.innerHeight, scrollY: window.scrollY };
+  });
+  expect(box.scrollY).toBeGreaterThan(200);
+  expect(box.top).toBeLessThanOrEqual(0);
+  expect(box.bottom).toBeGreaterThanOrEqual(box.height);
+});

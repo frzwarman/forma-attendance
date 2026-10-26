@@ -17,17 +17,21 @@ export function Backdrop({ children }: { children: ReactNode }) {
   const { settings } = useSettings();
   const image = brandImageUrl(settings.background_path) ?? bundledUri(bundled.background);
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        backgroundColor: c.background,
-        backgroundImage: `url(${image})`,
-        backgroundSize: "cover",
-        backgroundPosition: "left top",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
-      {children}
+    <div style={{ position: "relative", minHeight: "100vh", backgroundColor: c.background }}>
+      <div
+        data-testid="backdrop-image"
+        aria-hidden
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: c.background,
+          backgroundImage: `url(${image})`,
+          backgroundSize: "cover",
+          backgroundPosition: "left top",
+          backgroundRepeat: "no-repeat",
+        }}
+      />
+      <div style={{ position: "relative" }}>{children}</div>
     </div>
   );
 }
