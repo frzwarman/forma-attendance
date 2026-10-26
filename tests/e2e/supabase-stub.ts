@@ -17,6 +17,8 @@ type Seed = {
   admin?: { email: string; password: string };
   failSettings?: boolean;
   newRowAfterFirstPage?: boolean;
+  // The event slideshow opens on a first visit; tests opt in to see it.
+  intro?: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -118,6 +120,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     signedPaths: [],
     rangeHeaders: [],
   };
+  if (!seed.intro) await page.addInitScript(() => sessionStorage.setItem("guestbook.intro.seen", "1"));
   const admin = seed.admin || { email: "admin@bawaslu.test", password: "rahasia123" };
   const adminUser = { id: "00000000-0000-4000-8000-00000000adm1", email: admin.email };
 

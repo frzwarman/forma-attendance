@@ -49,3 +49,7 @@ export const SwitchCamera = make([["path",{"d":"M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0
 export const X = make([["path",{"d":"M18 6 6 18"}],["path",{"d":"m6 6 12 12"}]]);
 
 export const Upload = make([["path",{"d":"M12 3v12"}],["path",{"d":"m17 8-5-5-5 5"}],["path",{"d":"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"}]]);
+
+export const ChevronLeft = make([["path",{"d":"m15 18-6-6 6-6"}]]);
+
+export const ChevronRight = make([["path",{"d":"m9 18 6-6-6-6"}]]);

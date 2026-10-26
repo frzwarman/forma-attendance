@@ -3,6 +3,7 @@ import { Asset } from "expo-asset";
 import { RotateCcw, Save } from "../../components/icons";
 import { useEffect, useMemo, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
+import { Sphere } from "../../components/Brand";
 import { ColorInput, FileInput } from "../../components/NativeInput";
 import { Button, Card, Divider, Field, Row, SectionTitle, T } from "../../components/ui";
 import { BAWASLU, isHexColor, type ThemeColors } from "../../domain/theme";
@@ -229,8 +230,11 @@ function Preview({ draft, logoSrc }: { draft: Draft; logoSrc: string }) {
   const c = useTheme();
   return (
     <View style={{ gap: 14, alignItems: "flex-start" }}>
-      <div style={{ display: "inline-flex", padding: "7px 12px", borderRadius: 999, backgroundColor: "#ffffff" }}>
-        <img alt="" src={logoSrc} style={{ width: 110, height: "auto", display: "block" }} />
+      <div style={{ display: "flex", alignSelf: "stretch", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ display: "inline-flex", padding: "7px 12px", borderRadius: 999, backgroundColor: "#ffffff" }}>
+          <img alt="" src={logoSrc} style={{ width: 110, height: "auto", display: "block" }} />
+        </div>
+        <Sphere width={96} />
       </div>
       <T size={22} weight="extra" color={c.onBackground}>
         {draft.event_name || "Buku Tamu"}

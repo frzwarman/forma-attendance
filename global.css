@@ -39,6 +39,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0;
   cursor: pointer;
 }
+.intro-track {
+  scrollbar-width: none;
+}
+.intro-track::-webkit-scrollbar {
+  display: none;
+}
 @keyframes reveal {
   from {
     opacity: 0;
