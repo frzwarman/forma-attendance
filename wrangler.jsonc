@@ -1,0 +1,11 @@
+// Cloudflare Workers static assets for the guest book (deployed from this repo).
+// The site is a single-page app: any path without a file (such as /admin) must
+// return index.html so the client router can render it.
+{
+  "name": "forma-attendance",
+  "compatibility_date": "2026-01-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
