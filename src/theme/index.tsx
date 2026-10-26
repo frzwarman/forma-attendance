@@ -11,7 +11,9 @@ export function ThemeProvider({ colors, children }: { colors: ThemeColors; child
 }
 export const useTheme = () => useContext(Context);
 
-const family = Platform.OS === "android" ? "sans-serif" : "Arial";
+// Plus Jakarta Sans (Tokotype, Jakarta) with system fallbacks until it loads.
+export const FONT_STACK = '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const family = Platform.OS === "web" ? FONT_STACK : "sans-serif";
 export const fonts = {
   regular: family,
   medium: family,

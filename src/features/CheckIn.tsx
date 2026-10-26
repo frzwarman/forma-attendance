@@ -1,17 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { TextInput, View } from "react-native";
+import { TextInput, View, useWindowDimensions } from "react-native";
 import { DateInput, FileInput } from "../components/NativeInput";
-import { Button, Card, Field, Row, T } from "../components/ui";
+import { Button, Card, Divider, Field, Row, SectionTitle, T } from "../components/ui";
 import { checkInSchema, type CheckInInput } from "../domain/checkin";
 import { whatsappLink } from "../domain/phone";
-import { formatWib } from "../domain/time";
+import { formatDateRange, formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
-import { ALLOWED_TYPES, UNSUPPORTED_FILE, uploadCheckInFile } from "../services/uploads";
-import { MapPicker, type Pin } from "./checkin/MapPicker";
 import { useSettings } from "../services/settings";
-import { useTheme } from "../theme";
+import { ALLOWED_TYPES, UNSUPPORTED_FILE, uploadCheckInFile } from "../services/uploads";
+import { FONT_STACK, useTheme } from "../theme";
+import { MapPicker, type Pin } from "./checkin/MapPicker";
 
 const empty: CheckInInput = {
   name: "",
@@ -25,6 +25,7 @@ const empty: CheckInInput = {
 
 export function CheckIn() {
   const c = useTheme();
+  const { width } = useWindowDimensions();
   const { settings } = useSettings();
   const {
     control,
@@ -76,22 +77,42 @@ export function CheckIn() {
       ["E-mail", created.email],
       ["Jabatan", created.jabatan],
       ["Alamat", created.address],
-      ["Tanggal", `${created.check_in_date} – ${created.check_out_date}`],
+      ["Kunjungan", formatDateRange(created.check_in_date, created.check_out_date)],
     ];
     return (
-      <Card style={{ gap: 14 }}>
-        <T size={22} weight="bold" accessibilityRole="header">
-          Terima kasih, {created.name}!
-        </T>
-        <T color={c.muted}>Check-in Anda sudah tercatat.</T>
-        {rows.map(([label, value]) => (
-          <Row key={label} style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-            <T color={c.muted}>{label}</T>
-            <T weight="medium" style={{ flex: 1, textAlign: "right" }}>
-              {value}
-            </T>
-          </Row>
-        ))}
+      <Card elevated style={{ gap: 20 }}>
+        <View
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 32,
+            backgroundColor: c.accentSoft,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke={c.accent} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </View>
+        <View style={{ gap: 6 }}>
+          <T size={28} weight="extra" accessibilityRole="header">
+            Terima kasih, {created.name}!
+          </T>
+          <T color={c.muted}>Check-in Anda sudah tercatat. Sampai jumpa di lokasi acara.</T>
+        </View>
+        <View style={{ backgroundColor: c.ground, borderRadius: 12, padding: 16, gap: 10 }}>
+          {rows.map(([label, value]) => (
+            <Row key={label} style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+              <T size={13} color={c.muted} style={{ width: 110 }}>
+                {label}
+              </T>
+              <T size={14} weight="semibold" style={{ flex: 1, textAlign: "right" }}>
+                {value}
+              </T>
+            </Row>
+          ))}
+        </View>
         {!!settings.whatsapp_number && (
           <a
             href={whatsappLink(settings.whatsapp_number)}
@@ -100,12 +121,13 @@ export function CheckIn() {
             style={{
               display: "block",
               textAlign: "center",
-              padding: "14px 20px",
-              borderRadius: 100,
+              padding: "15px 20px",
+              borderRadius: 999,
               backgroundColor: c.accent,
               color: c.onAccent,
-              fontFamily: "Arial",
+              fontFamily: FONT_STACK,
               fontWeight: 600,
+              fontSize: 15,
               textDecoration: "none",
             }}
           >
@@ -159,16 +181,26 @@ export function CheckIn() {
   );
 
   return (
-    <Card style={{ gap: 18 }}>
-      <T size={18} weight="bold" accessibilityRole="header">
-        Formulir Check-in
-      </T>
-      {text("name", "Nama", { autoComplete: "name" })}
-      {text("phone", "Nomor Telepon", { keyboardType: "phone-pad", inputMode: "tel", autoComplete: "tel" })}
-      {text("email", "E-mail", { keyboardType: "email-address", autoCapitalize: "none", autoComplete: "email" })}
-      {text("jabatan", "Jabatan")}
-      {text("address", "Alamat", { multiline: true, style: { minHeight: 88, textAlignVertical: "top" } })}
+    <Card elevated style={{ gap: 22, padding: width < 400 ? 20 : 28 }}>
+      <View style={{ gap: 4 }}>
+        <T size={22} weight="extra" accessibilityRole="header">
+          Formulir Check-in
+        </T>
+        <T size={14} color={c.muted}>
+          Isi data berikut; proses hanya butuh satu menit.
+        </T>
+      </View>
+      <SectionTitle title="Data diri" />
+      {text("name", "Nama", { autoComplete: "name", placeholder: "Nama lengkap" })}
+      {text("phone", "Nomor Telepon", { keyboardType: "phone-pad", inputMode: "tel", autoComplete: "tel", placeholder: "0812 3456 7890" })}
+      {text("email", "E-mail", { keyboardType: "email-address", autoCapitalize: "none", autoComplete: "email", placeholder: "nama@instansi.go.id" })}
+      {text("jabatan", "Jabatan", { placeholder: "Jabatan atau peran" })}
+      <Divider />
+      <SectionTitle title="Lokasi" description="Alamat asal, ditambah titik di peta jika berkenan." />
+      {text("address", "Alamat", { multiline: true, placeholder: "Jalan, kota, provinsi", style: { minHeight: 88, textAlignVertical: "top" } })}
       <MapPicker value={pin} onChange={setPin} />
+      <Divider />
+      <SectionTitle title="Berkas pendukung" description="Opsional, misalnya surat tugas atau kartu identitas." />
       <FileInput
         label="Unggah Berkas (opsional)"
         accept="image/*,application/pdf"
@@ -184,8 +216,12 @@ export function CheckIn() {
           }
         }}
       />
-      {date("check_in_date", "Tanggal Check In")}
-      {date("check_out_date", "Tanggal Check Out")}
+      <Divider />
+      <SectionTitle title="Tanggal kunjungan" />
+      <Row style={{ gap: 12, alignItems: "flex-start", flexWrap: width < 380 ? "wrap" : "nowrap" }}>
+        <View style={{ flex: 1, minWidth: 150 }}>{date("check_in_date", "Tanggal Check In")}</View>
+        <View style={{ flex: 1, minWidth: 150 }}>{date("check_out_date", "Tanggal Check Out")}</View>
+      </Row>
       <TextInput
         accessibilityLabel="Kosongkan kolom ini"
         aria-hidden
@@ -205,8 +241,9 @@ export function CheckIn() {
           {error}
         </T>
       )}
-      <View style={{ marginTop: 6 }}>
+      <View style={{ marginTop: 4 }}>
         <Button
+          large
           label="Kirim"
           loading={isSubmitting}
           loadingLabel={uploading ? "Mengunggah berkas…" : "Mengirim…"}

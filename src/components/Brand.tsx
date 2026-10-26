@@ -11,6 +11,11 @@ const bundled = {
 };
 const bundledUri = (module: number) => Asset.fromModule(module).uri;
 
+export function useBrandBackground() {
+  const { settings } = useSettings();
+  return brandImageUrl(settings.background_path) ?? bundledUri(bundled.background);
+}
+
 // The site is web only, so the backdrop and logo are plain DOM elements.
 export function Backdrop({ children }: { children: ReactNode }) {
   const c = useTheme();
@@ -40,22 +45,42 @@ export function Backdrop({ children }: { children: ReactNode }) {
   );
 }
 
-export function Logo({ width = 220 }: { width?: number }) {
+// "pill" places the logo on a white capsule for dark grounds; "bare" is for white surfaces.
+export function Logo({ width = 200, variant = "pill" }: { width?: number; variant?: "pill" | "bare" }) {
   const { settings } = useSettings();
   const src = brandImageUrl(settings.logo_path) ?? bundledUri(bundled.logo);
-  return <img alt={settings.event_name} src={src} style={{ width, height: "auto", display: "block" }} />;
+  const image = <img alt={settings.event_name} src={src} style={{ width, height: "auto", display: "block" }} />;
+  if (variant === "bare") return image;
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: `${Math.round(width * 0.06)}px ${Math.round(width * 0.1)}px`,
+        borderRadius: 999,
+        backgroundColor: "#ffffff",
+        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
+      }}
+    >
+      {image}
+    </div>
+  );
 }
 
 export function EventHeader() {
   const c = useTheme();
   const { settings } = useSettings();
   return (
-    <View style={{ gap: 14, alignItems: "flex-start" }}>
-      <Logo />
-      <T size={26} weight="bold" color={c.onBackground} accessibilityRole="header">
-        {settings.event_name}
-      </T>
-      <T color={c.onBackground}>{settings.welcome_text}</T>
+    <View style={{ gap: 18, alignItems: "flex-start" }}>
+      <Logo width={170} />
+      <View style={{ gap: 8 }}>
+        <T size={34} weight="extra" color={c.onBackground} accessibilityRole="header" style={{ maxWidth: 520 }}>
+          {settings.event_name}
+        </T>
+        <T size={16} color={c.onBackgroundMuted} style={{ maxWidth: 480 }}>
+          {settings.welcome_text}
+        </T>
+      </View>
     </View>
   );
 }

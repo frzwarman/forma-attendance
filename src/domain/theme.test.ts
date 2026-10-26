@@ -18,7 +18,8 @@ it("derives the Bawaslu theme", () => {
   assert.equal(t.text, "#1e1e1e");
   assert.equal(t.gold, "#d1aa67");
   assert.equal(t.muted, "rgba(30, 30, 30, 0.65)");
-  assert.equal(t.border, "rgba(30, 30, 30, 0.18)");
+  assert.equal(t.border, "rgba(0, 36, 63, 0.14)");
+  assert.equal(t.ground, "#f2f4f5");
   assert.equal(t.overlay, "rgba(0, 36, 63, 0.72)");
 });
 

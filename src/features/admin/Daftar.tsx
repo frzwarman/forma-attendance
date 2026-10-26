@@ -1,18 +1,21 @@
-import { useState } from "react";
-import { View } from "react-native";
-import { Badge, Button, Card, Empty, Field, Row, T } from "../../components/ui";
+import { CalendarCheck, FileSpreadsheet, FileText, Paperclip, Search, Trophy, Users } from "../../components/icons";
+import { useState, type CSSProperties } from "react";
+import { View, useWindowDimensions } from "react-native";
+import { Badge, Button, Card, Empty, Field, Row, Stat, T } from "../../components/ui";
 import { exportFileName, exportRows, toCsv, toXlsx } from "../../domain/export";
-import { formatWib } from "../../domain/time";
+import { formatDateRange, formatWib } from "../../domain/time";
 import { useAdminApi, useCheckIns, useWinners } from "../../services/adminContext";
 import { downloadFile } from "../../services/download";
 import { useSettings } from "../../services/settings";
-import { useTheme } from "../../theme";
+import { FONT_STACK, useTheme } from "../../theme";
 import type { CheckIn, Winner } from "../../types/guestbook";
 
 const STEP = 200;
 
 export function Daftar() {
   const c = useTheme();
+  const { width } = useWindowDimensions();
+  const wide = width >= 900;
   const api = useAdminApi();
   const checkins = useCheckIns();
   const winners = useWinners();
@@ -26,6 +29,9 @@ export function Daftar() {
   const filtered = needle
     ? rows.filter((row) => [row.name, row.phone, row.email].some((value) => value.toLowerCase().includes(needle)))
     : rows;
+  const todayKey = formatWib(new Date().toISOString()).slice(0, 10);
+  const today = rows.filter((row) => formatWib(row.created_at).slice(0, 10) === todayKey).length;
+  const withFiles = rows.filter((row) => row.file_path).length;
 
   // Open the tab synchronously so popup blockers allow it, then point it at the signed URL.
   async function openFile(path: string) {
@@ -51,17 +57,28 @@ export function Daftar() {
       );
   }
 
+  const visible = filtered.slice(0, shown);
   return (
-    <Card style={{ gap: 16 }}>
-      <Row style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <T size={22} weight="bold" accessibilityRole="header">
-          Daftar Check-in
-        </T>
-        <T weight="medium">Total check-in: {rows.length.toLocaleString("id-ID")}</T>
+    <View style={{ gap: 20 }}>
+      <Row style={{ justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 14 }}>
+        <View style={{ gap: 2 }}>
+          <T size={28} weight="extra" accessibilityRole="header">
+            Daftar Check-in
+          </T>
+          <T size={14} color={c.muted}>
+            Total check-in: {rows.length.toLocaleString("id-ID")}
+          </T>
+        </View>
+        <Row style={{ gap: 10, flexWrap: "wrap" }}>
+          <Button small icon={FileSpreadsheet} label="Ekspor Excel" disabled={checkins.isLoading} onPress={() => exportAs("xlsx")} />
+          <Button small variant="secondary" icon={FileText} label="Ekspor CSV" disabled={checkins.isLoading} onPress={() => exportAs("csv")} />
+        </Row>
       </Row>
-      <Row style={{ gap: 10, flexWrap: "wrap" }}>
-        <Button small label="Ekspor Excel" disabled={checkins.isLoading} onPress={() => exportAs("xlsx")} />
-        <Button small variant="secondary" label="Ekspor CSV" disabled={checkins.isLoading} onPress={() => exportAs("csv")} />
+      <Row style={{ gap: 14, flexWrap: "wrap", alignItems: "stretch" }}>
+        <Stat label="Total peserta" value={rows.length.toLocaleString("id-ID")} icon={Users} hint="Diperbarui setiap 10 detik" />
+        <Stat label="Check-in hari ini" value={today.toLocaleString("id-ID")} icon={CalendarCheck} hint="Waktu Indonesia Barat" />
+        <Stat label="Dengan berkas" value={withFiles.toLocaleString("id-ID")} icon={Paperclip} hint="Lampiran yang diunggah" />
+        <Stat label="Pemenang undian" value={(winners.data ?? []).length.toLocaleString("id-ID")} icon={Trophy} tone="gold" hint="Lihat halaman Undian" />
       </Row>
       {checkins.isError && (
         <T accessibilityRole="alert" color={c.danger}>
@@ -73,61 +90,138 @@ export function Daftar() {
           {error}
         </T>
       )}
-      <Field
-        label="Cari nama, telepon, atau e-mail"
-        value={query}
-        onChangeText={(value) => {
-          setQuery(value);
-          setShown(STEP);
-        }}
-        placeholder="Ketik untuk mencari"
-        autoCapitalize="none"
-      />
-      {checkins.isLoading ? (
-        <T color={c.muted}>Memuat daftar…</T>
-      ) : filtered.length === 0 ? (
-        <Empty title="Belum ada check-in" message="Daftar akan terisi saat peserta melakukan check-in." />
-      ) : (
-        <View>
-          {filtered.slice(0, shown).map((row) => (
-            <CheckInRow key={row.id} row={row} winner={winnerById.get(row.id)} onOpenFile={openFile} />
+      <Card style={{ gap: 16, padding: wide ? 20 : 16 }}>
+        <Field
+          label="Cari nama, telepon, atau e-mail"
+          labelHidden
+          placeholder="Cari nama, telepon, atau e-mail"
+          leading={<Search size={16} color={c.muted} strokeWidth={2} />}
+          value={query}
+          onChangeText={(value) => {
+            setQuery(value);
+            setShown(STEP);
+          }}
+          autoCapitalize="none"
+        />
+        {checkins.isLoading ? (
+          <T color={c.muted}>Memuat daftar…</T>
+        ) : filtered.length === 0 ? (
+          <Empty
+            title={needle ? "Tidak ada yang cocok" : "Belum ada check-in"}
+            message={needle ? "Coba kata kunci lain." : "Bagikan tautan halaman check-in; peserta akan muncul di sini begitu mengisi formulir."}
+          />
+        ) : wide ? (
+          <CheckInTable rows={visible} winnerById={winnerById} onOpenFile={openFile} />
+        ) : (
+          <View>
+            {visible.map((row) => (
+              <CheckInRow key={row.id} row={row} winner={winnerById.get(row.id)} onOpenFile={openFile} />
+            ))}
+          </View>
+        )}
+        {filtered.length > shown && (
+          <Button
+            variant="secondary"
+            label={`Tampilkan ${Math.min(STEP, filtered.length - shown)} berikutnya`}
+            onPress={() => setShown(shown + STEP)}
+          />
+        )}
+      </Card>
+    </View>
+  );
+}
+
+function CheckInTable({
+  rows,
+  winnerById,
+  onOpenFile,
+}: {
+  rows: CheckIn[];
+  winnerById: Map<string, Winner>;
+  onOpenFile: (path: string) => void;
+}) {
+  const c = useTheme();
+  const head: CSSProperties = {
+    textAlign: "left",
+    padding: "10px 12px",
+    fontSize: 12,
+    fontWeight: 600,
+    color: c.muted,
+    borderBottom: `1px solid ${c.border}`,
+    whiteSpace: "nowrap",
+  };
+  const cell: CSSProperties = { padding: "12px", verticalAlign: "top", borderBottom: `1px solid ${c.border}`, fontSize: 14, color: c.text };
+  const sub: CSSProperties = { color: c.muted, fontSize: 13, marginTop: 2 };
+  return (
+    <table style={{ width: "100%", fontFamily: FONT_STACK }}>
+      <thead>
+        <tr>
+          {["Waktu", "Peserta", "Kontak", "Kunjungan", "Berkas"].map((label) => (
+            <th key={label} style={head}>
+              {label}
+            </th>
           ))}
-          {filtered.length > shown && (
-            <View style={{ marginTop: 12 }}>
-              <Button
-                variant="secondary"
-                label={`Tampilkan ${Math.min(STEP, filtered.length - shown)} berikutnya`}
-                onPress={() => setShown(shown + STEP)}
-              />
-            </View>
-          )}
-        </View>
-      )}
-    </Card>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const winner = winnerById.get(row.id);
+          return (
+            <tr key={row.id}>
+              <td style={{ ...cell, whiteSpace: "nowrap", color: c.muted }}>{formatWib(row.created_at)}</td>
+              <td style={cell}>
+                <div style={{ fontWeight: 700 }}>{row.name}</div>
+                <div style={sub}>{row.jabatan}</div>
+                {winner && (
+                  <div style={{ marginTop: 6 }}>
+                    <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />
+                  </div>
+                )}
+              </td>
+              <td style={cell}>
+                <div>{row.phone}</div>
+                <div style={sub}>{row.email}</div>
+              </td>
+              <td style={{ ...cell, whiteSpace: "nowrap" }}>{formatDateRange(row.check_in_date, row.check_out_date)}</td>
+              <td style={cell}>
+                {row.file_path ? (
+                  <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />
+                ) : (
+                  <span style={{ color: c.muted }}>Tidak ada</span>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
 function CheckInRow({ row, winner, onOpenFile }: { row: CheckIn; winner?: Winner; onOpenFile: (path: string) => void }) {
   const c = useTheme();
   return (
-    <View style={{ borderTopWidth: 1, borderColor: c.border, paddingVertical: 12, gap: 4 }}>
-      <Row style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <T weight="bold">{row.name}</T>
+    <View style={{ borderTopWidth: 1, borderColor: c.border, paddingVertical: 14, gap: 6 }}>
+      <Row style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <T weight="bold">{row.name}</T>
+          <T size={13} color={c.muted}>
+            {row.jabatan}
+          </T>
+        </View>
         <T size={12} color={c.muted}>
           {formatWib(row.created_at)}
         </T>
       </Row>
-      <T size={13}>
-        {row.jabatan} · {row.phone} · {row.email}
+      <T size={14}>{row.phone}</T>
+      <T size={13} color={c.muted}>
+        {row.email}
       </T>
-      <T size={12} color={c.muted}>
-        {row.address}
-      </T>
-      <Row style={{ gap: 10, flexWrap: "wrap" }}>
-        <T size={12} color={c.muted}>
-          {row.check_in_date} → {row.check_out_date}
+      <Row style={{ gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+        <T size={13} color={c.muted}>
+          {formatDateRange(row.check_in_date, row.check_out_date)}
         </T>
-        {winner && <Badge tone="gold" label={`Pemenang · ${winner.prize || "Undian"}`} />}
+        {winner && <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />}
         {!!row.file_path && (
           <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />
         )}

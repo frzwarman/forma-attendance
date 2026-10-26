@@ -27,39 +27,43 @@ export function Masuk() {
 
   return (
     <Backdrop>
-      <View style={{ padding: 20, paddingTop: 48, paddingBottom: 48 }}>
-        <View style={{ width: "100%", maxWidth: 420, alignSelf: "center", gap: 20 }}>
-          <Logo />
-          <Card style={{ gap: 16 }}>
-            <T size={22} weight="bold" accessibilityRole="header">
+      <View style={{ flex: 1, justifyContent: "center", padding: 20, paddingVertical: 48 }}>
+        <Card elevated style={{ width: "100%", maxWidth: 420, alignSelf: "center", gap: 20, padding: 28 }}>
+          <Logo width={190} variant="bare" />
+          <View style={{ gap: 4 }}>
+            <T size={26} weight="extra" accessibilityRole="header">
               Masuk Admin
             </T>
-            <Field
-              label="E-mail"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              editable={!busy}
-            />
-            <Field
-              label="Kata sandi"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="current-password"
-              editable={!busy}
-              onSubmitEditing={() => void submit()}
-            />
-            {!!error && (
-              <T accessibilityRole="alert" color={c.danger}>
-                {error}
-              </T>
-            )}
-            <Button label="Masuk" loading={busy} loadingLabel="Memeriksa…" onPress={() => void submit()} />
-          </Card>
-        </View>
+            <T size={14} color={c.muted}>
+              Gunakan akun admin acara untuk melihat daftar check-in.
+            </T>
+          </View>
+          <Field
+            label="E-mail"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            placeholder="nama@instansi.go.id"
+            editable={!busy}
+          />
+          <Field
+            label="Kata sandi"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoComplete="current-password"
+            editable={!busy}
+            onSubmitEditing={() => void submit()}
+          />
+          {!!error && (
+            <T accessibilityRole="alert" color={c.danger}>
+              {error}
+            </T>
+          )}
+          <Button large label="Masuk" loading={busy} loadingLabel="Memeriksa…" onPress={() => void submit()} />
+        </Card>
       </View>
     </Backdrop>
   );

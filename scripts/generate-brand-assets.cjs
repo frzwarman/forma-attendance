@@ -7,13 +7,6 @@ const Jimp = requireImageUtils('jimp-compact');
 const brandDir = path.join(path.dirname(require.resolve('../app.json')), 'assets/brand');
 const out = (name) => path.join(brandDir, name);
 
-function transparentWhite(image) {
-  image.scan(0, 0, image.bitmap.width, image.bitmap.height, (x, y, offset) => {
-    const d = image.bitmap.data;
-    if (d[offset] > 240 && d[offset + 1] > 240 && d[offset + 2] > 240) d[offset + 3] = 0;
-  });
-  return image;
-}
 
 async function writeIcon(mark, filename, size, height, background) {
   const scaled = mark.clone().resize(Jimp.AUTO, height, Jimp.RESIZE_BICUBIC);
@@ -29,8 +22,9 @@ async function main() {
   const source = await Jimp.read(out('bawaslu-kv.png'));
   if (source.bitmap.width !== 4536 || source.bitmap.height !== 2552) throw new Error('Unexpected key visual size');
 
-  // Logo: the white pill with mark and wordmark, top-left of the key visual.
-  await source.clone().crop(130, 130, 700, 220).writeAsync(out('bawaslu-logo.png'));
+  // Logo: the official transparent logo from bawaslu.go.id, resized for the web.
+  const logoSource = await Jimp.read(out('bawaslu-logo-source.png'));
+  await logoSource.clone().resize(1200, Jimp.AUTO, Jimp.RESIZE_BICUBIC).writeAsync(out('bawaslu-logo.png'));
 
   // Background: everything below the pill, 1600 px wide JPEG under 240 KB.
   const background = source.clone().crop(0, 400, 4536, 2152).resize(1600, Jimp.AUTO, Jimp.RESIZE_BICUBIC);
@@ -43,8 +37,8 @@ async function main() {
     }
   }
 
-  // Icons: the ballot-box mark alone, white pill background made transparent.
-  const mark = transparentWhite(source.clone().crop(205, 170, 145, 145));
+  // Icons: the ballot-box mark from the transparent logo.
+  const mark = logoSource.clone().crop(0, 0, 560, 720);
   await writeIcon(mark, 'app-icon.png', 1024, 640, '#ffffff');
   await writeIcon(mark, 'adaptive-icon.png', 1024, 560, 0x00000000);
   await writeIcon(mark, 'favicon.png', 64, 48, '#ffffff');

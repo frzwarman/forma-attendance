@@ -4,6 +4,8 @@ A one-event guest book on the web, in Bahasa Indonesia. Attendees open the link 
 
 Built with Expo Router on React Native Web (web only), TanStack Query, react-hook-form + zod, Leaflet with OpenStreetMap tiles, SheetJS for Excel, and Supabase (Postgres, Auth, Storage).
 
+The interface uses Plus Jakarta Sans (loaded from Google Fonts with system fallbacks), the official Bawaslu logo on a white capsule over the navy key visual, a navy sidebar for the admin area, and inline SVG icons generated from lucide (`scripts/generate-icons.cjs`), so no icon library ships to the browser.
+
 The previous workforce-attendance prototype is preserved on the `workforce-app` branch and the `workforce-app-final` tag.
 
 ## Run locally

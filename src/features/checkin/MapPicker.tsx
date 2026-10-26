@@ -85,7 +85,7 @@ export function MapPicker({ value, onChange }: { value: Pin | null; onChange: (p
         ref={container}
         role="img"
         aria-label="Peta lokasi"
-        style={{ height: 240, borderRadius: 6, overflow: "hidden", border: `1px solid ${c.border}` }}
+        style={{ height: 240, borderRadius: 12, overflow: "hidden", border: `1px solid ${c.border}` }}
       />
       <Row style={{ gap: 12, flexWrap: "wrap" }}>
         <Button small variant="secondary" label="Gunakan lokasi saya" loading={locating} loadingLabel="Mencari lokasi…" onPress={locate} />

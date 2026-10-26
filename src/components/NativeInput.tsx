@@ -1,19 +1,19 @@
 import { useState, type CSSProperties } from "react";
 import { View } from "react-native";
-import { useTheme } from "../theme";
+import { FONT_STACK, useTheme } from "../theme";
 import { Row, T } from "./ui";
 
 // Web-only native inputs (date, file, colour) styled like Field.
 export function useInputStyle(error?: string): CSSProperties {
   const c = useTheme();
   return {
-    minHeight: 44,
-    borderRadius: 6,
+    minHeight: 46,
+    borderRadius: 10,
     border: `1px solid ${error ? c.danger : c.border}`,
-    padding: "10px 14px",
+    padding: "11px 14px",
     color: c.text,
     backgroundColor: c.inputSurface,
-    fontFamily: "Arial",
+    fontFamily: FONT_STACK,
     fontSize: 15,
     width: "100%",
     boxSizing: "border-box",
@@ -35,7 +35,7 @@ export function DateInput({
   const style = useInputStyle(error);
   return (
     <View style={{ gap: 8 }}>
-      <T size={14} weight="medium">
+      <T size={14} weight="semibold">
         {label}
       </T>
       <input type="date" aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} style={style} />
@@ -65,7 +65,7 @@ export function FileInput({
   const [name, setName] = useState("");
   return (
     <View style={{ gap: 8 }}>
-      <T size={14} weight="medium">
+      <T size={14} weight="semibold">
         {label}
       </T>
       <Row style={{ gap: 12 }}>
@@ -73,11 +73,13 @@ export function FileInput({
           style={{
             position: "relative",
             display: "inline-block",
-            padding: "10px 16px",
-            borderRadius: 100,
+            padding: "10px 18px",
+            borderRadius: 999,
             border: `1px solid ${c.border}`,
+            backgroundColor: c.surface,
+            fontWeight: 600,
             cursor: "pointer",
-            fontFamily: "Arial",
+            fontFamily: FONT_STACK,
             fontSize: 14,
             color: c.text,
             whiteSpace: "nowrap",
@@ -126,7 +128,7 @@ export function ColorInput({
   const c = useTheme();
   return (
     <View style={{ gap: 8 }}>
-      <T size={14} weight="medium">
+      <T size={14} weight="semibold">
         {label}
       </T>
       <Row style={{ gap: 12 }}>
@@ -135,7 +137,7 @@ export function ColorInput({
           aria-label={label}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          style={{ width: 56, height: 44, padding: 2, border: `1px solid ${c.border}`, borderRadius: 6, background: "transparent" }}
+          style={{ width: 56, height: 46, padding: 3, border: `1px solid ${c.border}`, borderRadius: 10, background: "transparent" }}
         />
         <T size={13} color={c.muted}>
           {value}
