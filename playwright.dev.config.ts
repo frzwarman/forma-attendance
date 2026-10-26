@@ -6,6 +6,7 @@ import base from "./playwright.config";
 export default defineConfig({
   ...base,
   testMatch: ["dev-server.spec.ts"],
+  testIgnore: [],
   timeout: 180000,
   use: { ...base.use, baseURL: "http://localhost:8090" },
   webServer: {
