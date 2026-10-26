@@ -171,7 +171,6 @@ function CheckInTable({
               <td style={{ ...cell, whiteSpace: "nowrap", color: c.muted }}>{formatWib(row.created_at)}</td>
               <td style={cell}>
                 <div style={{ fontWeight: 700 }}>{row.name}</div>
-                <div style={sub}>{row.jabatan}</div>
                 {winner && (
                   <div style={{ marginTop: 6 }}>
                     <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />
@@ -203,12 +202,9 @@ function CheckInRow({ row, winner, onOpenFile }: { row: CheckIn; winner?: Winner
   return (
     <View style={{ borderTopWidth: 1, borderColor: c.border, paddingVertical: 14, gap: 6 }}>
       <Row style={{ justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <T weight="bold">{row.name}</T>
-          <T size={13} color={c.muted}>
-            {row.jabatan}
-          </T>
-        </View>
+        <T weight="bold" style={{ flex: 1 }}>
+          {row.name}
+        </T>
         <T size={12} color={c.muted}>
           {formatWib(row.created_at)}
         </T>

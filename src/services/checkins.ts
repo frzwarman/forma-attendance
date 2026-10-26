@@ -15,7 +15,8 @@ export function submitCheckIn(input: CheckInInput, extra: CheckInExtra): Promise
     p_name: input.name,
     p_phone: input.phone,
     p_email: input.email,
-    p_jabatan: input.jabatan,
+    // The RPC keeps p_jabatan so older clients still work; the form no longer asks for it.
+    p_jabatan: null,
     p_address: input.address,
     p_latitude: extra.latitude,
     p_longitude: extra.longitude,

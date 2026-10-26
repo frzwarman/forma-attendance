@@ -5,8 +5,8 @@ import { checkInRow, installSupabaseStub } from "./supabase-stub";
 test("the draw picks each attendee once, masks the phone and can be redrawn after removal", async ({ page }) => {
   const state = await installSupabaseStub(page, {
     checkins: [
-      checkInRow({ name: "Budi Santoso", phone: "081211112222", jabatan: "Staf" }),
-      checkInRow({ name: "Siti Rahma", phone: "081333334444", jabatan: "Analis" }),
+      checkInRow({ name: "Budi Santoso", phone: "081211112222" }),
+      checkInRow({ name: "Siti Rahma", phone: "081333334444" }),
     ],
   });
   await page.goto("/admin");

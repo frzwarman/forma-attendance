@@ -15,7 +15,6 @@ export const checkInSchema = z
       .trim()
       .max(160, "E-mail maksimal 160 karakter")
       .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "E-mail tidak valid"),
-    jabatan: z.string().trim().min(1, "Jabatan wajib diisi").max(120, "Jabatan maksimal 120 karakter"),
     address: z.string().trim().min(1, "Alamat wajib diisi").max(400, "Alamat maksimal 400 karakter"),
     check_in_date: z.string().regex(dateString, "Tanggal check in wajib diisi"),
     check_out_date: z.string().regex(dateString, "Tanggal check out wajib diisi"),

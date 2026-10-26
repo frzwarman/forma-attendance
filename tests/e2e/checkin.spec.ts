@@ -6,10 +6,12 @@ test("an attendee can check in and sees a thank-you with the organiser WhatsApp 
   const state = await installSupabaseStub(page, { settings: { whatsapp_number: "0812-3456-7890" } });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
+  await expect(page.getByLabel("Jabatan", { exact: true })).toHaveCount(0);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Terima kasih, Budi Santoso!" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Hubungi Panitia via WhatsApp" })).toHaveAttribute("href", "https://wa.me/6281234567890");
+  expect(state.rpcCalls[0].body.p_jabatan).toBeNull();
   expect(state.checkins).toHaveLength(1);
   expect(state.checkins[0].phone).toBe("0812 1111 2222");
 });
@@ -33,7 +35,6 @@ test("validation messages appear in Bahasa before anything is sent", async ({ pa
     "Nama wajib diisi",
     "Nomor telepon tidak valid",
     "E-mail tidak valid",
-    "Jabatan wajib diisi",
     "Alamat wajib diisi",
     "Tanggal check in wajib diisi",
   ]) {

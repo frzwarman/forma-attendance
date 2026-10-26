@@ -81,9 +81,6 @@ export function Undian() {
           <T testID="winner-name" size={wide ? 56 : 36} weight="extra" color={c.gold} style={{ textAlign: "center" }}>
             {result.checkin.name}
           </T>
-          <T size={18} color={c.onBackground}>
-            {result.checkin.jabatan}
-          </T>
           <T testID="winner-phone" size={15} color={c.onBackgroundMuted}>
             {maskPhone(result.checkin.phone)}
           </T>

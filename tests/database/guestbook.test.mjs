@@ -32,7 +32,9 @@ before(async () => {
     grant usage on schema storage to anon, authenticated;
     grant all on storage.buckets, storage.objects to anon, authenticated;
   `);
-  await db.exec(await readFile(new URL("../../supabase/migrations/20261026000000_guestbook.sql", import.meta.url), "utf8"));
+  for (const migration of ["20261026000000_guestbook.sql", "20261026120000_guestbook_optional_jabatan.sql"]) {
+    await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
+  }
   await db.exec(`
     insert into auth.users values ('${id(1)}'), ('${id(2)}');
     insert into public.guestbook_admins (auth_user_id) values ('${id(1)}');
@@ -196,5 +198,27 @@ test("storage policies allow anonymous uploads only into checkins/ and admin rea
     await insert("guestbook-uploads", "checkins/b.jpg");
     await insert("guestbook-brand", "logo.png");
     assert.equal((await db.query("select * from storage.objects")).rows.length, 2);
+  });
+});
+
+// Runs last: it leaves rows behind that earlier tests would otherwise count.
+test("jabatan is optional: missing or blank values are stored as null and long ones are refused", async () => {
+  const given = await asRole(null, "anon", () => checkIn({ name: "Dewi Lestari", phone: "0821 1000 2000", email: "dewi@example.test", jabatan: "Kepala Bagian" }));
+  const missing = await asRole(null, "anon", () => checkIn({ name: "Rudi Hartono", phone: "0821 1000 3000", email: "rudi@example.test", jabatan: null }));
+  const blank = await asRole(null, "anon", () => checkIn({ name: "Nina Sari", phone: "0821 1000 4000", email: "nina@example.test", jabatan: "   " }));
+  for (const result of [given, missing, blank]) assert.equal(result.status, "created");
+  await assert.rejects(
+    () => asUser(null, () => checkIn({ phone: "0821 1000 5000", email: "panjang@example.test", jabatan: "x".repeat(121) }), "anon"),
+    /Jabatan/,
+  );
+  await asUser(id(1), async () => {
+    const { rows } = await db.query(
+      "select email, jabatan from public.guestbook_checkins where email in ('dewi@example.test', 'rudi@example.test', 'nina@example.test') order by email",
+    );
+    assert.deepEqual(rows, [
+      { email: "dewi@example.test", jabatan: "Kepala Bagian" },
+      { email: "nina@example.test", jabatan: null },
+      { email: "rudi@example.test", jabatan: null },
+    ]);
   });
 });

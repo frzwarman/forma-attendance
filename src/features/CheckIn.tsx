@@ -17,7 +17,6 @@ const empty: CheckInInput = {
   name: "",
   phone: "",
   email: "",
-  jabatan: "",
   address: "",
   check_in_date: "",
   check_out_date: "",
@@ -75,7 +74,6 @@ export function CheckIn() {
       ["Nama", created.name],
       ["Nomor Telepon", created.phone],
       ["E-mail", created.email],
-      ["Jabatan", created.jabatan],
       ["Alamat", created.address],
       ["Kunjungan", formatDateRange(created.check_in_date, created.check_out_date)],
     ];
@@ -150,7 +148,7 @@ export function CheckIn() {
   }
 
   const text = (
-    name: "name" | "phone" | "email" | "jabatan" | "address",
+    name: "name" | "phone" | "email" | "address",
     label: string,
     props: Partial<React.ComponentProps<typeof Field>> = {},
   ) => (
@@ -194,7 +192,6 @@ export function CheckIn() {
       {text("name", "Nama", { autoComplete: "name", placeholder: "Nama lengkap" })}
       {text("phone", "Nomor Telepon", { keyboardType: "phone-pad", inputMode: "tel", autoComplete: "tel", placeholder: "0812 3456 7890" })}
       {text("email", "E-mail", { keyboardType: "email-address", autoCapitalize: "none", autoComplete: "email", placeholder: "nama@instansi.go.id" })}
-      {text("jabatan", "Jabatan", { placeholder: "Jabatan atau peran" })}
       <Divider />
       <SectionTitle title="Lokasi" description="Alamat asal, ditambah titik di peta jika berkenan." />
       {text("address", "Alamat", { multiline: true, placeholder: "Jalan, kota, provinsi", style: { minHeight: 88, textAlignVertical: "top" } })}

@@ -19,7 +19,8 @@ export type CheckIn = {
   name: string;
   phone: string;
   email: string;
-  jabatan: string;
+  // No longer collected on the form; older rows may still hold a value.
+  jabatan: string | null;
   address: string;
   latitude: number | null;
   longitude: number | null;

@@ -6,7 +6,7 @@ export type DrawResult =
   | {
       status: "drawn";
       winner: Pick<Winner, "id" | "checkin_id" | "prize" | "drawn_at">;
-      checkin: Pick<CheckIn, "id" | "name" | "jabatan" | "phone" | "email">;
+      checkin: Pick<CheckIn, "id" | "name" | "phone" | "email">;
     };
 
 // Atomic server-side draw; the database never picks the same attendee twice.

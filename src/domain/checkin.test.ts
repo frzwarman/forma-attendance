@@ -6,7 +6,6 @@ const valid = {
   name: "Budi Santoso",
   phone: "0812 1111 2222",
   email: "budi@example.test",
-  jabatan: "Staf",
   address: "Jl. MH Thamrin 14",
   check_in_date: "2026-11-02",
   check_out_date: "2026-11-04",
