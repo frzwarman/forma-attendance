@@ -113,3 +113,34 @@ export function FileInput({
     </View>
   );
 }
+
+export function ColorInput({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (hex: string) => void;
+}) {
+  const c = useTheme();
+  return (
+    <View style={{ gap: 8 }}>
+      <T size={14} weight="medium">
+        {label}
+      </T>
+      <Row style={{ gap: 12 }}>
+        <input
+          type="color"
+          aria-label={label}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          style={{ width: 56, height: 44, padding: 2, border: `1px solid ${c.border}`, borderRadius: 6, background: "transparent" }}
+        />
+        <T size={13} color={c.muted}>
+          {value}
+        </T>
+      </Row>
+    </View>
+  );
+}
