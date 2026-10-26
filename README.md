@@ -16,7 +16,7 @@ cp .env.example .env.local   # fill in both values from Supabase → Project Set
 npm run web
 ```
 
-`.env.local` holds only the project URL and the publishable key; both are public client values and are embedded at build time. Never put the database password, CLI token, secret key or service-role key in an `EXPO_PUBLIC_` variable.
+`.env.local` holds only the project URL and the publishable key; both are public client values and are embedded at build time. Never put the database password, CLI token, secret key or service-role key in an `EXPO_PUBLIC_` variable. Keep private CLI credentials in `supabase/.env.cli.local`, not in a root `.env.*` file: Expo's development server bundles every root file that starts with `.env` and only understands the standard names, so a file such as `.env.supabase.local` breaks `npm run web` with a 500 on the entry bundle.
 
 ```sh
 npm run typecheck
@@ -32,7 +32,7 @@ npm run weight     # public page weight gate (needs the dist/ build)
 The app uses the `guestbook_` tables, RPCs and buckets created by `supabase/migrations/20261026000000_guestbook.sql` in the linked project `dzzufvejzbhgwiemcxwz`. Migrations are additive; never run `db reset --linked`.
 
 ```sh
-set -a; . ./.env.supabase.local; set +a   # exports SUPABASE_DB_PASSWORD for the CLI without printing it
+set -a; . ./supabase/.env.cli.local; set +a   # exports SUPABASE_DB_PASSWORD for the CLI without printing it
 npm run db:plan    # dry run
 npm run db:push
 npm run db:status
@@ -92,6 +92,7 @@ Checked in this workspace on 2026-10-26:
 - TypeScript and ESLint: clean.
 - `npm test`: **15 unit tests** pass (theme derivation and contrast, phone normalisation/masking/WhatsApp links, WIB formatting, check-in validation messages, CSV/Excel export incl. text phone cells, formula neutralisation and file naming).
 - `npm run db:test`: **16 tests** pass against the real migrations in embedded Postgres: RLS and grants, phone-key normalisation, anonymous check-in and duplicate reporting, input rejection, admin-only reads and settings updates, draws that never repeat a winner, and storage policies.
+- `npm run test:e2e:dev`: the public page renders on the Expo development server with no 5xx bundle responses.
 - `npm run test:e2e`: **21 browser tests** pass against the built site with every Supabase endpoint stubbed by Playwright routes: public page and defaults, check-in success/duplicate/validation/honeypot, map pin and compressed upload (unsupported files refused), admin sign-in and reload, paged list with exactly 2,000 rows and a row arriving between pages, search, signed file links, CSV and Excel downloads, the lucky draw, theme changes reflected on the public page, the Bawaslu preset and logo upload, plus reference screenshots in `artifacts/`.
 - `npm run weight`: the public page downloads **473 KB** of gzipped JavaScript and **135 KB** of images on first load (budget 500 KB and 300 KB).
 
@@ -100,6 +101,7 @@ To repeat the browser suite:
 ```sh
 EXPO_PUBLIC_SUPABASE_URL=https://stub.supabase.co EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=stub-key npm run build:web
 npm run test:e2e      # set PLAYWRIGHT_CHROMIUM_EXECUTABLE to an installed Chrome if Playwright's Chromium is missing
+npm run test:e2e:dev  # the same public page served by the Expo development server (Metro dev bundling)
 ```
 
 Not yet verified: a real check-in on a phone against the hosted project, and the admin pages against the hosted project (they need the owner checklist above first). Do that smoke test before the event: check in, repeat the same phone number, sign in, export, and open the Excel file.

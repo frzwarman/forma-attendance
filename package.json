@@ -13,13 +13,14 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "test:e2e": "playwright test",
     "db:login": "supabase login",
-    "db:link": "node --env-file=.env.supabase.local scripts/supabase-link.cjs",
+    "db:link": "node --env-file=supabase/.env.cli.local scripts/supabase-link.cjs",
     "db:plan": "supabase db push --dry-run",
     "db:push": "supabase db push",
     "db:status": "supabase migration list",
     "db:types": "node scripts/supabase-types.cjs",
     "db:test": "node --test tests/database/*.test.mjs",
-    "weight": "node scripts/report-weight.cjs"
+    "weight": "node scripts/report-weight.cjs",
+    "test:e2e:dev": "playwright test --config playwright.dev.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

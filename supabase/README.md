@@ -2,7 +2,7 @@
 
 The guest book application reads and writes the `guestbook_` tables created by `20261026000000_guestbook.sql` (settings, check-ins, draw winners, admins, two Storage buckets and the check-in and draw RPCs). The earlier `forma_` workforce tables from the first migration remain in place, unused and untouched; the sections below about them are kept for reference.
 
-The initial hosted project is [Forma Workforce](https://supabase.com/dashboard/project/dzzufvejzbhgwiemcxwz), reference `dzzufvejzbhgwiemcxwz`, in Singapore (`ap-southeast-1`). Its first migration is `20261024000000_workforce_foundation.sql`. Public connection settings are saved in the ignored `.env.local`; private CLI database credentials are in the separate ignored `.env.supabase.local`.
+The initial hosted project is [Forma Workforce](https://supabase.com/dashboard/project/dzzufvejzbhgwiemcxwz), reference `dzzufvejzbhgwiemcxwz`, in Singapore (`ap-southeast-1`). Its first migration is `20261024000000_workforce_foundation.sql`. Public connection settings are saved in the ignored `.env.local`; private CLI database credentials are in the separate ignored `supabase/.env.cli.local`.
 
 The initial migration creates 15 `forma_` tables: organizations, departments, locations, employees, attendance policies, shifts, schedules, attendance sessions, raw attendance events, requests, yearly leave entitlements, approvals, attendance adjustments, notifications, and audit logs. All references involving employees, locations, schedules, and requests are organization-scoped. UUID identifiers replace the demo's `emp-1`/`hq` identifiers.
 
@@ -18,7 +18,7 @@ The Supabase CLI must be installed. The project uses the host CLI rather than si
 npm run db:login
 ```
 
-For the account setup performed from this workspace, the generated database password and project reference are stored in the ignored `.env.supabase.local` file with owner-only permissions. Keep it private. For another checkout, create that file with these fields:
+For the account setup performed from this workspace, the generated database password and project reference are stored in the ignored `supabase/.env.cli.local` file with owner-only permissions. Keep it private. For another checkout, create that file with these fields:
 
 ```dotenv
 SUPABASE_PROJECT_REF=your_twenty_letter_project_ref
