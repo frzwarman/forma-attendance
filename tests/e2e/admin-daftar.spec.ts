@@ -47,3 +47,12 @@ test("an uploaded file opens through a signed link", async ({ page }) => {
   expect(opened.url()).toContain("checkins/abc.jpg");
   expect(state.signedPaths).toEqual(["checkins/abc.jpg"]);
 });
+
+test("a check-in arriving between pages is neither skipped nor duplicated", async ({ page }) => {
+  const checkins = Array.from({ length: 1000 }, () => checkInRow());
+  await installSupabaseStub(page, { checkins, newRowAfterFirstPage: true });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await expect(page.getByText("Total check-in: 1.001", { exact: true })).toBeVisible();
+  await expect(page.getByText("Peserta Baru", { exact: true })).toBeVisible();
+});

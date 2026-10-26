@@ -16,6 +16,7 @@ type Seed = {
   winners?: Winner[];
   admin?: { email: string; password: string };
   failSettings?: boolean;
+  newRowAfterFirstPage?: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -174,13 +175,18 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
 
   await page.route("**/rest/v1/guestbook_checkins*", async (route, request) => {
     const url = new URL(request.url());
-    const rows = [...state.checkins].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const ascending = (url.searchParams.get("order") || "").startsWith("created_at.asc");
+    const rows = [...state.checkins].sort((a, b) =>
+      (ascending ? a.created_at.localeCompare(b.created_at) : b.created_at.localeCompare(a.created_at)) || a.id.localeCompare(b.id),
+    );
     const rangeHeader = request.headers()["range"];
     let from = Number(url.searchParams.get("offset") || 0);
     let to = from + Number(url.searchParams.get("limit") || rows.length) - 1;
     if (rangeHeader) [from, to] = rangeHeader.split("-").map(Number);
     state.rangeHeaders.push(`${from}-${to}`);
     const slice = rows.slice(from, to + 1);
+    if (seed.newRowAfterFirstPage && from === 0 && !state.checkins.some((c) => c.name === "Peserta Baru"))
+      state.checkins.push(checkInRow({ name: "Peserta Baru", created_at: new Date().toISOString() }));
     return json(route, slice, 200, { "Content-Range": `${from}-${from + slice.length - 1}/*` });
   });
 

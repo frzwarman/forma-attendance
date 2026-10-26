@@ -39,3 +39,12 @@ test("the Bawaslu preset restores the defaults and a logo upload is stored in th
   expect(state.settings.logo_path).toMatch(/^logo-\d+\.(png|jpg)$/);
   expect(state.settings.accent_color).toBe("#ec1c24");
 });
+
+test("the settings form is withheld when settings failed to load", async ({ page }) => {
+  await installSupabaseStub(page, { failSettings: true });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "Tampilan" }).click();
+  await expect(page.getByRole("alert")).toContainText("Pengaturan gagal dimuat");
+  await expect(page.getByRole("button", { name: "Simpan", exact: true })).toHaveCount(0);
+});

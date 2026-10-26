@@ -43,4 +43,9 @@ test("an image upload is compressed to JPEG and attached; unsupported files are 
   });
   await expect(page.getByText("Berkas harus berupa gambar atau PDF", { exact: true })).toBeVisible();
   expect(state.uploads).toHaveLength(1);
+  await fillForm(page, { phone: "0813 2222 3333", email: "lain@example.test" });
+  await page.getByRole("button", { name: "Kirim", exact: true }).click();
+  await expect(page.getByText("Berkas harus berupa gambar atau PDF", { exact: true })).toBeVisible();
+  expect(state.rpcCalls).toHaveLength(1);
+  expect(state.checkins).toHaveLength(1);
 });

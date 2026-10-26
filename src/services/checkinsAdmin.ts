@@ -3,21 +3,25 @@ import { getSupabase } from "./supabase";
 
 export const PAGE = 1000;
 
-// PostgREST caps responses at 1,000 rows; page until a short page arrives.
+// PostgREST caps responses at 1,000 rows. Pages are read oldest first so rows that
+// arrive while paging append at the end instead of shifting earlier pages; the
+// loop stops on an empty page and the result is reversed to newest first.
 export async function fetchAllCheckIns(): Promise<CheckIn[]> {
   const rows: CheckIn[] = [];
-  for (let offset = 0; ; offset += PAGE) {
+  for (let offset = 0; ; ) {
     const { data, error } = await getSupabase()
       .from("guestbook_checkins")
       .select("*")
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(error.message);
     const page = (data ?? []) as CheckIn[];
+    if (page.length === 0) break;
     rows.push(...page);
-    if (page.length < PAGE) break;
+    offset += page.length;
   }
-  return rows;
+  return rows.reverse();
 }
 
 export async function fetchWinners(): Promise<Winner[]> {

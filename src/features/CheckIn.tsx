@@ -42,6 +42,7 @@ export function CheckIn() {
   const [uploading, setUploading] = useState(false);
 
   const submit = handleSubmit(async (input) => {
+    if (fileError) return;
     setError("");
     setDuplicateAt("");
     try {

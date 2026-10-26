@@ -29,7 +29,12 @@ export function useSettings() {
     placeholderData: DEFAULT_SETTINGS,
     staleTime: 60_000,
   });
-  return { settings: query.data ?? DEFAULT_SETTINGS, isLoading: query.isLoading, ready: !query.isPlaceholderData };
+  return {
+    settings: query.data ?? DEFAULT_SETTINGS,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    ready: !query.isPlaceholderData && !query.isError,
+  };
 }
 
 export function brandImageUrl(path: string | null): string | null {

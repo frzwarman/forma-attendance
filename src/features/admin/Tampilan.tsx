@@ -38,7 +38,15 @@ function useObjectUrl(file: File | null) {
 
 export function Tampilan() {
   const c = useTheme();
-  const { settings, ready } = useSettings();
+  const { settings, ready, isError } = useSettings();
+  if (isError)
+    return (
+      <Card>
+        <T accessibilityRole="alert" color={c.danger}>
+          Pengaturan gagal dimuat. Muat ulang halaman lalu coba lagi; formulir disembunyikan agar tampilan tersimpan tidak tertimpa.
+        </T>
+      </Card>
+    );
   if (!ready)
     return (
       <Card>

@@ -44,7 +44,14 @@ export function exportRows(checkins: CheckIn[], winners: Winner[]): string[][] {
   ];
 }
 
-const quote = (value: string) => (/[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
+// Text starting like a formula is prefixed with an apostrophe (OWASP CSV injection
+// guidance); signed numbers such as phones and coordinates stay readable.
+const neutralise = (value: string) =>
+  /^[=@\t\r]/.test(value) || (/^[+-]/.test(value) && !/^[+-][\d\s(]/.test(value)) ? `'${value}` : value;
+const quote = (value: string) => {
+  const safe = neutralise(value);
+  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
 
 // UTF-8 BOM so Excel reads accents; every value stays text.
 export const toCsv = (rows: string[][]) =>

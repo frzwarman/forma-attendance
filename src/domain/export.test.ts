@@ -59,3 +59,7 @@ it("names export files after the event and date", () => {
     "check-in-rakernas-bawaslu-2026-20261026.xlsx",
   );
 });
+
+it("neutralises spreadsheet formulas in attendee text while keeping phones and coordinates", () => {
+  assert.equal(toCsv([["=1+1", "@cmd", "-SUM(1)", "+62 812", "-6.1754", "\tx"]]), "﻿'=1+1,'@cmd,'-SUM(1),+62 812,-6.1754,'\tx\r\n");
+});

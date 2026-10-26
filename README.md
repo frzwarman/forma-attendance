@@ -32,7 +32,8 @@ npm run weight     # public page weight gate (needs the dist/ build)
 The app uses the `guestbook_` tables, RPCs and buckets created by `supabase/migrations/20261026000000_guestbook.sql` in the linked project `dzzufvejzbhgwiemcxwz`. Migrations are additive; never run `db reset --linked`.
 
 ```sh
-npm run db:plan    # dry run (loads SUPABASE_DB_PASSWORD from .env.supabase.local, see supabase/README.md)
+set -a; . ./.env.supabase.local; set +a   # exports SUPABASE_DB_PASSWORD for the CLI without printing it
+npm run db:plan    # dry run
 npm run db:push
 npm run db:status
 ```
@@ -69,7 +70,7 @@ Share the public link (or a QR code of it) with attendees; keep `/admin` for the
 ## Admin guide
 
 - **Daftar Check-in** (`/admin`): running total, search by name, phone or e-mail, newest first, refreshed every 10 seconds. *Lihat berkas* opens an attendee's upload through a short-lived signed link. The list pages through PostgREST in blocks of 1,000, so a 4,000-row event loads completely.
-- **Ekspor Excel / Ekspor CSV**: one file with every check-in (WIB times, all fields, prize and draw time). Excel keeps phone numbers as text so leading zeros survive; CSV is UTF-8 with a BOM.
+- **Ekspor Excel / Ekspor CSV**: one file with every check-in (WIB times, all fields, prize and draw time). Use the Excel export for Excel: it keeps phone numbers as text, whereas a CSV opened by double-click drops leading zeros. The CSV is UTF-8 with a BOM, and attendee text that looks like a formula is prefixed with an apostrophe.
 - **Undian**: type a prize name, press *Undi*. The database picks one attendee who has not won yet, atomically, and shows the name large with the phone masked (`0812******22`). Previous winners are listed; *Hapus* releases a no-show so the prize can be redrawn.
 - **Tampilan**: event name, welcome text, organiser WhatsApp number (shows a *Hubungi Panitia via WhatsApp* button after check-in), logo, background image and four colours (accent, background, surface, text), with a live preview and a one-tap Bawaslu preset. Uploaded images are resized in the browser (logo 1200 px, background 1920 px).
 
@@ -89,9 +90,9 @@ Attendee images are compressed to a 1600 px JPEG before upload and PDFs are capp
 Checked in this workspace on 2026-10-26:
 
 - TypeScript and ESLint: clean.
-- `npm test`: **14 unit tests** pass (theme derivation and contrast, phone normalisation/masking/WhatsApp links, WIB formatting, check-in validation messages, CSV/Excel export incl. text phone cells and file naming).
+- `npm test`: **15 unit tests** pass (theme derivation and contrast, phone normalisation/masking/WhatsApp links, WIB formatting, check-in validation messages, CSV/Excel export incl. text phone cells, formula neutralisation and file naming).
 - `npm run db:test`: **16 tests** pass against the real migrations in embedded Postgres: RLS and grants, phone-key normalisation, anonymous check-in and duplicate reporting, input rejection, admin-only reads and settings updates, draws that never repeat a winner, and storage policies.
-- `npm run test:e2e`: **19 browser tests** pass against the built site with every Supabase endpoint stubbed by Playwright routes: public page and defaults, check-in success/duplicate/validation/honeypot, map pin and compressed upload (unsupported files refused), admin sign-in and reload, paged list with exactly 2,000 rows, search, signed file links, CSV and Excel downloads, the lucky draw, theme changes reflected on the public page, the Bawaslu preset and logo upload, plus reference screenshots in `artifacts/`.
+- `npm run test:e2e`: **21 browser tests** pass against the built site with every Supabase endpoint stubbed by Playwright routes: public page and defaults, check-in success/duplicate/validation/honeypot, map pin and compressed upload (unsupported files refused), admin sign-in and reload, paged list with exactly 2,000 rows and a row arriving between pages, search, signed file links, CSV and Excel downloads, the lucky draw, theme changes reflected on the public page, the Bawaslu preset and logo upload, plus reference screenshots in `artifacts/`.
 - `npm run weight`: the public page downloads **473 KB** of gzipped JavaScript and **135 KB** of images on first load (budget 500 KB and 300 KB).
 
 To repeat the browser suite:
