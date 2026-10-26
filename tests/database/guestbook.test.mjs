@@ -32,7 +32,7 @@ before(async () => {
     grant usage on schema storage to anon, authenticated;
     grant all on storage.buckets, storage.objects to anon, authenticated;
   `);
-  for (const migration of ["20261026000000_guestbook.sql", "20261026120000_guestbook_optional_jabatan.sql", "20261026180000_guestbook_automatic_checkin.sql"]) {
+  for (const migration of ["20261026000000_guestbook.sql", "20261026120000_guestbook_optional_jabatan.sql", "20261026180000_guestbook_automatic_checkin.sql", "20261026200000_guestbook_checkout.sql"]) {
     await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
   }
   await db.exec(`
@@ -233,5 +233,45 @@ test("a check-in without dates gets today's Jakarta date and no check-out yet", 
       "select check_in_date = (now() at time zone 'Asia/Jakarta')::date as today, check_out_date from public.guestbook_checkins where email = 'tono@example.test'",
     );
     assert.deepEqual(rows, [{ today: true, check_out_date: null }]);
+  });
+});
+
+test("a check-in returns a check-out code that checks the attendee out once", async () => {
+  const wati = { name: "Wati Lestari", phone: "0821 1000 7000", email: "wati@example.test", in: null, out: null };
+  const created = await asRole(null, "anon", () => checkIn(wati));
+  assert.equal(created.status, "created");
+  assert.match(created.checkout_token, /^[0-9a-f-]{36}$/);
+  const duplicate = await asRole(null, "anon", () => checkIn(wati));
+  assert.equal(duplicate.status, "duplicate");
+  assert.equal(duplicate.checkout_token, undefined);
+  const checkOut = async (token) => (await db.query("select public.guestbook_check_out($1) as r", [token])).rows[0].r;
+  const first = await asRole(null, "anon", () => checkOut(created.checkout_token));
+  assert.equal(first.status, "checked_out");
+  assert.equal(first.name, "Wati Lestari");
+  assert.equal(typeof first.checked_out_at, "string");
+  const again = await asRole(null, "anon", () => checkOut(created.checkout_token));
+  assert.deepEqual(again, { ...first, status: "already" });
+  await assert.rejects(() => asUser(null, () => checkOut("00000000-0000-4000-8000-000000000000"), "anon"), /tidak dikenal/);
+  await asUser(id(1), async () => {
+    const { rows } = await db.query(
+      "select checked_out_at is not null as out, checkout_token_hash <> $1 as hashed from public.guestbook_checkins where email = 'wati@example.test'",
+      [created.checkout_token],
+    );
+    assert.deepEqual(rows, [{ out: true, hashed: true }]);
+  });
+});
+
+test("admins check out one attendee, undo it, and check out everyone still present", async () => {
+  const adminCheckOut = (checkin, undo = false) => db.query("select public.guestbook_admin_check_out($1, $2) as at", [checkin, undo]);
+  const target = (await asUser(id(1), () => db.query("select id from public.guestbook_checkins where email = 'dewi@example.test'"))).rows[0].id;
+  await assert.rejects(() => asUser(id(2), () => adminCheckOut(target)), /admin/);
+  await assert.rejects(() => asUser(null, () => adminCheckOut(target), "anon"), /permission denied/);
+  await asUser(id(1), async () => {
+    assert.ok((await adminCheckOut(target)).rows[0].at);
+    assert.equal((await adminCheckOut(target, true)).rows[0].at, null);
+    const open = Number((await db.query("select count(*) from public.guestbook_checkins where checked_out_at is null")).rows[0].count);
+    assert.ok(open > 1);
+    assert.equal((await db.query("select public.guestbook_check_out_all() as n")).rows[0].n, open);
+    assert.equal(Number((await db.query("select count(*) from public.guestbook_checkins where checked_out_at is null")).rows[0].count), 0);
   });
 });

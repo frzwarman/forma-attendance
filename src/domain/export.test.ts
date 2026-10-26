@@ -15,6 +15,7 @@ const checkin = (overrides: Partial<CheckIn> = {}): CheckIn => ({
   latitude: -6.1754,
   longitude: 106.8272,
   file_path: "checkins/abc.jpg",
+  checked_out_at: "2026-10-26T10:30:00Z",
   check_in_date: "2026-11-02",
   check_out_date: "2026-11-04",
   ...overrides,
@@ -39,19 +40,22 @@ it("maps check-ins and winners to export rows", () => {
   assert.equal(EXPORT_HEADERS.some((header) => header.startsWith("Tanggal")), false);
   assert.equal(rows[1].includes("Staf"), false);
   assert.equal(rows[1][0], "26/10/2026 10:05 WIB");
-  assert.equal(rows[1][2], "081234567890");
-  assert.equal(rows[1][5], "-6.1754");
-  assert.equal(rows[1][7], "checkins/abc.jpg");
-  assert.equal(rows[1][8], "Hadiah 1");
-  assert.equal(rows[1][9], "26/10/2026 11:00 WIB");
-  const none = exportRows([checkin({ latitude: null, longitude: null, file_path: null })], []);
-  assert.deepEqual(none[1].slice(5), ["", "", "", "", ""]);
+  assert.equal(rows[0][1], "Waktu Check-out (WIB)");
+  assert.equal(rows[1][1], "26/10/2026 17:30 WIB");
+  assert.equal(rows[1][3], "081234567890");
+  assert.equal(rows[1][6], "-6.1754");
+  assert.equal(rows[1][8], "checkins/abc.jpg");
+  assert.equal(rows[1][9], "Hadiah 1");
+  assert.equal(rows[1][10], "26/10/2026 11:00 WIB");
+  const none = exportRows([checkin({ latitude: null, longitude: null, file_path: null, checked_out_at: null })], []);
+  assert.equal(none[1][1], "");
+  assert.deepEqual(none[1].slice(6), ["", "", "", "", ""]);
 });
 
 it("keeps phone numbers as text cells in Excel", () => {
   const rows = exportRows([checkin()], [winner()]);
   const workbook = XLSX.read(toXlsx(rows), { type: "array" });
-  const cell = workbook.Sheets["Check-in"]["C2"];
+  const cell = workbook.Sheets["Check-in"]["D2"];
   assert.equal(cell.t, "s");
   assert.equal(cell.v, "081234567890");
 });

@@ -4,6 +4,7 @@ import { formatWib } from "./time";
 
 export const EXPORT_HEADERS = [
   "Waktu Check-in (WIB)",
+  "Waktu Check-out (WIB)",
   "Nama",
   "Nomor Telepon",
   "E-mail",
@@ -24,6 +25,7 @@ export function exportRows(checkins: CheckIn[], winners: Winner[]): string[][] {
       const winner = byCheckin.get(row.id);
       return [
         formatWib(row.created_at),
+        row.checked_out_at ? formatWib(row.checked_out_at) : "",
         row.name,
         row.phone,
         row.email,

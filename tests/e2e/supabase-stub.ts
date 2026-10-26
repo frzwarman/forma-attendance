@@ -61,6 +61,7 @@ export function checkInRow(overrides: Partial<CheckIn> = {}): CheckIn {
     file_path: null,
     check_in_date: "2026-11-02",
     check_out_date: "2026-11-04",
+    checked_out_at: null,
     ...overrides,
   };
 }
@@ -125,6 +126,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
   if (!seed.intro) await page.addInitScript(() => sessionStorage.setItem("guestbook.intro.seen", "1"));
   const admin = seed.admin || { email: "admin@bawaslu.test", password: "rahasia123" };
   const adminUser = { id: "00000000-0000-4000-8000-00000000adm1", email: admin.email };
+  const tokens = new Map<string, string>();
 
   await page.route("**/rest/v1/guestbook_settings*", async (route, request) => {
     if (request.method() === "PATCH" && seed.settingsWriteDenied) {
@@ -164,10 +166,34 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       check_out_date: (body.p_check_out_date as string | null) ?? null,
     });
     state.checkins.push(row);
-    return json(route, { status: "created", created_at: row.created_at });
+    const token = crypto.randomUUID();
+    tokens.set(token, row.id);
+    return json(route, { status: "created", created_at: row.created_at, checkout_token: token });
   });
 
   await page.route("**/rest/v1/rpc/guestbook_is_admin", (route) => json(route, admin.isAdmin ?? true));
+
+  await page.route("**/rest/v1/rpc/guestbook_check_out", async (route, request) => {
+    const body = parseBody(request);
+    state.rpcCalls.push({ name: "guestbook_check_out", body });
+    const row = state.checkins.find((c) => c.id === tokens.get(String(body.p_token)));
+    if (!row) return json(route, { message: "Kode check-out tidak dikenal" }, 400);
+    const status = row.checked_out_at ? "already" : "checked_out";
+    row.checked_out_at ??= new Date().toISOString();
+    return json(route, { status, name: row.name, checked_out_at: row.checked_out_at });
+  });
+  await page.route("**/rest/v1/rpc/guestbook_admin_check_out", async (route, request) => {
+    const body = parseBody(request);
+    const row = state.checkins.find((c) => c.id === body.p_checkin_id);
+    if (!row) return json(route, { message: "Peserta tidak ditemukan" }, 400);
+    row.checked_out_at = body.p_undo ? null : row.checked_out_at ?? new Date().toISOString();
+    return json(route, row.checked_out_at);
+  });
+  await page.route("**/rest/v1/rpc/guestbook_check_out_all", (route) => {
+    const open = state.checkins.filter((c) => !c.checked_out_at);
+    for (const row of open) row.checked_out_at = new Date().toISOString();
+    return json(route, open.length);
+  });
 
   await page.route("**/rest/v1/rpc/guestbook_draw_winner", async (route, request) => {
     const body = parseBody(request);

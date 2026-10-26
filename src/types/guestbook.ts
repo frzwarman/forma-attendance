@@ -26,8 +26,9 @@ export type CheckIn = {
   longitude: number | null;
   file_path: string | null;
   check_in_date: string;
-  // Set by the server; check-out is not recorded yet.
+  // Legacy visit date; check-out time is checked_out_at.
   check_out_date: string | null;
+  checked_out_at: string | null;
 };
 
 export type Winner = {
@@ -38,4 +39,5 @@ export type Winner = {
   drawn_by: string | null;
 };
 
-export type CheckInResult = { status: "created" | "duplicate"; created_at: string };
+// checkout_token comes back only for a new check-in; the phone keeps it to check out later.
+export type CheckInResult = { status: "created" | "duplicate"; created_at: string; checkout_token?: string };

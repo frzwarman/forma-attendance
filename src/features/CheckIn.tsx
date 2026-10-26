@@ -7,6 +7,7 @@ import { checkInSchema, type CheckInInput } from "../domain/checkin";
 import { whatsappLink } from "../domain/phone";
 import { formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
+import { rememberCheckIn } from "../services/checkout";
 import { useSettings } from "../services/settings";
 import { uploadCheckInFile } from "../services/uploads";
 import { FONT_STACK, useTheme } from "../theme";
@@ -60,7 +61,10 @@ export function CheckIn() {
         longitude: pin?.longitude ?? null,
       });
       if (result.status === "duplicate") setDuplicateAt(result.created_at);
-      else setCreated({ ...input, at: result.created_at });
+      else {
+        if (result.checkout_token) rememberCheckIn({ token: result.checkout_token, name: input.name.trim(), at: result.created_at });
+        setCreated({ ...input, at: result.created_at });
+      }
     } catch (cause) {
       const message = (cause as Error).message;
       setError(message === "spam" ? "Pengiriman ditolak. Coba lagi." : message);
@@ -96,6 +100,7 @@ export function CheckIn() {
             Terima kasih, {created.name}!
           </T>
           <T color={c.muted}>Check-in Anda sudah tercatat. Sampai jumpa di lokasi acara.</T>
+          <T color={c.muted}>Saat pulang, buka tautan ini lagi di HP ini lalu tekan Check out sekarang.</T>
         </View>
         <View style={{ backgroundColor: c.ground, borderRadius: 12, padding: 16, gap: 10 }}>
           {rows.map(([label, value]) => (
@@ -209,7 +214,7 @@ export function CheckIn() {
       />
       {!!duplicateAt && (
         <T accessibilityRole="alert" color={c.danger}>
-          Nomor telepon atau e-mail ini sudah terdaftar pada {formatWib(duplicateAt)}. Periksa kembali data Anda.
+          Nomor telepon atau e-mail ini sudah terdaftar pada {formatWib(duplicateAt)}. Periksa kembali data Anda. Untuk check-out, buka tautan ini di HP yang dipakai saat check-in, atau hubungi panitia.
         </T>
       )}
       {!!error && (

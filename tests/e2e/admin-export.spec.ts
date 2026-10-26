@@ -18,7 +18,7 @@ test("admins download the complete list as CSV and Excel with phone numbers inta
   const csv = await csvDownload;
   expect(csv.suggestedFilename()).toMatch(/^check-in-rakernas-bawaslu-2026-\d{8}\.csv$/);
   const text = fs.readFileSync((await csv.path())!, "utf8");
-  expect(text.startsWith("﻿Waktu Check-in (WIB),Nama")).toBe(true);
+  expect(text.startsWith("﻿Waktu Check-in (WIB),Waktu Check-out (WIB),Nama")).toBe(true);
   expect(text.trim().split("\r\n")).toHaveLength(4);
   expect(text).toContain("081234567890");
 
@@ -27,7 +27,7 @@ test("admins download the complete list as CSV and Excel with phone numbers inta
   const xlsx = await xlsxDownload;
   expect(xlsx.suggestedFilename()).toMatch(/^check-in-rakernas-bawaslu-2026-\d{8}\.xlsx$/);
   const sheet = XLSX.read(fs.readFileSync((await xlsx.path())!)).Sheets["Check-in"];
-  const phones = ["C2", "C3", "C4"].map((ref) => sheet[ref]);
+  const phones = ["D2", "D3", "D4"].map((ref) => sheet[ref]);
   expect(phones.every((cell) => cell.t === "s")).toBe(true);
   expect(phones.map((cell) => cell.v)).toContain("081234567890");
 });

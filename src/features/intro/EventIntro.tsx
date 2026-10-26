@@ -5,6 +5,7 @@ import { Logo, Sphere, useBrandBackground } from "../../components/Brand";
 import { ChevronLeft, ChevronRight, X } from "../../components/icons";
 import { Button } from "../../components/ui";
 import { FONT_STACK, useTheme } from "../../theme";
+import { storedCheckIns } from "../../services/checkout";
 import { EVENT, PHOTO_SLIDES } from "./slides";
 
 // Shown once per browser session when the public page opens.
@@ -29,7 +30,8 @@ export function EventIntro() {
   const { width } = useWindowDimensions();
   const wide = width >= 700;
   const background = useBrandBackground();
-  const [open, setOpen] = useState(() => !alreadySeen());
+  // Attendees returning to check out have seen the event information already.
+  const [open, setOpen] = useState(() => !alreadySeen() && storedCheckIns().length === 0);
   const [index, setIndex] = useState(0);
   // Photos load for the current and next slide only, so opening the page stays light.
   const [loaded, setLoaded] = useState(() => new Set([0, 1]));

@@ -39,3 +39,17 @@ export async function signedFileUrl(path: string): Promise<string> {
   return data.signedUrl;
 }
 
+
+// Check one attendee out now (server time), or undo it. Returns the stored time.
+export async function adminCheckOut(checkinId: string, undo = false): Promise<string | null> {
+  const { data, error } = await getSupabase().rpc("guestbook_admin_check_out", { p_checkin_id: checkinId, p_undo: undo });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? null;
+}
+
+// Closing time: check out everyone still present. Returns how many.
+export async function checkOutAll(): Promise<number> {
+  const { data, error } = await getSupabase().rpc("guestbook_check_out_all");
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}

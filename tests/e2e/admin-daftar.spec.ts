@@ -56,3 +56,26 @@ test("a check-in arriving between pages is neither skipped nor duplicated", asyn
   await expect(page.getByText("Total check-in: 1.001", { exact: true })).toBeVisible();
   await expect(page.getByText("Peserta Baru", { exact: true })).toBeVisible();
 });
+
+test("admins check out one attendee, undo it, and check out everyone after confirming", async ({ page }) => {
+  const state = await installSupabaseStub(page, {
+    checkins: [
+      checkInRow({ name: "Budi Santoso" }),
+      checkInRow({ name: "Siti Rahma" }),
+      checkInRow({ name: "Agus Wijaya", checked_out_at: "2026-10-26T09:00:00Z" }),
+    ],
+  });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await expect(page.getByText("Total check-in: 3", { exact: true })).toBeVisible();
+  const budi = page.getByRole("row").filter({ hasText: "Budi Santoso" });
+  await budi.getByRole("button", { name: "Check out", exact: true }).click();
+  await expect(budi.getByRole("button", { name: "Batalkan", exact: true })).toBeVisible();
+  await budi.getByRole("button", { name: "Batalkan", exact: true }).click();
+  await expect(budi.getByRole("button", { name: "Check out", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Check out semua", exact: true }).click();
+  await expect(page.getByText(/Check out 2 peserta yang belum check-out\?/)).toBeVisible();
+  await page.getByRole("button", { name: "Ya, check out semua", exact: true }).click();
+  await expect.poll(() => state.checkins.filter((c) => !c.checked_out_at).length).toBe(0);
+  await expect(page.getByRole("row").filter({ hasText: "Siti Rahma" }).getByRole("button", { name: "Batalkan", exact: true })).toBeVisible();
+});

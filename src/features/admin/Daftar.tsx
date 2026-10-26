@@ -1,4 +1,5 @@
-import { CalendarCheck, FileSpreadsheet, FileText, Paperclip, Search, Trophy, Users } from "../../components/icons";
+import { useQueryClient } from "@tanstack/react-query";
+import { CalendarCheck, FileSpreadsheet, FileText, LogOut, Search, Trophy, Users } from "../../components/icons";
 import { useState, type CSSProperties } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { Badge, Button, Card, Empty, Field, Row, Stat, T } from "../../components/ui";
@@ -17,12 +18,17 @@ export function Daftar() {
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const api = useAdminApi();
+  const client = useQueryClient();
   const checkins = useCheckIns();
   const winners = useWinners();
   const { settings } = useSettings();
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(STEP);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [rowBusy, setRowBusy] = useState("");
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [allBusy, setAllBusy] = useState(false);
   const rows = checkins.data ?? [];
   const winnerById = new Map((winners.data ?? []).map((w) => [w.checkin_id, w]));
   const needle = query.trim().toLowerCase();
@@ -31,7 +37,39 @@ export function Daftar() {
     : rows;
   const todayKey = formatWib(new Date().toISOString()).slice(0, 10);
   const today = rows.filter((row) => formatWib(row.created_at).slice(0, 10) === todayKey).length;
-  const withFiles = rows.filter((row) => row.file_path).length;
+  const checkedOut = rows.filter((row) => row.checked_out_at).length;
+  const present = rows.length - checkedOut;
+
+  async function toggleCheckOut(row: CheckIn) {
+    if (rowBusy) return;
+    setRowBusy(row.id);
+    setError("");
+    setNotice("");
+    try {
+      await api.adminCheckOut(row.id, !!row.checked_out_at);
+      await client.invalidateQueries({ queryKey: ["checkins"] });
+    } catch (cause) {
+      setError(`Check-out gagal disimpan: ${(cause as Error).message}`);
+    } finally {
+      setRowBusy("");
+    }
+  }
+
+  async function checkOutEveryone() {
+    if (allBusy) return;
+    setAllBusy(true);
+    setError("");
+    try {
+      const count = await api.checkOutAll();
+      await client.invalidateQueries({ queryKey: ["checkins"] });
+      setConfirmAll(false);
+      setNotice(`${count.toLocaleString("id-ID")} peserta di-check-out.`);
+    } catch (cause) {
+      setError(`Check-out semua gagal: ${(cause as Error).message}`);
+    } finally {
+      setAllBusy(false);
+    }
+  }
 
   // Open the tab synchronously so popup blockers allow it, then point it at the signed URL.
   async function openFile(path: string) {
@@ -72,12 +110,39 @@ export function Daftar() {
         <Row style={{ gap: 10, flexWrap: "wrap" }}>
           <Button small icon={FileSpreadsheet} label="Ekspor Excel" disabled={checkins.isLoading} onPress={() => exportAs("xlsx")} />
           <Button small variant="secondary" icon={FileText} label="Ekspor CSV" disabled={checkins.isLoading} onPress={() => exportAs("csv")} />
+          <Button
+            small
+            variant="secondary"
+            icon={LogOut}
+            label="Check out semua"
+            disabled={checkins.isLoading || present === 0}
+            onPress={() => {
+              setNotice("");
+              setConfirmAll(true);
+            }}
+          />
         </Row>
       </Row>
+      {confirmAll && (
+        <Card style={{ gap: 12, borderColor: c.danger }}>
+          <T weight="semibold">
+            Check out {present.toLocaleString("id-ID")} peserta yang belum check-out? Waktu check-out dicatat sekarang dan bisa dibatalkan per peserta.
+          </T>
+          <Row style={{ gap: 10, flexWrap: "wrap" }}>
+            <Button small variant="danger" label="Ya, check out semua" loading={allBusy} loadingLabel="Mencatat…" onPress={() => void checkOutEveryone()} />
+            <Button small variant="ghost" label="Batal" disabled={allBusy} onPress={() => setConfirmAll(false)} />
+          </Row>
+        </Card>
+      )}
+      {!!notice && (
+        <T accessibilityRole="status" color={c.success} weight="semibold">
+          {notice}
+        </T>
+      )}
       <Row style={{ gap: 14, flexWrap: "wrap", alignItems: "stretch" }}>
         <Stat label="Total peserta" value={rows.length.toLocaleString("id-ID")} icon={Users} hint="Diperbarui setiap 10 detik" />
         <Stat label="Check-in hari ini" value={today.toLocaleString("id-ID")} icon={CalendarCheck} hint="Waktu Indonesia Barat" />
-        <Stat label="Dengan berkas" value={withFiles.toLocaleString("id-ID")} icon={Paperclip} hint="Lampiran yang diunggah" />
+        <Stat label="Sudah check-out" value={checkedOut.toLocaleString("id-ID")} icon={LogOut} hint={`Masih di lokasi: ${present.toLocaleString("id-ID")}`} />
         <Stat label="Pemenang undian" value={(winners.data ?? []).length.toLocaleString("id-ID")} icon={Trophy} tone="gold" hint="Lihat halaman Undian" />
       </Row>
       {checkins.isError && (
@@ -111,11 +176,18 @@ export function Daftar() {
             message={needle ? "Coba kata kunci lain." : "Bagikan tautan halaman check-in; peserta akan muncul di sini begitu mengisi formulir."}
           />
         ) : wide ? (
-          <CheckInTable rows={visible} winnerById={winnerById} onOpenFile={openFile} />
+          <CheckInTable rows={visible} winnerById={winnerById} onOpenFile={openFile} onToggle={toggleCheckOut} busy={rowBusy} />
         ) : (
           <View>
             {visible.map((row) => (
-              <CheckInRow key={row.id} row={row} winner={winnerById.get(row.id)} onOpenFile={openFile} />
+              <CheckInRow
+                key={row.id}
+                row={row}
+                winner={winnerById.get(row.id)}
+                onOpenFile={openFile}
+                onToggle={toggleCheckOut}
+                busy={rowBusy === row.id}
+              />
             ))}
           </View>
         )}
@@ -131,14 +203,31 @@ export function Daftar() {
   );
 }
 
+function CheckOutAction({ row, busy, onToggle }: { row: CheckIn; busy: boolean; onToggle: (row: CheckIn) => void }) {
+  return (
+    <Button
+      small
+      variant={row.checked_out_at ? "ghost" : "secondary"}
+      label={row.checked_out_at ? "Batalkan" : "Check out"}
+      loading={busy}
+      loadingLabel="Menyimpan…"
+      onPress={() => onToggle(row)}
+    />
+  );
+}
+
 function CheckInTable({
   rows,
   winnerById,
   onOpenFile,
+  onToggle,
+  busy,
 }: {
   rows: CheckIn[];
   winnerById: Map<string, Winner>;
   onOpenFile: (path: string) => void;
+  onToggle: (row: CheckIn) => void;
+  busy: string;
 }) {
   const c = useTheme();
   const head: CSSProperties = {
@@ -156,7 +245,7 @@ function CheckInTable({
     <table style={{ width: "100%", fontFamily: FONT_STACK }}>
       <thead>
         <tr>
-          {["Waktu check-in", "Peserta", "Kontak", "Berkas"].map((label) => (
+          {["Waktu check-in", "Peserta", "Kontak", "Check-out", "Berkas"].map((label) => (
             <th key={label} style={head}>
               {label}
             </th>
@@ -182,6 +271,14 @@ function CheckInTable({
                 <div style={sub}>{row.email}</div>
               </td>
               <td style={cell}>
+                <div style={{ whiteSpace: "nowrap", color: row.checked_out_at ? c.text : c.muted }}>
+                  {row.checked_out_at ? formatWib(row.checked_out_at) : "Belum"}
+                </div>
+                <div style={{ marginTop: 6 }}>
+                  <CheckOutAction row={row} busy={busy === row.id} onToggle={onToggle} />
+                </div>
+              </td>
+              <td style={cell}>
                 {row.file_path ? (
                   <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />
                 ) : (
@@ -196,7 +293,19 @@ function CheckInTable({
   );
 }
 
-function CheckInRow({ row, winner, onOpenFile }: { row: CheckIn; winner?: Winner; onOpenFile: (path: string) => void }) {
+function CheckInRow({
+  row,
+  winner,
+  onOpenFile,
+  onToggle,
+  busy,
+}: {
+  row: CheckIn;
+  winner?: Winner;
+  onOpenFile: (path: string) => void;
+  onToggle: (row: CheckIn) => void;
+  busy: boolean;
+}) {
   const c = useTheme();
   return (
     <View style={{ borderTopWidth: 1, borderColor: c.border, paddingVertical: 14, gap: 6 }}>
@@ -212,7 +321,11 @@ function CheckInRow({ row, winner, onOpenFile }: { row: CheckIn; winner?: Winner
       <T size={13} color={c.muted}>
         {row.email}
       </T>
+      <T size={13} color={c.muted}>
+        Check-out: {row.checked_out_at ? formatWib(row.checked_out_at) : "belum"}
+      </T>
       <Row style={{ gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+        <CheckOutAction row={row} busy={busy} onToggle={onToggle} />
         {winner && <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />}
         {!!row.file_path && (
           <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />
