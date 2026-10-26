@@ -215,10 +215,8 @@ export function CheckIn() {
       />
       <Divider />
       <SectionTitle title="Tanggal kunjungan" />
-      <Row style={{ gap: 12, alignItems: "flex-start", flexWrap: width < 380 ? "wrap" : "nowrap" }}>
-        <View style={{ flex: 1, minWidth: 150 }}>{date("check_in_date", "Tanggal Check In")}</View>
-        <View style={{ flex: 1, minWidth: 150 }}>{date("check_out_date", "Tanggal Check Out")}</View>
-      </Row>
+      {date("check_in_date", "Tanggal Check In")}
+      {date("check_out_date", "Tanggal Check Out")}
       <TextInput
         accessibilityLabel="Kosongkan kolom ini"
         aria-hidden

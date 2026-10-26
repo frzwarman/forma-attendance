@@ -307,7 +307,7 @@ export function Field({
               color: c.text,
               backgroundColor: c.inputSurface,
               fontFamily: fonts.regular,
-              fontSize: 15,
+              fontSize: 16,
             },
             props.style,
           ]}

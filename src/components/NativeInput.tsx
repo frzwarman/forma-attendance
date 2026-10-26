@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { View } from "react-native";
 import { FONT_STACK, useTheme } from "../theme";
+import { Calendar } from "./icons";
 import { Row, T } from "./ui";
 
 // Web-only native inputs (date, file, colour) styled like Field.
@@ -14,7 +15,7 @@ export function useInputStyle(error?: string): CSSProperties {
     color: c.text,
     backgroundColor: c.inputSurface,
     fontFamily: FONT_STACK,
-    fontSize: 15,
+    fontSize: 16,
     width: "100%",
     boxSizing: "border-box",
   };
@@ -33,12 +34,37 @@ export function DateInput({
 }) {
   const c = useTheme();
   const style = useInputStyle(error);
+  const [focused, setFocused] = useState(false);
+  // iOS shows an empty date field as a blank box, so a hint and an icon mark it until
+  // a date is chosen; while focused the browser's own editor shows through.
+  const hint = !value && !focused;
   return (
     <View style={{ gap: 8 }}>
       <T size={14} weight="semibold">
         {label}
       </T>
-      <input type="date" aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} style={style} />
+      <div style={{ position: "relative" }}>
+        <input
+          type="date"
+          aria-label={label}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{ ...style, display: "block", paddingRight: 44, color: hint ? "transparent" : c.text }}
+        />
+        {hint && (
+          <span
+            aria-hidden
+            style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", color: c.muted, fontFamily: FONT_STACK, fontSize: 16, pointerEvents: "none" }}
+          >
+            Pilih tanggal
+          </span>
+        )}
+        <span aria-hidden style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", display: "flex", pointerEvents: "none" }}>
+          <Calendar size={18} color={c.muted} />
+        </span>
+      </div>
       {!!error && (
         <T size={12} color={c.danger} accessibilityRole="alert">
           {error}
