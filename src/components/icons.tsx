@@ -53,3 +53,7 @@ export const Upload = make([["path",{"d":"M12 3v12"}],["path",{"d":"m17 8-5-5-5 
 export const ChevronLeft = make([["path",{"d":"m15 18-6-6 6-6"}]]);
 
 export const ChevronRight = make([["path",{"d":"m9 18 6-6-6-6"}]]);
+
+export const MessageCircle = make([["path",{"d":"M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"}]]);
+
+export const CircleCheck = make([["circle",{"cx":"12","cy":"12","r":"10"}],["path",{"d":"m9 12 2 2 4-4"}]]);

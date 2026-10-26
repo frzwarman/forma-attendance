@@ -6,7 +6,7 @@ import { checkOut, forgetCheckIn, type StoredCheckIn } from "../services/checkou
 import { useTheme } from "../theme";
 
 // Shown instead of the form when this phone holds a check-in that has not checked out.
-export function CheckOut({ entries, onNewCheckIn }: { entries: StoredCheckIn[]; onNewCheckIn: () => void }) {
+export function CheckOut({ entries, onEmpty }: { entries: StoredCheckIn[]; onEmpty: () => void }) {
   const c = useTheme();
   const [pending, setPending] = useState<StoredCheckIn[]>(entries);
   const [busy, setBusy] = useState("");
@@ -34,7 +34,7 @@ export function CheckOut({ entries, onNewCheckIn }: { entries: StoredCheckIn[]; 
     setError(undefined);
     const rest = pending.filter((item) => item.token !== token);
     setPending(rest);
-    if (!rest.length && !done) onNewCheckIn();
+    if (!rest.length && !done) onEmpty();
   }
 
   return (
@@ -84,7 +84,6 @@ export function CheckOut({ entries, onNewCheckIn }: { entries: StoredCheckIn[]; 
           ))}
         </View>
       )}
-      <Button variant="ghost" label="Check-in untuk orang lain" onPress={onNewCheckIn} />
     </Card>
   );
 }

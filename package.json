@@ -20,7 +20,8 @@
     "db:types": "node scripts/supabase-types.cjs",
     "db:test": "node --test tests/database/*.test.mjs",
     "weight": "node scripts/report-weight.cjs",
-    "test:e2e:dev": "playwright test --config playwright.dev.config.ts"
+    "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
+    "demo:export": "node --import tsx scripts/demo-export.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -1,40 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
-import { PGlite } from "@electric-sql/pglite";
+import { guestbookDatabase } from "./guestbook-db.mjs";
 
 let db;
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 before(async () => {
-  db = new PGlite();
-  // Minimal Supabase Auth and Storage contracts; SQL and RLS execute in a real embedded Postgres.
-  await db.exec(`
-    create role anon nologin;
-    create role authenticated nologin;
-    create role service_role nologin bypassrls;
-    grant usage on schema public to anon, authenticated, service_role;
-    alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-    create schema auth;
-    create table auth.users (id uuid primary key);
-    create function auth.uid() returns uuid language sql stable as $$
-      select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
-    $$;
-    grant usage on schema auth to authenticated;
-    grant execute on function auth.uid() to authenticated;
-    create schema storage;
-    create table storage.buckets (id text primary key, name text not null, public boolean default false, file_size_limit bigint, allowed_mime_types text[]);
-    create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text references storage.buckets(id), name text not null, owner uuid, created_at timestamptz default now());
-    alter table storage.objects enable row level security;
-    create function storage.foldername(name text) returns text[] language sql immutable as $$
-      select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1]
-    $$;
-    grant usage on schema storage to anon, authenticated;
-    grant all on storage.buckets, storage.objects to anon, authenticated;
-  `);
-  for (const migration of ["20261026000000_guestbook.sql", "20261026120000_guestbook_optional_jabatan.sql", "20261026180000_guestbook_automatic_checkin.sql", "20261026200000_guestbook_checkout.sql"]) {
-    await db.exec(await readFile(new URL(`../../supabase/migrations/${migration}`, import.meta.url), "utf8"));
-  }
+  db = await guestbookDatabase();
   await db.exec(`
     insert into auth.users values ('${id(1)}'), ('${id(2)}');
     insert into public.guestbook_admins (auth_user_id) values ('${id(1)}');
@@ -274,4 +247,29 @@ test("admins check out one attendee, undo it, and check out everyone still prese
     assert.equal((await db.query("select public.guestbook_check_out_all() as n")).rows[0].n, open);
     assert.equal(Number((await db.query("select count(*) from public.guestbook_checkins where checked_out_at is null")).rows[0].count), 0);
   });
+});
+
+test("the demo seed adds 48 attendees, about half checked out, three winners; it is repeatable and removable", async () => {
+  const seed = await readFile(new URL("../../supabase/seed/demo-checkins.sql", import.meta.url), "utf8");
+  const remove = await readFile(new URL("../../supabase/seed/remove-demo-checkins.sql", import.meta.url), "utf8");
+  const counts = async () =>
+    (
+      await db.query(`
+        select count(*)::int as checkins, count(checked_out_at)::int as out,
+          (select count(*)::int from public.guestbook_draw_winners w
+             join public.guestbook_checkins c on c.id = w.checkin_id
+            where c.email_key like '%@example.com') as winners
+        from public.guestbook_checkins where email_key like '%@example.com'`)
+    ).rows[0];
+  const before = (await db.query("select count(*)::int as n from public.guestbook_checkins")).rows[0].n;
+  await db.exec(seed);
+  const first = await counts();
+  assert.equal(first.checkins, 48);
+  assert.ok(first.out >= 15 && first.out <= 30, `checked out: ${first.out}`);
+  assert.equal(first.winners, 3);
+  await db.exec(seed);
+  assert.deepEqual(await counts(), first);
+  await db.exec(remove);
+  assert.deepEqual(await counts(), { checkins: 0, out: 0, winners: 0 });
+  assert.equal((await db.query("select count(*)::int as n from public.guestbook_checkins")).rows[0].n, before);
 });

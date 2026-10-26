@@ -21,17 +21,6 @@ test("a returning attendee checks out with one tap on the same phone", async ({ 
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
 });
 
-test("someone else can still check in on a phone that holds a check-in", async ({ page }) => {
-  await installSupabaseStub(page);
-  await page.goto("/");
-  await fillForm(page);
-  await page.getByRole("button", { name: "Kirim", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Terima kasih/ })).toBeVisible();
-  await page.reload();
-  await page.getByRole("button", { name: "Check-in untuk orang lain", exact: true }).click();
-  await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
-});
-
 test("the slideshow does not open again for an attendee returning to check out", async ({ page }) => {
   await installSupabaseStub(page, { intro: true });
   await page.goto("/");
