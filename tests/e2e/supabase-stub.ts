@@ -5,8 +5,8 @@ export type StubState = {
   settings: Settings;
   checkins: CheckIn[];
   winners: Winner[];
-  rpcCalls: Array<{ name: string; body: Record<string, unknown> }>;
-  uploads: Array<{ bucket: string; path: string; contentType: string; bytes: number }>;
+  rpcCalls: { name: string; body: Record<string, unknown> }[];
+  uploads: { bucket: string; path: string; contentType: string; bytes: number }[];
   signedPaths: string[];
   rangeHeaders: string[];
 };
