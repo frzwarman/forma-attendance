@@ -10,6 +10,8 @@ The previous workforce-attendance prototype is preserved on the `workforce-app` 
 
 ## Run locally
 
+First time on this project? Follow [GETTING_STARTED.md](GETTING_STARTED.md) for installing, connecting Supabase, creating the first admin and deploying.
+
 Use Node 24 LTS (24.3+) or 22.13+.
 
 ```sh
