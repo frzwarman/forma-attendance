@@ -5,6 +5,7 @@ import { T } from "../components/ui";
 import { WhatsAppHelp } from "../components/WhatsAppHelp";
 import { CheckIn } from "../features/CheckIn";
 import { CheckOut } from "../features/CheckOut";
+import { EventGuide } from "../features/EventGuide";
 import { EventIntro } from "../features/intro/EventIntro";
 import { EventSlides } from "../features/intro/EventSlides";
 import { ThankYou, type CheckInDetails } from "../features/ThankYou";
@@ -52,6 +53,7 @@ export default function Index() {
                 >
                   <EventSlides wide={false} />
                 </section>
+                <EventGuide />
               </>
             )}
             <T size={12} color={c.onBackgroundMuted}>

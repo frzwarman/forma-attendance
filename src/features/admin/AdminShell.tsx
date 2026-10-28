@@ -1,5 +1,5 @@
 import { Link, usePathname } from "expo-router";
-import { Gift, LayoutList, LogOut, Palette, type IconComponent } from "../../components/icons";
+import { Gift, LayoutList, LogOut, Palette, Presentation, type IconComponent } from "../../components/icons";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { Logo } from "../../components/Brand";
@@ -11,6 +11,7 @@ import { useTheme } from "../../theme";
 const items: [string, string, IconComponent][] = [
   ["Daftar Check-in", "/admin", LayoutList],
   ["Undian", "/admin/undian", Gift],
+  ["Info acara", "/admin/acara", Presentation],
   ["Tampilan", "/admin/tampilan", Palette],
 ];
 

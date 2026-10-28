@@ -92,8 +92,11 @@ export function Button({
   style,
   small = false,
   large = false,
+  accessibilityLabel,
 }: {
   label: string;
+  // When several buttons share a visible label, e.g. "Hapus" on every row.
+  accessibilityLabel?: string;
   onPress: () => void;
   icon?: IconComponent;
   variant?: "primary" | "secondary" | "ghost" | "danger" | "inverse";
@@ -117,7 +120,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ disabled: disabled || loading, busy: loading }}
       aria-busy={loading}
       disabled={disabled || loading}

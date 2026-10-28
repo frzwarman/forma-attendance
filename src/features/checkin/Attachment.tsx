@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { Camera, FileText, SwitchCamera, Upload, X } from "../../components/icons";
 import { Button, Row, T } from "../../components/ui";
+import { formatFileSize } from "../../domain/files";
 import { ALLOWED_TYPES, UNSUPPORTED_FILE } from "../../services/uploads";
 import { FONT_STACK, useTheme } from "../../theme";
 
@@ -166,9 +167,7 @@ export function Attachment({
               {file.name}
             </T>
             <T size={12} color={c.muted}>
-              {file.size < 1024 * 1024
-                ? `${Math.max(1, Math.round(file.size / 1024))} KB`
-                : `${(file.size / 1024 / 1024).toFixed(1).replace(".", ",")} MB`}
+              {formatFileSize(file.size)}
             </T>
           </View>
           <Button small variant="ghost" label="Hapus" onPress={() => onChange(null)} />
