@@ -33,7 +33,7 @@ export function Daftar() {
   const winnerById = new Map((winners.data ?? []).map((w) => [w.checkin_id, w]));
   const needle = query.trim().toLowerCase();
   const filtered = needle
-    ? rows.filter((row) => [row.name, row.phone, row.email].some((value) => value.toLowerCase().includes(needle)))
+    ? rows.filter((row) => [row.name, row.phone, row.email, row.room_number ?? ""].some((value) => value.toLowerCase().includes(needle)))
     : rows;
   const todayKey = formatWib(new Date().toISOString()).slice(0, 10);
   const today = rows.filter((row) => formatWib(row.created_at).slice(0, 10) === todayKey).length;
@@ -157,9 +157,9 @@ export function Daftar() {
       )}
       <Card style={{ gap: 16, padding: wide ? 20 : 16 }}>
         <Field
-          label="Cari nama, telepon, atau e-mail"
+          label="Cari nama, telepon, e-mail, atau kamar"
           labelHidden
-          placeholder="Cari nama, telepon, atau e-mail"
+          placeholder="Cari nama, telepon, e-mail, atau kamar"
           leading={<Search size={16} color={c.muted} strokeWidth={2} />}
           value={query}
           onChangeText={(value) => {
@@ -245,7 +245,7 @@ function CheckInTable({
     <table style={{ width: "100%", fontFamily: FONT_STACK }}>
       <thead>
         <tr>
-          {["Waktu check-in", "Peserta", "Kontak", "Check-out", "Berkas"].map((label) => (
+          {["Waktu check-in", "Peserta", "Kontak", "Kamar", "Check-out", "Berkas"].map((label) => (
             <th key={label} style={head}>
               {label}
             </th>
@@ -270,6 +270,7 @@ function CheckInTable({
                 <div>{row.phone}</div>
                 <div style={sub}>{row.email}</div>
               </td>
+              <td style={{ ...cell, whiteSpace: "nowrap" }}>{row.room_number || <span style={{ color: c.muted }}>Tidak ada</span>}</td>
               <td style={cell}>
                 <div style={{ whiteSpace: "nowrap", color: row.checked_out_at ? c.text : c.muted }}>
                   {row.checked_out_at ? formatWib(row.checked_out_at) : "Belum"}
@@ -321,6 +322,11 @@ function CheckInRow({
       <T size={13} color={c.muted}>
         {row.email}
       </T>
+      {!!row.room_number && (
+        <T size={13} color={c.muted}>
+          Kamar hotel {row.room_number}
+        </T>
+      )}
       <T size={13} color={c.muted}>
         Check-out: {row.checked_out_at ? formatWib(row.checked_out_at) : "belum"}
       </T>

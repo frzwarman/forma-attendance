@@ -209,6 +209,43 @@ test("a check-in without dates gets today's Jakarta date and no check-out yet", 
   });
 });
 
+// Named arguments, as PostgREST calls the function. The form no longer asks for an address.
+async function checkInNamed({ email, phone, room = null, address = null }) {
+  const { rows } = await db.query(
+    `select public.guestbook_check_in(p_name => 'Tamu Hotel', p_phone => $1, p_email => $2, p_jabatan => null,
+       p_address => $4, p_latitude => null, p_longitude => null, p_file_path => null,
+       p_check_in_date => null, p_check_out_date => null, p_room_number => $3) as result`,
+    [phone, email, room, address],
+  );
+  return rows[0].result;
+}
+
+test("the hotel room number and the address are optional; a room is trimmed and at most 20 characters", async () => {
+  const given = await asRole(null, "anon", () => checkInNamed({ email: "kamar1@example.test", phone: "0821 2000 1000", room: "  1205 " }));
+  const blank = await asRole(null, "anon", () => checkInNamed({ email: "kamar2@example.test", phone: "0821 2000 2000", room: "   ", address: "  " }));
+  // An older client sends an address and no p_room_number at all.
+  const older = await asRole(null, "anon", () => checkIn({ name: "Tamu Lama", phone: "0821 2000 3000", email: "kamar3@example.test" }));
+  for (const result of [given, blank, older]) assert.equal(result.status, "created");
+  await assert.rejects(
+    () => asUser(null, () => checkInNamed({ email: "kamar4@example.test", phone: "0821 2000 4000", room: "x".repeat(21) }), "anon"),
+    /Nomor kamar/,
+  );
+  await assert.rejects(
+    () => asUser(null, () => checkInNamed({ email: "kamar5@example.test", phone: "0821 2000 5000", address: "x".repeat(401) }), "anon"),
+    /Alamat/,
+  );
+  await asUser(id(1), async () => {
+    const { rows } = await db.query(
+      "select email, room_number, address from public.guestbook_checkins where email like 'kamar%@example.test' order by email",
+    );
+    assert.deepEqual(rows, [
+      { email: "kamar1@example.test", room_number: "1205", address: null },
+      { email: "kamar2@example.test", room_number: null, address: null },
+      { email: "kamar3@example.test", room_number: null, address: "Jl. MH Thamrin 14" },
+    ]);
+  });
+});
+
 test("a check-in returns a check-out code that checks the attendee out once", async () => {
   const wati = { name: "Wati Lestari", phone: "0821 1000 7000", email: "wati@example.test", in: null, out: null };
   const created = await asRole(null, "anon", () => checkIn(wati));
@@ -249,13 +286,13 @@ test("admins check out one attendee, undo it, and check out everyone still prese
   });
 });
 
-test("the demo seed adds 48 attendees, about half checked out, three winners; it is repeatable and removable", async () => {
+test("the demo seed adds 48 attendees, about half checked out, hotel rooms for 36, three winners; it is repeatable and removable", async () => {
   const seed = await readFile(new URL("../../supabase/seed/demo-checkins.sql", import.meta.url), "utf8");
   const remove = await readFile(new URL("../../supabase/seed/remove-demo-checkins.sql", import.meta.url), "utf8");
   const counts = async () =>
     (
       await db.query(`
-        select count(*)::int as checkins, count(checked_out_at)::int as out,
+        select count(*)::int as checkins, count(checked_out_at)::int as out, count(room_number)::int as rooms,
           (select count(*)::int from public.guestbook_draw_winners w
              join public.guestbook_checkins c on c.id = w.checkin_id
             where c.email_key like '%@example.com') as winners
@@ -267,9 +304,10 @@ test("the demo seed adds 48 attendees, about half checked out, three winners; it
   assert.equal(first.checkins, 48);
   assert.ok(first.out >= 15 && first.out <= 30, `checked out: ${first.out}`);
   assert.equal(first.winners, 3);
+  assert.equal(first.rooms, 36);
   await db.exec(seed);
   assert.deepEqual(await counts(), first);
   await db.exec(remove);
-  assert.deepEqual(await counts(), { checkins: 0, out: 0, winners: 0 });
+  assert.deepEqual(await counts(), { checkins: 0, out: 0, rooms: 0, winners: 0 });
   assert.equal((await db.query("select count(*)::int as n from public.guestbook_checkins")).rows[0].n, before);
 });

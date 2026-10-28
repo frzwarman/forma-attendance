@@ -155,4 +155,4 @@ When the database changes (a new file in `supabase/migrations/`), apply it with 
 | `/admin` says "Akun ini belum menjadi admin" | The account signed in but has no admin grant. Run the SQL in step 5.5 with that e-mail. |
 | `npm ci` warns about the Node.js version | Use Node.js 24 LTS. |
 | `db:push` asks for a password or fails to connect | Run the `set -a; . ./supabase/.env.cli.local; set +a` line in the same terminal first, and check `npm run db:link` succeeded. |
-| Camera or "Gunakan lokasi saya" does nothing | Browsers allow them only on `https://` or `localhost`, and the user must allow access. |
+| *Ambil foto* (camera) does nothing | Browsers allow the camera only on `https://` or `localhost`, and the user must allow access. |

@@ -62,4 +62,3 @@ export const Presentation = make([["path",{"d":"M2 3h20"}],["path",{"d":"M21 3v1
 
 export const Download = make([["path",{"d":"M12 15V3"}],["path",{"d":"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"}],["path",{"d":"m7 10 5 5 5-5"}]]);
 
-export const Plus = make([["path",{"d":"M5 12h14"}],["path",{"d":"M12 5v14"}]]);

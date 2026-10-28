@@ -21,7 +21,10 @@ export type CheckIn = {
   email: string;
   // No longer collected on the form; older rows may still hold a value.
   jabatan: string | null;
-  address: string;
+  // Absent until migration 20261028000000_guestbook_room_number_optional_address.sql is applied.
+  room_number?: string | null;
+  // No longer collected on the form (no address, no map pin); older rows may still hold values.
+  address: string | null;
   latitude: number | null;
   longitude: number | null;
   file_path: string | null;

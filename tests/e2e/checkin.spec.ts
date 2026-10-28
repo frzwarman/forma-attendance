@@ -9,6 +9,9 @@ test("an attendee checks in, sees a thank-you popup, then the event information 
   await expect(page.getByLabel("Jabatan", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Tanggal Check In", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("Tanggal Check Out", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Lokasi", exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Alamat", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("img", { name: "Peta lokasi" })).toHaveCount(0);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   const popup = page.getByRole("dialog", { name: "Check-in berhasil" });
@@ -19,6 +22,8 @@ test("an attendee checks in, sees a thank-you popup, then the event information 
   expect(state.rpcCalls[0].body.p_jabatan).toBeNull();
   expect(state.rpcCalls[0].body.p_check_in_date).toBeNull();
   expect(state.rpcCalls[0].body.p_check_out_date).toBeNull();
+  expect(state.rpcCalls[0].body.p_address).toBeNull();
+  expect(state.rpcCalls[0].body.p_latitude).toBeNull();
   expect(state.checkins).toHaveLength(1);
   expect(state.checkins[0].phone).toBe("0812 1111 2222");
   await popup.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
@@ -72,7 +77,6 @@ test("validation messages appear in Bahasa before anything is sent", async ({ pa
     "Nama wajib diisi",
     "Nomor telepon tidak valid",
     "E-mail tidak valid",
-    "Alamat wajib diisi",
   ]) {
     await expect(page.getByText(message, { exact: true })).toBeVisible();
   }

@@ -11,6 +11,7 @@ const checkin = (overrides: Partial<CheckIn> = {}): CheckIn => ({
   phone: "081234567890",
   email: "budi@example.test",
   jabatan: "Staf",
+  room_number: "1205",
   address: "Jl. MH Thamrin 14",
   latitude: -6.1754,
   longitude: 106.8272,
@@ -37,19 +38,26 @@ it("maps check-ins and winners to export rows", () => {
   const rows = exportRows([checkin()], [winner()]);
   assert.deepEqual(rows[0], EXPORT_HEADERS);
   assert.equal(EXPORT_HEADERS.includes("Jabatan"), false);
+  // The form no longer asks for an address or map pin; older rows keep theirs in the database.
+  for (const dropped of ["Alamat", "Latitude", "Longitude"]) assert.equal(EXPORT_HEADERS.includes(dropped), false, dropped);
+  assert.equal(rows[1].includes("Jl. MH Thamrin 14"), false);
   assert.equal(EXPORT_HEADERS.some((header) => header.startsWith("Tanggal")), false);
   assert.equal(rows[1].includes("Staf"), false);
   assert.equal(rows[1][0], "26/10/2026 10:05 WIB");
   assert.equal(rows[0][1], "Waktu Check-out (WIB)");
   assert.equal(rows[1][1], "26/10/2026 17:30 WIB");
   assert.equal(rows[1][3], "081234567890");
-  assert.equal(rows[1][6], "-6.1754");
-  assert.equal(rows[1][8], "checkins/abc.jpg");
-  assert.equal(rows[1][9], "Hadiah 1");
-  assert.equal(rows[1][10], "26/10/2026 11:00 WIB");
-  const none = exportRows([checkin({ latitude: null, longitude: null, file_path: null, checked_out_at: null })], []);
+  assert.equal(rows[0][5], "Nomor Kamar Hotel");
+  assert.equal(rows[1][5], "1205");
+  assert.equal(rows[1][6], "checkins/abc.jpg");
+  assert.equal(rows[1][7], "Hadiah 1");
+  assert.equal(rows[1][8], "26/10/2026 11:00 WIB");
+  const none = exportRows([checkin({ room_number: null, address: null, file_path: null, checked_out_at: null })], []);
   assert.equal(none[1][1], "");
-  assert.deepEqual(none[1].slice(6), ["", "", "", "", ""]);
+  assert.deepEqual(none[1].slice(5), ["", "", "", ""]);
+  // Rows read before the room-number migration have no such field.
+  const { room_number: _, ...older } = checkin();
+  assert.equal(exportRows([older as CheckIn], [])[1][5], "");
 });
 
 it("keeps phone numbers as text cells in Excel", () => {

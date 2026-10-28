@@ -10,13 +10,12 @@ import { uploadCheckInFile } from "../services/uploads";
 import { useTheme } from "../theme";
 import type { CheckInDetails } from "./ThankYou";
 import { Attachment } from "./checkin/Attachment";
-import { MapPicker, type Pin } from "./checkin/MapPicker";
 
 const empty: CheckInInput = {
   name: "",
   phone: "",
   email: "",
-  address: "",
+  room_number: "",
 };
 
 // The check-in form; the page shows the thank-you popup once onCheckedIn fires.
@@ -31,7 +30,6 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState("");
   const [duplicateAt, setDuplicateAt] = useState("");
-  const [pin, setPin] = useState<Pin | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -50,12 +48,7 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
           setUploading(false);
         }
       }
-      const result = await submitCheckIn(input, {
-        file_path,
-        honeypot,
-        latitude: pin?.latitude ?? null,
-        longitude: pin?.longitude ?? null,
-      });
+      const result = await submitCheckIn(input, { file_path, honeypot });
       if (result.status === "duplicate") setDuplicateAt(result.created_at);
       else onCheckedIn({ ...input, name: input.name.trim(), at: result.created_at, token: result.checkout_token });
     } catch (cause) {
@@ -65,7 +58,7 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
   });
 
   const text = (
-    name: "name" | "phone" | "email" | "address",
+    name: "name" | "phone" | "email" | "room_number",
     label: string,
     props: Partial<React.ComponentProps<typeof Field>> = {},
   ) => (
@@ -99,10 +92,13 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
       {text("name", "Nama", { autoComplete: "name", placeholder: "Nama lengkap" })}
       {text("phone", "Nomor Telepon", { keyboardType: "phone-pad", inputMode: "tel", autoComplete: "tel", placeholder: "0812 3456 7890" })}
       {text("email", "E-mail", { keyboardType: "email-address", autoCapitalize: "none", autoComplete: "email", placeholder: "nama@instansi.go.id" })}
-      <Divider />
-      <SectionTitle title="Lokasi" description="Alamat asal, ditambah titik di peta jika berkenan." />
-      {text("address", "Alamat", { multiline: true, placeholder: "Jalan, kota, provinsi", style: { minHeight: 88, textAlignVertical: "top" } })}
-      <MapPicker value={pin} onChange={setPin} />
+      {text("room_number", "Nomor Kamar Hotel", {
+        placeholder: "Contoh: 1205",
+        hint: "Opsional. Kosongkan jika tidak menginap di hotel acara.",
+        maxLength: 20,
+        autoComplete: "off",
+        autoCapitalize: "characters",
+      })}
       <Divider />
       <SectionTitle title="Berkas pendukung" description="Opsional: foto surat tugas atau kartu identitas, atau berkas PDF." />
       <Attachment

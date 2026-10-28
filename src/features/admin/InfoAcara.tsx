@@ -1,12 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { View } from "react-native";
-import { FileText, Plus, RotateCcw, Save } from "../../components/icons";
+import { FileText, RotateCcw, Save } from "../../components/icons";
 import { FileInput } from "../../components/NativeInput";
 import { Button, Card, Divider, Field, Row, SectionTitle, T } from "../../components/ui";
 import { formatFileSize } from "../../domain/files";
 import { isMentimeterUrl } from "../../domain/mentimeter";
-import { SAMPLE_EVENT_INFO, saveEventInfo, useEventInfo, type EventInfo, type Material, type Room } from "../../services/eventInfo";
+import { SAMPLE_EVENT_INFO, saveEventInfo, useEventInfo, type EventInfo, type Material } from "../../services/eventInfo";
 import { useTheme } from "../../theme";
 
 // Mock mode keeps PDFs inline in localStorage, which holds only a few megabytes in all.
@@ -38,8 +38,6 @@ export function InfoAcara() {
     setError("");
     setDraft((current) => ({ ...current, ...patch }));
   };
-  const setRoom = (index: number, patch: Partial<Room>) =>
-    update({ rooms: draft.rooms.map((room, i) => (i === index ? { ...room, ...patch } : room)) });
   const setMaterial = (index: number, patch: Partial<Material>) =>
     update({ materials: draft.materials.map((material, i) => (i === index ? { ...material, ...patch } : material)) });
 
@@ -70,16 +68,8 @@ export function InfoAcara() {
       setLinkError("Tautan harus diawali https://www.menti.com/ atau https://www.mentimeter.com/.");
       return;
     }
-    const rooms = draft.rooms
-      .map((room) => ({ number: room.number.trim(), name: room.name.trim() }))
-      .filter((room) => room.number || room.name);
-    if (rooms.some((room) => !room.number)) {
-      setError("Isi nomor ruang untuk setiap ruangan.");
-      return;
-    }
     const next: EventInfo = {
       mentimeter_url: link || null,
-      rooms,
       materials: draft.materials.map((material) => ({ ...material, title: material.title.trim() || material.file_name })),
     };
     try {
@@ -100,7 +90,7 @@ export function InfoAcara() {
           Info acara
         </T>
         <T size={14} color={c.muted}>
-          Tautan Mentimeter, ruangan, dan materi yang tampil di halaman peserta setelah check-in.
+          Tautan Mentimeter dan materi yang tampil di halaman peserta setelah check-in.
         </T>
       </View>
       <Card style={{ gap: 18, maxWidth: 760 }}>
@@ -123,38 +113,6 @@ export function InfoAcara() {
           hint="Kosongkan jika tidak memakai Mentimeter."
           error={linkError}
         />
-        <Divider />
-        <SectionTitle title="Ruangan" description="Nomor ruang dan kegiatan di dalamnya." />
-        {draft.rooms.length > 0 && (
-          <Row style={{ gap: 10 }}>
-            <T size={13} weight="semibold" color={c.muted} style={{ width: 96 }}>
-              Nomor ruang
-            </T>
-            <T size={13} weight="semibold" color={c.muted} style={{ flex: 1 }}>
-              Kegiatan
-            </T>
-          </Row>
-        )}
-        {draft.rooms.map((room, i) => (
-          <Row key={i} style={{ gap: 10 }}>
-            <View style={{ width: 96 }}>
-              <Field labelHidden label={`Nomor ruang ${i + 1}`} value={room.number} onChangeText={(number) => setRoom(i, { number })} placeholder="201" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Field labelHidden label={`Kegiatan ruang ${i + 1}`} value={room.name} onChangeText={(name) => setRoom(i, { name })} placeholder="Pleno" />
-            </View>
-            <Button
-              small
-              variant="ghost"
-              label="Hapus"
-              accessibilityLabel={`Hapus ruang ${room.number || i + 1}`}
-              onPress={() => update({ rooms: draft.rooms.filter((_, j) => j !== i) })}
-            />
-          </Row>
-        ))}
-        <View style={{ alignItems: "flex-start" }}>
-          <Button small variant="secondary" icon={Plus} label="Tambah ruangan" onPress={() => update({ rooms: [...draft.rooms, { number: "", name: "" }] })} />
-        </View>
         <Divider />
         <SectionTitle title="Materi" description="PDF yang bisa diunduh peserta. Mode contoh menyimpan berkas hingga 1 MB." />
         {draft.materials.map((material, i) => (

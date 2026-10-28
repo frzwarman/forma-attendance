@@ -12,7 +12,8 @@ export const checkInSchema = z.object({
     .trim()
     .max(160, "E-mail maksimal 160 karakter")
     .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "E-mail tidak valid"),
-  address: z.string().trim().min(1, "Alamat wajib diisi").max(400, "Alamat maksimal 400 karakter"),
+  // Hotel room, for attendees who stay at the event hotel.
+  room_number: z.string().trim().max(20, "Nomor kamar maksimal 20 karakter").optional(),
 });
 
 export type CheckInInput = z.infer<typeof checkInSchema>;

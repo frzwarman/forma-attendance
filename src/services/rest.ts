@@ -6,15 +6,18 @@ function headers(extra: Record<string, string> = {}) {
   return { apikey: key, Authorization: `Bearer ${key}`, ...extra };
 }
 
-async function failure(response: Response): Promise<Error> {
+// Carries PostgREST's error code (e.g. PGRST202, function not found) next to the message.
+async function failure(response: Response): Promise<Error & { code?: string }> {
   let message = response.statusText || `HTTP ${response.status}`;
+  let code: string | undefined;
   try {
     const body = await response.json();
     if (body && typeof body.message === "string") message = body.message;
+    if (body && typeof body.code === "string") code = body.code;
   } catch {
     /* not JSON */
   }
-  return new Error(message);
+  return Object.assign(new Error(message), { code });
 }
 
 export async function getSingleRow<T>(table: string, filter: string): Promise<T | null> {

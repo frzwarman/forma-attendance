@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { Download, FileText, Presentation } from "../components/icons";
-import { Card, Divider, Row, SectionTitle, T } from "../components/ui";
+import { Card, Divider, SectionTitle, T } from "../components/ui";
 import { formatFileSize } from "../domain/files";
 import { isMentimeterUrl } from "../domain/mentimeter";
 import { useEventInfo } from "../services/eventInfo";
 import { FONT_STACK, useTheme } from "../theme";
 
-// What a checked-in attendee needs during the event: polling, rooms and materials.
+// What a checked-in attendee needs during the event: polling and materials.
 export function EventGuide() {
   const c = useTheme();
-  const { mentimeter_url, rooms, materials } = useEventInfo();
+  const { mentimeter_url, materials } = useEventInfo();
   const menti = mentimeter_url && isMentimeterUrl(mentimeter_url) ? mentimeter_url : null;
   const sections: ReactNode[] = [];
   if (menti)
@@ -40,29 +40,6 @@ export function EventGuide() {
           <Presentation size={20} color={c.onBackground} />
           Ikut polling di Mentimeter
         </a>
-      </View>,
-    );
-  if (rooms.length)
-    sections.push(
-      <View key="rooms" style={{ gap: 12 }}>
-        <SectionTitle title="Ruangan" />
-        <View role="list" aria-label="Ruangan" style={{ gap: 8 }}>
-          {rooms.map((room, i) => (
-            <Row key={i} role="listitem" style={{ gap: 14, padding: 12, borderRadius: 12, backgroundColor: c.ground }}>
-              <View style={{ minWidth: 60, alignItems: "center" }}>
-                <T size={11} weight="semibold" color={c.muted}>
-                  Ruang
-                </T>
-                <T size={22} weight="extra" style={{ lineHeight: 26 }}>
-                  {room.number}
-                </T>
-              </View>
-              <T size={14} style={{ flex: 1 }}>
-                {room.name}
-              </T>
-            </Row>
-          ))}
-        </View>
       </View>,
     );
   if (materials.length)

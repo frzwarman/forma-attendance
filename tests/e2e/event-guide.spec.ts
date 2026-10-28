@@ -9,7 +9,7 @@ async function download(page: Page, name: string) {
   return { name: file.suggestedFilename(), head: fs.readFileSync((await file.path())!).subarray(0, 5).toString() };
 }
 
-test("after check-in the attendee finds the Mentimeter link, the rooms and the materials", async ({ page }) => {
+test("after check-in the attendee finds the Mentimeter link and the materials", async ({ page }) => {
   await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -22,15 +22,12 @@ test("after check-in the attendee finds the Mentimeter link, the rooms and the m
   const menti = guide.getByRole("link", { name: "Ikut polling di Mentimeter" });
   await expect(menti).toHaveAttribute("href", "https://www.menti.com/");
   await expect(menti).toHaveAttribute("target", "_blank");
-  const rooms = guide.getByRole("list", { name: "Ruangan" }).getByRole("listitem");
-  await expect(rooms).toHaveCount(4);
-  await expect(rooms.first()).toContainText("201");
-  await expect(rooms.first()).toContainText("Pleno");
+  await expect(guide.getByRole("list", { name: "Ruangan" })).toHaveCount(0);
   await expect(guide.getByRole("list", { name: "Materi" }).getByRole("listitem")).toHaveCount(3);
   expect(await download(page, "Unduh Panduan peserta")).toEqual({ name: "panduan-peserta.pdf", head: "%PDF-" });
 });
 
-test("an admin's Mentimeter link, rooms and materials show on the attendee page in the same browser", async ({ page }) => {
+test("an admin's Mentimeter link and materials show on the attendee page in the same browser", async ({ page }) => {
   await installSupabaseStub(page);
   await page.goto("/admin");
   await signInAsAdmin(page);
@@ -44,10 +41,7 @@ test("an admin's Mentimeter link, rooms and materials show on the attendee page 
   await expect(page.getByRole("alert")).toContainText("menti.com");
   await link.fill("https://www.menti.com/al1b2c3d4e5f");
 
-  await page.getByRole("button", { name: "Hapus ruang 305", exact: true }).click();
-  await page.getByRole("button", { name: "Tambah ruangan", exact: true }).click();
-  await page.getByLabel("Nomor ruang 4", { exact: true }).fill("410");
-  await page.getByLabel("Kegiatan ruang 4", { exact: true }).fill("Ruang media");
+  await expect(page.getByRole("button", { name: "Tambah ruangan" })).toHaveCount(0);
 
   const upload = page.getByLabel("Tambah materi (PDF)", { exact: true });
   await upload.setInputFiles({ name: "besar.pdf", mimeType: "application/pdf", buffer: Buffer.concat([Buffer.from("%PDF-"), Buffer.alloc(1100 * 1024)]) });
@@ -64,10 +58,7 @@ test("an admin's Mentimeter link, rooms and materials show on the attendee page 
   await page.goto("/");
   const guide = page.getByRole("region", { name: "Panduan acara" });
   await expect(guide.getByRole("link", { name: "Ikut polling di Mentimeter" })).toHaveAttribute("href", "https://www.menti.com/al1b2c3d4e5f");
-  const rooms = guide.getByRole("list", { name: "Ruangan" });
-  await expect(rooms.getByRole("listitem")).toHaveCount(4);
-  await expect(rooms).toContainText("Ruang media");
-  await expect(rooms).not.toContainText("305");
+  await expect(guide.getByRole("list", { name: "Materi" }).getByRole("listitem")).toHaveCount(4);
   expect(await download(page, "Unduh Paparan narasumber")).toEqual({ name: "paparan-narasumber.pdf", head: "%PDF-" });
 
   await page.goto("/admin/acara");
@@ -75,5 +66,7 @@ test("an admin's Mentimeter link, rooms and materials show on the attendee page 
   await expect(page.getByLabel("Tautan Mentimeter", { exact: true })).toHaveValue("https://www.menti.com/");
   await page.getByRole("button", { name: "Simpan", exact: true }).click();
   await page.goto("/");
-  await expect(page.getByRole("region", { name: "Panduan acara" }).getByRole("listitem").filter({ hasText: "305" })).toHaveCount(1);
+  const materials = page.getByRole("region", { name: "Panduan acara" }).getByRole("list", { name: "Materi" });
+  await expect(materials.getByRole("listitem")).toHaveCount(3);
+  await expect(materials).not.toContainText("Paparan narasumber");
 });
