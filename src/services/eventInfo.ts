@@ -27,18 +27,27 @@ const doc = (title: string, prefix: string, count: number, height: number): Page
   height,
 });
 
+// The part of a CV's first page with the speaker's name and photo, shown in the opening popup.
+// Cropped by hand to <prefix>-profil.jpg (ffmpeg -i <prefix>-1.jpg -vf crop=w:h:x:y -q:v 4 <prefix>-profil.jpg).
+export type Speaker = PagedDoc & { profile: { src: string; width: number; height: number } };
+const speaker = (cv: PagedDoc, width: number, height: number, src = cv.pages[0].replace(/-1\.jpg$/, "-profil.jpg")): Speaker => ({
+  ...cv,
+  profile: { src, width, height },
+});
+
 // Fixed in public/; not editable in the admin's Info acara tab.
 export const RUNDOWN = doc("Rundown acara", "/rundown/rundown", 2, 1755);
-export const SPEAKERS: PagedDoc[] = [
-  doc("Dr. Agus Canny", "/narasumber/agus-canny", 9, 1605),
-  doc("Muhammad Juan Al Qausar", "/narasumber/muhammad-juan-al-qausar", 7, 1605),
-  doc("Nicholas Khoo", "/narasumber/nicholas-khoo", 1, 1605),
-  doc("I Gede Putu Rahman Desyanta (Anta)", "/narasumber/rahman-desyanta", 4, 1754),
-  doc("Indra Hardianto", "/narasumber/indra-hardianto", 2, 1754),
-  doc("Verdyka Kurniawan", "/narasumber/verdyka-kurniawan", 2, 1754),
-  doc("Fransiskus Paranso (Anzo)", "/narasumber/fransiskus-paranso", 2, 1754),
-  doc("Karen Grace Sutoto", "/narasumber/karen-grace-sutoto", 1, 1605),
-  doc("Tim Positium", "/narasumber/tim-positium", 1, 1754),
+export const SPEAKERS: Speaker[] = [
+  speaker(doc("Dr. Agus Canny", "/narasumber/agus-canny", 9, 1605), 820, 310),
+  speaker(doc("Muhammad Juan Al Qausar", "/narasumber/muhammad-juan-al-qausar", 7, 1605), 960, 590),
+  speaker(doc("Nicholas Khoo", "/narasumber/nicholas-khoo", 1, 1605), 1240, 300),
+  speaker(doc("I Gede Putu Rahman Desyanta (Anta)", "/narasumber/rahman-desyanta", 4, 1754), 524, 1000),
+  speaker(doc("Indra Hardianto", "/narasumber/indra-hardianto", 2, 1754), 1240, 220),
+  speaker(doc("Verdyka Kurniawan", "/narasumber/verdyka-kurniawan", 2, 1754), 1060, 140),
+  speaker(doc("Fransiskus Paranso (Anzo)", "/narasumber/fransiskus-paranso", 2, 1754), 1240, 520),
+  speaker(doc("Karen Grace Sutoto", "/narasumber/karen-grace-sutoto", 1, 1605), 1240, 232),
+  // A one-page team introduction: every part of it is names and photos.
+  speaker(doc("Tim Positium", "/narasumber/tim-positium", 1, 1754), 1240, 1754, "/narasumber/tim-positium-1.jpg"),
 ];
 
 const KEY = "guestbook.event-info";

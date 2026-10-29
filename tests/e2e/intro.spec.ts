@@ -7,12 +7,27 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
   await page.goto("/");
   const dialog = page.getByRole("dialog", { name: "Informasi acara" });
   await expect(dialog).toBeVisible();
+  // Speakers come first, each with only the name-and-photo part of their CV, then the Bawaslu title card.
+  await expect(dialog.getByRole("heading", { name: "Dr. Agus Canny" })).toBeInViewport();
+  await expect(dialog.getByRole("img", { name: "Profil Dr. Agus Canny" })).toBeVisible();
+  await expect(dialog.getByRole("img", { name: /halaman/ })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Mulai check-in", exact: true })).toBeInViewport();
+  const next = dialog.getByRole("button", { name: "Slide berikutnya" });
+  await next.click();
+  await expect(dialog.getByRole("heading", { name: "Muhammad Juan Al Qausar" })).toBeInViewport();
+  await expect(dialog.getByText("2 dari 10", { exact: true })).toBeVisible();
+  // On a phone the arrows stay inside the popup.
+  expect((await next.boundingBox())!.x + 44).toBeLessThanOrEqual((await dialog.boundingBox())!.x + (await dialog.boundingBox())!.width);
+  for (let slide = 3; slide <= 10; slide++) {
+    await next.click();
+    await expect(dialog.getByText(`${slide} dari 10`, { exact: true })).toBeVisible();
+  }
   await expect(dialog.getByText("Jakarta, 2 - 6 November 2029", { exact: true })).toBeInViewport();
-  await dialog.getByRole("button", { name: "Slide berikutnya" }).click();
-  await expect(dialog.getByRole("heading", { name: "Lima hari sesi panel dan lokakarya" })).toBeInViewport();
-  await dialog.getByRole("button", { name: "Ke slide 4" }).click();
-  await expect(dialog.getByRole("heading", { name: "Lokasi acara di Jakarta" })).toBeInViewport();
-  await expect(dialog.getByRole("img", { name: "Bundaran HI dan gedung-gedung di Jakarta" })).toBeVisible();
+  await expect(next).toBeDisabled();
+  // The title card lines up with the popup instead of stopping short of it.
+  await expect
+    .poll(() => dialog.locator(".intro-track").evaluate((el) => el.scrollWidth - el.clientWidth - el.scrollLeft))
+    .toBeLessThan(1);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   await page.reload();
