@@ -80,27 +80,40 @@ test("admins check out one attendee, undo it, and check out everyone after confi
   await expect(page.getByRole("row").filter({ hasText: "Siti Rahma" }).getByRole("button", { name: "Batalkan", exact: true })).toBeVisible();
 });
 
-test("on a laptop-width screen every column, including the check-out buttons, fits in the card", async ({ page }) => {
+test("at every screen width the check-out and file buttons are fully visible, never cut off", async ({ page }) => {
+  const long = {
+    name: "Muhammad Juan Al Qausar Siregar",
+    email: "muhammad.juan.alqausar.siregar@bawaslu.go.id",
+    divisi: "Divisi Penanganan Pelanggaran dan Data Informasi",
+    answers: { "Asal instansi": "Bawaslu Provinsi Jawa Barat", "Ukuran kaos": "XL" },
+  };
   await installSupabaseStub(page, {
     checkins: [
-      checkInRow({
-        name: "Muhammad Juan Al Qausar Siregar",
-        email: "muhammad.juan.alqausar@bawaslu.go.id",
-        divisi: "Divisi Penanganan Pelanggaran dan Data Informasi",
-        room_number: "1205",
-        checked_out_at: "2026-10-26T10:30:00Z",
-        file_path: "checkins/a.jpg",
-      }),
-      checkInRow({ name: "Budi Santoso" }),
+      checkInRow({ ...long, room_number: "1205", checked_out_at: "2026-10-26T10:30:00Z", file_path: "checkins/a.jpg" }),
+      checkInRow({ ...long, name: "Budi Santoso" }),
     ],
   });
-  await page.setViewportSize({ width: 1000, height: 900 });
   await page.goto("/admin");
   await signInAsAdmin(page);
-  const table = page.getByRole("table");
-  for (const name of ["Check out", "Batalkan", "Lihat berkas"]) await expect(table.getByRole("button", { name }).first()).toBeInViewport({ ratio: 1 });
-  // Narrower still, the table scrolls sideways inside its card instead of cutting columns off.
-  await page.setViewportSize({ width: 920, height: 900 });
-  const scroller = table.locator("xpath=..");
-  expect(await scroller.evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
+  // Phones, the width where the sidebar appears, small laptops, and wide screens.
+  for (const width of [360, 420, 900, 960, 1024, 1100, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole("button", { name: "Batalkan" })).toBeVisible();
+    // A button is cut off when any scrolling or clipping ancestor (or the window) ends before it does.
+    const clipped = await page.getByRole("button", { name: /^(Check out|Check out semua|Batalkan|Lihat berkas)$/ }).evaluateAll((buttons) =>
+      buttons
+        .filter((button) => {
+          const box = button.getBoundingClientRect();
+          if (box.right > window.innerWidth + 0.5) return true;
+          for (let el = button.parentElement; el; el = el.parentElement) {
+            if (getComputedStyle(el).overflowX === "visible") continue;
+            const clip = el.getBoundingClientRect();
+            if (box.right > clip.right + 0.5 || box.left < clip.left - 0.5) return true;
+          }
+          return false;
+        })
+        .map((button) => button.textContent),
+    );
+    expect(clipped, `${width}px`).toEqual([]);
+  }
 });

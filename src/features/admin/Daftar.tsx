@@ -30,6 +30,10 @@ export function Daftar() {
   const [rowBusy, setRowBusy] = useState("");
   const [confirmAll, setConfirmAll] = useState(false);
   const [allBusy, setAllBusy] = useState(false);
+  // The table needs about 820 px; the card is narrower when the sidebar takes its share, so the
+  // card's own width (not the window's) picks the table or the stacked list.
+  const [listWidth, setListWidth] = useState(0);
+  const tableFits = listWidth ? listWidth >= 820 : wide;
   const rows = checkins.data ?? [];
   const winnerById = new Map((winners.data ?? []).map((w) => [w.checkin_id, w]));
   const needle = query.trim().toLowerCase();
@@ -108,7 +112,8 @@ export function Daftar() {
             Total check-in: {rows.length.toLocaleString("id-ID")}
           </T>
         </View>
-        <Row style={{ gap: 10, flexWrap: "wrap" }}>
+        {/* flexShrink: React Native children do not shrink by default, so the row would never wrap. */}
+        <Row style={{ gap: 10, flexWrap: "wrap", flexShrink: 1 }}>
           <Button small icon={FileSpreadsheet} label="Ekspor Excel" disabled={checkins.isLoading} onPress={() => exportAs("xlsx")} />
           <Button small variant="secondary" icon={FileText} label="Ekspor CSV" disabled={checkins.isLoading} onPress={() => exportAs("csv")} />
           <Button
@@ -156,7 +161,7 @@ export function Daftar() {
           {error}
         </T>
       )}
-      <Card style={{ gap: 16, padding: wide ? 20 : 16 }}>
+      <Card style={{ gap: 16, padding: wide ? 20 : 16 }} onLayout={(event) => setListWidth(event.nativeEvent.layout.width)}>
         <Field
           label="Cari nama, divisi, telepon, e-mail, atau kamar"
           labelHidden
@@ -176,7 +181,7 @@ export function Daftar() {
             title={needle ? "Tidak ada yang cocok" : "Belum ada check-in"}
             message={needle ? "Coba kata kunci lain." : "Bagikan tautan halaman check-in; peserta akan muncul di sini begitu mengisi formulir."}
           />
-        ) : wide ? (
+        ) : tableFits ? (
           <CheckInTable rows={visible} winnerById={winnerById} onOpenFile={openFile} onToggle={toggleCheckOut} busy={rowBusy} />
         ) : (
           <View>
