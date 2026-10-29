@@ -65,13 +65,13 @@ export function CheckOut({ entries, onEmpty }: { entries: StoredCheckIn[]; onEmp
                   Check-in {formatWib(entry.at)}
                 </T>
               </Row>
-              <Button
+              {/* <Button
                 large
                 label={pending.length === 1 ? "Check out sekarang" : `Check out ${entry.name}`}
                 loading={busy === entry.token}
                 loadingLabel="Mencatat check-out…"
                 onPress={() => void submit(entry)}
-              />
+              /> */}
               {error?.token === entry.token && (
                 <View style={{ gap: 8 }}>
                   <T size={13} color={c.danger} accessibilityRole="alert">

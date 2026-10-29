@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
 import { checkInSchemaFor, splitAnswers } from "./checkin";
-import { BUILTIN_FIELDS, DEFAULT_FORM_FIELDS, type FormField } from "./formFields";
+import { BUILTIN_FIELDS, type FormField } from "./formFields";
 
 const valid = {
   name: "Budi Santoso",
@@ -9,7 +9,8 @@ const valid = {
   email: "budi@example.test",
   answers: { divisi: "Divisi Hukum", room_number: "" },
 };
-const schema = checkInSchemaFor(DEFAULT_FORM_FIELDS);
+// Divisi plus the hotel room question, which admins can add back in Formulir.
+const schema = checkInSchemaFor([BUILTIN_FIELDS.divisi, BUILTIN_FIELDS.room_number]);
 const messages = (result: { error?: { issues: { message: string }[] } }) => result.error?.issues.map((issue) => issue.message).sort();
 
 it("accepts a complete check-in", () => {

@@ -10,11 +10,9 @@ test("an admin adds and removes questions; attendees answer them and admins see 
   await signInAsAdmin(page);
   await page.getByRole("link", { name: "Formulir" }).click();
   await expect(page.getByRole("heading", { name: "Formulir", exact: true })).toBeVisible();
-  // Nothing saved yet: Divisi and Nomor Kamar Hotel, as before.
+  // Nothing saved yet: Divisi only; the hotel room question can be brought back.
   await expect(page.getByLabel("Judul pertanyaan 1", { exact: true })).toHaveValue("Divisi");
-  await expect(page.getByLabel("Judul pertanyaan 2", { exact: true })).toHaveValue("Nomor Kamar Hotel");
-
-  await page.getByRole("button", { name: "Hapus pertanyaan 2", exact: true }).click();
+  await expect(page.getByLabel("Judul pertanyaan 2", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Kembalikan Nomor Kamar Hotel" })).toBeVisible();
 
   await page.getByRole("button", { name: "Tambah pertanyaan", exact: true }).click();
@@ -43,7 +41,7 @@ test("an admin adds and removes questions; attendees answer them and admins see 
   ]);
 
   await page.goto("/");
-  // The questions in the admin's order, after E-mail; the removed room question is gone.
+  // The questions in the admin's order, after E-mail; no room question.
   await expect(page.getByLabel("Ukuran kaos", { exact: true })).toBeVisible();
   const order = await page.getByLabel(/^(E-mail|Asal instansi|Divisi|Ukuran kaos)$/).evaluateAll((inputs) => inputs.map((input) => input.getAttribute("aria-label")));
   expect(order).toEqual(["E-mail", "Asal instansi", "Divisi", "Ukuran kaos"]);

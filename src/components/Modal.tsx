@@ -2,7 +2,8 @@ import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNo
 import { useTheme } from "../theme";
 import { X } from "./icons";
 
-// Accessible popup: focus moves into it, Tab stays inside, Escape or the backdrop closes it.
+// Accessible popup: focus moves into it and Tab stays inside. With onClose, the close button,
+// Escape or the backdrop closes it; without, only the popup's own buttons do.
 export function Modal({
   label,
   maxWidth,
@@ -11,7 +12,7 @@ export function Modal({
 }: {
   label: string;
   maxWidth: number;
-  onClose: () => void;
+  onClose?: () => void;
   children: ReactNode;
 }) {
   const c = useTheme();
@@ -22,7 +23,7 @@ export function Modal({
   }, []);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") return onClose();
+    if (event.key === "Escape") return onClose?.();
     if (event.key !== "Tab") return;
     const items = Array.from(
       dialog.current?.querySelectorAll<HTMLElement>("button:not([disabled]), a[href], [role='button'][tabindex='0']") ?? [],
@@ -58,7 +59,7 @@ export function Modal({
   return (
     <div
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) onClose?.();
       }}
       style={{
         position: "fixed",
@@ -95,9 +96,11 @@ export function Modal({
           animation: "reveal 320ms ease-out",
         }}
       >
-        <button type="button" aria-label="Tutup" onClick={onClose} style={close}>
-          <X size={20} color={c.text} />
-        </button>
+        {onClose && (
+          <button type="button" aria-label="Tutup" onClick={onClose} style={close}>
+            <X size={20} color={c.text} />
+          </button>
+        )}
         {children}
       </div>
     </div>

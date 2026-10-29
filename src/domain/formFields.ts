@@ -14,7 +14,7 @@ export const BUILTIN_FIELDS: Record<Builtin, FormField> = {
   room_number: { id: "room_number", builtin: "room_number", label: "Nomor Kamar Hotel", type: "text", required: false, options: [] },
 };
 // The form until an admin saves one (and before migration 20261031000000_guestbook_form_fields.sql).
-export const DEFAULT_FORM_FIELDS: FormField[] = [BUILTIN_FIELDS.divisi, BUILTIN_FIELDS.room_number];
+export const DEFAULT_FORM_FIELDS: FormField[] = [BUILTIN_FIELDS.divisi];
 // Nama, Nomor Telepon and E-mail: always asked, so no added question may take their labels.
 export const FIXED_LABELS = ["Nama", "Nomor Telepon", "E-mail"];
 

@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { signInAsAdmin } from "./admin";
 import { fillForm } from "./form";
+import { BUILTIN_FIELDS } from "../../src/domain/formFields";
 import { checkInRow, installSupabaseStub } from "./supabase-stub";
 
+// The default form no longer asks for the room; these attendees' admin added it back in Formulir.
+const withRoom = { form_fields: [BUILTIN_FIELDS.divisi, BUILTIN_FIELDS.room_number] };
+
 test("an attendee's hotel room number is saved, confirmed in the popup, and listed and searchable for admins", async ({ page }) => {
-  const state = await installSupabaseStub(page, { checkins: [checkInRow({ name: "Siti Rahma", room_number: "0811" })] });
+  const state = await installSupabaseStub(page, { settings: withRoom, checkins: [checkInRow({ name: "Siti Rahma", room_number: "0811" })] });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await fillForm(page);
@@ -32,7 +36,7 @@ test("an attendee's hotel room number is saved, confirmed in the popup, and list
 });
 
 test("without a room number the check-in request is the same as before", async ({ page }) => {
-  const state = await installSupabaseStub(page);
+  const state = await installSupabaseStub(page, { settings: withRoom });
   await page.goto("/");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
@@ -43,7 +47,7 @@ test("without a room number the check-in request is the same as before", async (
 });
 
 test("before migration 20261028000000 is applied, check-ins with and without a room number still go through", async ({ page }) => {
-  const state = await installSupabaseStub(page, { legacyCheckIn: true });
+  const state = await installSupabaseStub(page, { settings: withRoom, legacyCheckIn: true });
   await page.goto("/");
   await fillForm(page);
   await page.getByLabel("Nomor Kamar Hotel", { exact: true }).fill("1205");

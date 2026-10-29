@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { DEFAULT_FORM_FIELDS, formFieldsFrom, formFieldsProblem, parseFormFields, type FormField } from "./formFields";
 
-it("uses Divisi and Nomor Kamar Hotel until an admin saves a form", () => {
+it("asks for Divisi only until an admin saves a form", () => {
+  assert.deepEqual(DEFAULT_FORM_FIELDS.map((field) => field.label), ["Divisi"]);
   for (const raw of [null, undefined, {}, "x"]) assert.equal(formFieldsFrom(raw), DEFAULT_FORM_FIELDS);
   // An admin who removed every question saved an empty form, which is not the default.
   assert.deepEqual(formFieldsFrom([]), []);

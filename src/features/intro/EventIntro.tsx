@@ -36,8 +36,9 @@ export function EventIntro() {
     setOpen(false);
   }
   return (
-    <Modal label="Informasi acara" maxWidth={wide ? 780 : 440} onClose={close}>
-      <EventSlides wide={wide} reserveCloseButton speakers={content.speakers} action={<Button large label="Mulai check-in" onPress={close} />} />
+    // No close button, Escape or backdrop: the way out is Mulai check-in on the last slide.
+    <Modal label="Informasi acara" maxWidth={wide ? 780 : 440}>
+      <EventSlides wide={wide} opening speakers={content.speakers} action={<Button large label="Mulai check-in" onPress={close} />} />
     </Modal>
   );
 }

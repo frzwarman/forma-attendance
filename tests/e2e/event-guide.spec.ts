@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { signInAsAdmin } from "./admin";
 import { fillForm } from "./form";
+import { finishIntro } from "./intro";
 import { pdfWithPages } from "./pdf";
 import { installSupabaseStub } from "./supabase-stub";
 
@@ -165,10 +166,13 @@ test("the opening popup shows the speakers the admin saved", async ({ page }) =>
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const popup = page.getByRole("dialog", { name: "Informasi acara" });
-  await expect(popup.getByRole("heading", { name: "Sari Narasumber" })).toBeVisible();
+  // After the two opening pictures.
+  await popup.getByRole("button", { name: "Slide berikutnya" }).click();
+  await popup.getByRole("button", { name: "Slide berikutnya" }).click();
+  await expect(popup.getByRole("heading", { name: "Sari Narasumber" })).toBeInViewport();
   await expect(popup.getByRole("img", { name: "Profil Sari Narasumber" })).toHaveAttribute("src", /guestbook-event\/profiles\/s\.jpg$/);
-  await expect(popup.getByRole("region", { name: /^Slide \d dari 2$/ })).toHaveCount(2);
-  await popup.getByRole("button", { name: "Mulai check-in" }).click();
+  await expect(popup.getByRole("region", { name: /^Slide \d dari 4$/ })).toHaveCount(4);
+  await finishIntro(page);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();

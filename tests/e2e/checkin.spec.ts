@@ -30,7 +30,9 @@ test("an attendee checks in, sees a thank-you popup, then the event information 
   await expect(popup).toHaveCount(0);
   const info = page.getByRole("region", { name: "Informasi acara" });
   await expect(info).toBeVisible();
-  await expect(info.getByText("Jakarta, 2 - 6 November 2029", { exact: true })).toBeVisible();
+  // The event theme picture alone, without the opening popup's key visual and speakers.
+  await expect(info.getByRole("img", { name: /^Ekosistem Digitalisasi Pemilu 2029/ })).toBeVisible();
+  await expect(info.getByRole("region", { name: /^Slide/ })).toHaveCount(1);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check-in untuk orang lain" })).toHaveCount(0);

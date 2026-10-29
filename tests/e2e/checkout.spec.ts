@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fillForm } from "./form";
+import { finishIntro } from "./intro";
 import { installSupabaseStub } from "./supabase-stub";
 
 test("a returning attendee checks out with one tap on the same phone", async ({ page }) => {
@@ -24,7 +25,7 @@ test("a returning attendee checks out with one tap on the same phone", async ({ 
 test("the slideshow does not open again for an attendee returning to check out", async ({ page }) => {
   await installSupabaseStub(page, { intro: true });
   await page.goto("/");
-  await page.getByRole("button", { name: "Mulai check-in", exact: true }).click();
+  await finishIntro(page);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Terima kasih/ })).toBeVisible();

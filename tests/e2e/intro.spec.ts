@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { finishIntro } from "./intro";
 import { installSupabaseStub } from "./supabase-stub";
 
 test("the event slideshow opens on a first visit, can be browsed, and stays closed on reload", async ({ page }) => {
@@ -7,28 +8,63 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
   await page.goto("/");
   const dialog = page.getByRole("dialog", { name: "Informasi acara" });
   await expect(dialog).toBeVisible();
-  // Speakers come first, each with only the name-and-photo part of their CV, then the Bawaslu title card.
-  await expect(dialog.getByRole("heading", { name: "Dr. Agus Canny" })).toBeInViewport();
-  await expect(dialog.getByRole("img", { name: "Profil Dr. Agus Canny" })).toBeVisible();
+  // Two pictures first, then the speakers, each with only the name-and-photo part of their CV,
+  // then the closing picture.
+  const loadedWidth = (image: ReturnType<typeof dialog.getByRole>) => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth);
+  const opening = dialog.getByRole("img", { name: /^Bawaslu di pusat jaringan sistem pengawasan/ });
+  await expect(opening).toBeInViewport({ ratio: 0.9 });
+  await expect.poll(() => loadedWidth(opening)).toBe(1080);
+  await expect(dialog.getByText("1 dari 12", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("img", { name: /halaman/ })).toHaveCount(0);
-  await expect(dialog.getByRole("button", { name: "Mulai check-in", exact: true })).toBeInViewport();
+  // No way out before the last slide: no close button, and Mulai check-in waits there.
+  await expect(dialog.getByRole("button", { name: "Tutup" })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Mulai check-in", exact: true })).toHaveCount(0);
   const next = dialog.getByRole("button", { name: "Slide berikutnya" });
+  const previous = dialog.getByRole("button", { name: "Slide sebelumnya" });
+  // The arrows stay exactly where they are from slide to slide, so tap after tap lands on them.
+  await page.waitForTimeout(500); // the popup's opening animation
+  const arrowsAt = [(await previous.boundingBox())!, (await next.boundingBox())!];
+  const stayed = async () => {
+    await page.waitForTimeout(400); // the slide change and the sheet's height animation
+    const box = (await previous.boundingBox())!;
+    expect([box.x, box.y]).toEqual([arrowsAt[0].x, arrowsAt[0].y]);
+    if (await next.count()) expect((await next.boundingBox())!.y).toBe(arrowsAt[1].y);
+  };
   await next.click();
-  await expect(dialog.getByRole("heading", { name: "Muhammad Juan Al Qausar" })).toBeInViewport();
-  await expect(dialog.getByText("2 dari 10", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("2 dari 12", { exact: true })).toBeVisible();
+  const keyVisual = dialog.getByRole("img", { name: /^Penguatan Tata Kelola Perencanaan dan Kelembagaan Pengawasan Pemilu/ });
+  await expect(keyVisual).toBeInViewport({ ratio: 0.9 });
+  await expect.poll(() => loadedWidth(keyVisual)).toBe(1080);
+  await stayed();
+  await next.click();
+  await expect(dialog.getByRole("heading", { name: "Dr. Agus Canny" })).toBeInViewport();
+  await expect(dialog.getByRole("img", { name: "Profil Dr. Agus Canny" })).toBeInViewport();
+  await expect(dialog.getByText("3 dari 12", { exact: true })).toBeVisible();
   // On a phone the arrows stay inside the popup.
-  expect((await next.boundingBox())!.x + 44).toBeLessThanOrEqual((await dialog.boundingBox())!.x + (await dialog.boundingBox())!.width);
-  for (let slide = 3; slide <= 10; slide++) {
+  expect(arrowsAt[1].x + 44).toBeLessThanOrEqual((await dialog.boundingBox())!.x + (await dialog.boundingBox())!.width);
+  for (let slide = 4; slide <= 11; slide++) {
     await next.click();
-    await expect(dialog.getByText(`${slide} dari 10`, { exact: true })).toBeVisible();
+    await expect(dialog.getByText(`${slide} dari 12`, { exact: true })).toBeVisible();
+    await stayed();
   }
-  await expect(dialog.getByText("Jakarta, 2 - 6 November 2029", { exact: true })).toBeInViewport();
-  await expect(next).toBeDisabled();
-  // The title card lines up with the popup instead of stopping short of it.
+  await next.click();
+  await stayed();
+  const closing = dialog.getByRole("img", { name: "Ekosistem Digitalisasi Pemilu 2029 dengan Teknologi Blockchain & Artificial Intelligence" });
+  await expect(closing).toBeInViewport({ ratio: 0.9 });
+  await expect.poll(() => loadedWidth(closing)).toBe(828);
+  // On the last slide Mulai check-in takes the place of the counter and the next arrow.
+  await expect(dialog.getByRole("button", { name: "Mulai check-in", exact: true })).toBeInViewport();
+  await expect(next).toHaveCount(0);
+  await expect(dialog.getByText("12 dari 12", { exact: true })).toHaveCount(0);
+  // The last slide lines up with the popup instead of stopping short of it.
   await expect
     .poll(() => dialog.locator(".intro-track").evaluate((el) => el.scrollWidth - el.clientWidth - el.scrollLeft))
     .toBeLessThan(1);
+  // Escape and a tap on the dimmed page around the popup do not close it either.
   await page.keyboard.press("Escape");
+  await page.mouse.click(5, 5);
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Mulai check-in", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await page.reload();
   await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible();
@@ -38,8 +74,7 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
 test("Mulai check-in closes the slideshow so the form can be filled", async ({ page }) => {
   await installSupabaseStub(page, { intro: true });
   await page.goto("/");
-  await page.getByRole("button", { name: "Mulai check-in", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Informasi acara" })).toHaveCount(0);
+  await finishIntro(page);
   await page.getByLabel("Nama", { exact: true }).fill("Budi Santoso");
   await expect(page.getByLabel("Nama", { exact: true })).toHaveValue("Budi Santoso");
 });
@@ -56,4 +91,25 @@ test("the network illustration sits to the right of the logo on a phone", async 
   expect(box.x + box.width).toBeLessThanOrEqual(390);
   expect(box.y).toBeLessThan(logo.y + logo.height);
   expect(box.width).toBeGreaterThan(100);
+});
+
+test("on a laptop screen the slides share one height, so the arrows stay put", async ({ page }) => {
+  await installSupabaseStub(page, { intro: true });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  const dialog = page.getByRole("dialog", { name: "Informasi acara" });
+  const previous = dialog.getByRole("button", { name: "Slide sebelumnya" });
+  const next = dialog.getByRole("button", { name: "Slide berikutnya" });
+  await expect(next).toBeVisible();
+  await page.waitForTimeout(500); // the popup's opening animation
+  const at = (await previous.boundingBox())!;
+  for (let slide = 2; slide <= 12; slide++) {
+    await next.click();
+    // On the last slide Mulai check-in takes the place of the dots.
+    if (slide < 12) await expect(dialog.getByRole("button", { name: `Ke slide ${slide}` })).toHaveAttribute("aria-current", "true");
+    await page.waitForTimeout(400);
+    const box = (await previous.boundingBox())!;
+    expect([box.x, box.y], `slide ${slide}`).toEqual([at.x, at.y]);
+  }
+  await expect(dialog.getByRole("button", { name: "Mulai check-in", exact: true })).toBeVisible();
 });
