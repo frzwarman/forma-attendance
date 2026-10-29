@@ -6,6 +6,7 @@ const valid = {
   name: "Budi Santoso",
   phone: "0812 1111 2222",
   email: "budi@example.test",
+  divisi: "Divisi Hukum",
 };
 
 it("accepts a complete check-in", () => {
@@ -13,11 +14,11 @@ it("accepts a complete check-in", () => {
 });
 
 it("reports every invalid field in Bahasa", () => {
-  const result = checkInSchema.safeParse({ ...valid, name: "A", phone: "12", email: "x" });
+  const result = checkInSchema.safeParse({ ...valid, name: "A", phone: "12", email: "x", divisi: " " });
   assert.equal(result.success, false);
   assert.deepEqual(
     result.error!.issues.map((issue) => issue.message).sort(),
-    ["E-mail tidak valid", "Nama wajib diisi", "Nomor telepon tidak valid"],
+    ["Divisi wajib diisi", "E-mail tidak valid", "Nama wajib diisi", "Nomor telepon tidak valid"],
   );
 });
 

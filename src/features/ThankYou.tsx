@@ -15,6 +15,7 @@ export function ThankYou({ details, onClose }: { details: CheckInDetails; onClos
     ["Nama", details.name],
     ["Nomor Telepon", details.phone],
     ["E-mail", details.email],
+    ["Divisi", details.divisi],
     ...(details.room_number ? [["Kamar hotel", details.room_number] as [string, string]] : []),
     ["Waktu check-in", formatWib(details.at)],
   ];

@@ -21,6 +21,8 @@ export type CheckIn = {
   email: string;
   // No longer collected on the form; older rows may still hold a value.
   jabatan: string | null;
+  // Absent until migration 20261029000000_guestbook_divisi.sql is applied; null on older rows.
+  divisi?: string | null;
   // Absent until migration 20261028000000_guestbook_room_number_optional_address.sql is applied.
   room_number?: string | null;
   // No longer collected on the form (no address, no map pin); older rows may still hold values.

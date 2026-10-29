@@ -246,6 +246,26 @@ test("the hotel room number and the address are optional; a room is trimmed and 
   });
 });
 
+test("the division is stored trimmed, at most 120 characters, and optional for older clients", async () => {
+  const named = (email, phone, divisi) =>
+    db.query(
+      `select public.guestbook_check_in(p_name => 'Tamu Divisi', p_phone => $1, p_email => $2, p_jabatan => null,
+         p_address => null, p_latitude => null, p_longitude => null, p_file_path => null,
+         p_check_in_date => null, p_check_out_date => null, p_divisi => $3) as result`,
+      [phone, email, divisi],
+    );
+  await asRole(null, "anon", () => named("divisi1@example.test", "0821 3000 1000", "  Divisi Hukum "));
+  await asRole(null, "anon", () => checkIn({ name: "Tamu Lama", phone: "0821 3000 2000", email: "divisi2@example.test" }));
+  await assert.rejects(() => asUser(null, () => named("divisi3@example.test", "0821 3000 3000", "x".repeat(121)), "anon"), /Divisi/);
+  await asUser(id(1), async () => {
+    const { rows } = await db.query("select email, divisi from public.guestbook_checkins where email like 'divisi%@example.test' order by email");
+    assert.deepEqual(rows, [
+      { email: "divisi1@example.test", divisi: "Divisi Hukum" },
+      { email: "divisi2@example.test", divisi: null },
+    ]);
+  });
+});
+
 test("a check-in returns a check-out code that checks the attendee out once", async () => {
   const wati = { name: "Wati Lestari", phone: "0821 1000 7000", email: "wati@example.test", in: null, out: null };
   const created = await asRole(null, "anon", () => checkIn(wati));

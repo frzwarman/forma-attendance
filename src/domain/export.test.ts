@@ -11,6 +11,7 @@ const checkin = (overrides: Partial<CheckIn> = {}): CheckIn => ({
   phone: "081234567890",
   email: "budi@example.test",
   jabatan: "Staf",
+  divisi: "Divisi Hukum",
   room_number: "1205",
   address: "Jl. MH Thamrin 14",
   latitude: -6.1754,
@@ -47,17 +48,19 @@ it("maps check-ins and winners to export rows", () => {
   assert.equal(rows[0][1], "Waktu Check-out (WIB)");
   assert.equal(rows[1][1], "26/10/2026 17:30 WIB");
   assert.equal(rows[1][3], "081234567890");
-  assert.equal(rows[0][5], "Nomor Kamar Hotel");
-  assert.equal(rows[1][5], "1205");
-  assert.equal(rows[1][6], "checkins/abc.jpg");
-  assert.equal(rows[1][7], "Hadiah 1");
-  assert.equal(rows[1][8], "26/10/2026 11:00 WIB");
-  const none = exportRows([checkin({ room_number: null, address: null, file_path: null, checked_out_at: null })], []);
+  assert.equal(rows[0][5], "Divisi");
+  assert.equal(rows[1][5], "Divisi Hukum");
+  assert.equal(rows[0][6], "Nomor Kamar Hotel");
+  assert.equal(rows[1][6], "1205");
+  assert.equal(rows[1][7], "checkins/abc.jpg");
+  assert.equal(rows[1][8], "Hadiah 1");
+  assert.equal(rows[1][9], "26/10/2026 11:00 WIB");
+  const none = exportRows([checkin({ divisi: null, room_number: null, address: null, file_path: null, checked_out_at: null })], []);
   assert.equal(none[1][1], "");
-  assert.deepEqual(none[1].slice(5), ["", "", "", ""]);
-  // Rows read before the room-number migration have no such field.
-  const { room_number: _, ...older } = checkin();
-  assert.equal(exportRows([older as CheckIn], [])[1][5], "");
+  assert.deepEqual(none[1].slice(5), ["", "", "", "", ""]);
+  // Rows read before the room-number and division migrations have no such fields.
+  const { room_number: _, divisi: __, ...older } = checkin();
+  assert.deepEqual(exportRows([older as CheckIn], [])[1].slice(5, 7), ["", ""]);
 });
 
 it("keeps phone numbers as text cells in Excel", () => {

@@ -33,7 +33,7 @@ export function Daftar() {
   const winnerById = new Map((winners.data ?? []).map((w) => [w.checkin_id, w]));
   const needle = query.trim().toLowerCase();
   const filtered = needle
-    ? rows.filter((row) => [row.name, row.phone, row.email, row.room_number ?? ""].some((value) => value.toLowerCase().includes(needle)))
+    ? rows.filter((row) => [row.name, row.divisi ?? "", row.phone, row.email, row.room_number ?? ""].some((value) => value.toLowerCase().includes(needle)))
     : rows;
   const todayKey = formatWib(new Date().toISOString()).slice(0, 10);
   const today = rows.filter((row) => formatWib(row.created_at).slice(0, 10) === todayKey).length;
@@ -157,9 +157,9 @@ export function Daftar() {
       )}
       <Card style={{ gap: 16, padding: wide ? 20 : 16 }}>
         <Field
-          label="Cari nama, telepon, e-mail, atau kamar"
+          label="Cari nama, divisi, telepon, e-mail, atau kamar"
           labelHidden
-          placeholder="Cari nama, telepon, e-mail, atau kamar"
+          placeholder="Cari nama, divisi, telepon, e-mail, atau kamar"
           leading={<Search size={16} color={c.muted} strokeWidth={2} />}
           value={query}
           onChangeText={(value) => {
@@ -260,6 +260,7 @@ function CheckInTable({
               <td style={{ ...cell, whiteSpace: "nowrap", color: c.muted }}>{formatWib(row.created_at)}</td>
               <td style={cell}>
                 <div style={{ fontWeight: 700 }}>{row.name}</div>
+                {!!row.divisi && <div style={sub}>{row.divisi}</div>}
                 {winner && (
                   <div style={{ marginTop: 6 }}>
                     <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />
@@ -318,6 +319,11 @@ function CheckInRow({
           {formatWib(row.created_at)}
         </T>
       </Row>
+      {!!row.divisi && (
+        <T size={13} color={c.muted}>
+          {row.divisi}
+        </T>
+      )}
       <T size={14}>{row.phone}</T>
       <T size={13} color={c.muted}>
         {row.email}

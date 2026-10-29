@@ -12,6 +12,8 @@ export const checkInSchema = z.object({
     .trim()
     .max(160, "E-mail maksimal 160 karakter")
     .regex(/^[^@\s]+@[^@\s]+\.[^@\s]+$/, "E-mail tidak valid"),
+  // The attendee's division (unit kerja), e.g. "Divisi Hukum".
+  divisi: z.string().trim().min(2, "Divisi wajib diisi").max(120, "Divisi maksimal 120 karakter"),
   // Hotel room, for attendees who stay at the event hotel.
   room_number: z.string().trim().max(20, "Nomor kamar maksimal 20 karakter").optional(),
 });

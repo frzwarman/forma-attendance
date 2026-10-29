@@ -21,7 +21,7 @@ test("search narrows the list by name, phone or e-mail", async ({ page }) => {
   });
   await page.goto("/admin");
   await signInAsAdmin(page);
-  const search = page.getByLabel("Cari nama, telepon, e-mail, atau kamar", { exact: true });
+  const search = page.getByLabel("Cari nama, divisi, telepon, e-mail, atau kamar", { exact: true });
   await expect(page.getByText("Agus Wijaya", { exact: true })).toBeVisible();
   await search.fill("0813");
   await expect(page.getByText("Siti Rahma", { exact: true })).toBeVisible();

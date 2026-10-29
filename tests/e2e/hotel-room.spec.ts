@@ -13,7 +13,9 @@ test("an attendee's hotel room number is saved, confirmed in the popup, and list
   const popup = page.getByRole("dialog", { name: "Check-in berhasil" });
   await expect(popup.getByText("Kamar hotel", { exact: true })).toBeVisible();
   await expect(popup.getByText("1205", { exact: true })).toBeVisible();
+  await expect(popup.getByText("Divisi Hukum", { exact: true })).toBeVisible();
   expect(state.rpcCalls[0].body.p_room_number).toBe("1205");
+  expect(state.rpcCalls[0].body.p_divisi).toBe("Divisi Hukum");
   expect(state.checkins.at(-1)?.room_number).toBe("1205");
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -22,8 +24,9 @@ test("an attendee's hotel room number is saved, confirmed in the popup, and list
   const table = page.getByRole("table");
   await expect(table.getByRole("columnheader", { name: "Kamar" })).toBeVisible();
   await expect(table.getByRole("row").filter({ hasText: "Budi Santoso" })).toContainText("1205");
+  await expect(table.getByRole("row").filter({ hasText: "Budi Santoso" })).toContainText("Divisi Hukum");
   await expect(table.getByRole("row").filter({ hasText: "Siti Rahma" })).toContainText("0811");
-  await page.getByLabel("Cari nama, telepon, e-mail, atau kamar", { exact: true }).fill("1205");
+  await page.getByLabel("Cari nama, divisi, telepon, e-mail, atau kamar", { exact: true }).fill("1205");
   await expect(table.getByRole("row").filter({ hasText: "Siti Rahma" })).toHaveCount(0);
   await expect(table.getByRole("row").filter({ hasText: "Budi Santoso" })).toHaveCount(1);
 });

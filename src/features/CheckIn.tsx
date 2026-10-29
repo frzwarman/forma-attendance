@@ -15,6 +15,7 @@ const empty: CheckInInput = {
   name: "",
   phone: "",
   email: "",
+  divisi: "",
   room_number: "",
 };
 
@@ -50,7 +51,7 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
       }
       const result = await submitCheckIn(input, { file_path, honeypot });
       if (result.status === "duplicate") setDuplicateAt(result.created_at);
-      else onCheckedIn({ ...input, name: input.name.trim(), at: result.created_at, token: result.checkout_token });
+      else onCheckedIn({ ...input, name: input.name.trim(), divisi: input.divisi.trim(), at: result.created_at, token: result.checkout_token });
     } catch (cause) {
       const message = (cause as Error).message;
       setError(message === "spam" ? "Pengiriman ditolak. Coba lagi." : message);
@@ -58,7 +59,7 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
   });
 
   const text = (
-    name: "name" | "phone" | "email" | "room_number",
+    name: "name" | "phone" | "email" | "divisi" | "room_number",
     label: string,
     props: Partial<React.ComponentProps<typeof Field>> = {},
   ) => (
@@ -92,6 +93,7 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
       {text("name", "Nama", { autoComplete: "name", placeholder: "Nama lengkap" })}
       {text("phone", "Nomor Telepon", { keyboardType: "phone-pad", inputMode: "tel", autoComplete: "tel", placeholder: "0812 3456 7890" })}
       {text("email", "E-mail", { keyboardType: "email-address", autoCapitalize: "none", autoComplete: "email", placeholder: "nama@instansi.go.id" })}
+      {text("divisi", "Divisi", { autoComplete: "organization-title", placeholder: "Contoh: Divisi Hukum", maxLength: 120 })}
       {text("room_number", "Nomor Kamar Hotel", {
         placeholder: "Contoh: 1205",
         hint: "Opsional. Kosongkan jika tidak menginap di hotel acara.",

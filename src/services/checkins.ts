@@ -28,11 +28,16 @@ export async function submitCheckIn(input: CheckInInput, extra: CheckInExtra): P
   // Sent only when filled, so a check-in without a room keeps the parameters older databases know.
   const room = input.room_number?.trim();
   try {
-    return await callFunction<CheckInResult>("guestbook_check_in", room ? { ...params, p_room_number: room } : params);
+    return await callFunction<CheckInResult>("guestbook_check_in", {
+      ...params,
+      p_divisi: input.divisi.trim(),
+      ...(room ? { p_room_number: room } : {}),
+    });
   } catch (cause) {
-    // Until migration 20261028000000_guestbook_room_number_optional_address.sql is applied the RPC
-    // knows no p_room_number (PGRST202) and requires an address: check in the old way, without the
-    // room and with "-" as the address, rather than turn the attendee away.
+    // Until migrations 20261028000000_guestbook_room_number_optional_address.sql and
+    // 20261029000000_guestbook_divisi.sql are applied the RPC knows no p_room_number or p_divisi
+    // (PGRST202) and may require an address: check in the old way, without the room and the
+    // division and with "-" as the address, rather than turn the attendee away.
     const { code, message } = cause as Error & { code?: string };
     if (code !== "PGRST202" && message !== "Alamat wajib diisi") throw cause;
     return callFunction<CheckInResult>("guestbook_check_in", { ...params, p_address: "-" });

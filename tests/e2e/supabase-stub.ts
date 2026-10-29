@@ -21,7 +21,8 @@ type Seed = {
   newRowAfterFirstPage?: boolean;
   // The event slideshow opens on a first visit; tests opt in to see it.
   intro?: boolean;
-  // A database without migration 20261028000000: no p_room_number yet, and an address is required.
+  // A database without migrations 20261028000000 and 20261029000000: no p_room_number or p_divisi
+  // yet, and an address is required.
   legacyCheckIn?: boolean;
 };
 
@@ -147,7 +148,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     const body = parseBody(request);
     state.rpcCalls.push({ name: "guestbook_check_in", body });
     if (body.p_honeypot) return json(route, { message: "spam" }, 400);
-    if (seed.legacyCheckIn && "p_room_number" in body)
+    if (seed.legacyCheckIn && ("p_room_number" in body || "p_divisi" in body))
       return json(route, { code: "PGRST202", message: "Could not find the function public.guestbook_check_in in the schema cache" }, 404);
     if (seed.legacyCheckIn && !String(body.p_address ?? "").trim()) return json(route, { code: "P0001", message: "Alamat wajib diisi" }, 400);
     const key = phoneKey(String(body.p_phone || ""));
@@ -162,6 +163,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       phone: String(body.p_phone),
       email: String(body.p_email),
       jabatan: (body.p_jabatan as string | null) ?? null,
+      divisi: (body.p_divisi as string | null) ?? null,
       room_number: (body.p_room_number as string | null) ?? null,
       address: (body.p_address as string | null) ?? null,
       latitude: (body.p_latitude as number | null) ?? null,
