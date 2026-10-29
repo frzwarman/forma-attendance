@@ -3,7 +3,8 @@
 import { isAdmin, signIn, signOut, useSession } from "./auth";
 import { adminCheckOut, checkOutAll, fetchAllCheckIns, fetchWinners, signedFileUrl } from "./checkinsAdmin";
 import { drawWinner, removeWinner } from "./draw";
-import { updateSettings, uploadBrandImage } from "./settingsAdmin";
+import { saveEventContent, uploadMaterial, uploadPdfPages, uploadProfileImage } from "./eventAdmin";
+import { saveFormFields, updateSettings, uploadBrandImage } from "./settingsAdmin";
 
 export const adminApi = {
   isAdmin,
@@ -16,6 +17,11 @@ export const adminApi = {
   removeWinner,
   updateSettings,
   uploadBrandImage,
+  saveEventContent,
+  uploadPdfPages,
+  uploadProfileImage,
+  uploadMaterial,
+  saveFormFields,
 };
 export type AdminApi = typeof adminApi;
 export { signIn, signOut, useSession };

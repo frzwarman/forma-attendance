@@ -3,7 +3,7 @@ import { useWindowDimensions } from "react-native";
 import { Modal } from "../../components/Modal";
 import { Button } from "../../components/ui";
 import { storedCheckIns } from "../../services/checkout";
-import { SPEAKERS } from "../../services/eventInfo";
+import { useEventContent } from "../../services/eventInfo";
 import { EventSlides } from "./EventSlides";
 
 // Shown once per browser session when the public page opens.
@@ -28,14 +28,16 @@ export function EventIntro() {
   const wide = width >= 700;
   // Attendees returning to check out have seen the event information already.
   const [open, setOpen] = useState(() => !alreadySeen() && storedCheckIns().length === 0);
-  if (!open) return null;
+  const content = useEventContent();
+  // Opens once the settings are in, with the speakers the admin saved.
+  if (!open || !content) return null;
   function close() {
     rememberSeen();
     setOpen(false);
   }
   return (
     <Modal label="Informasi acara" maxWidth={wide ? 780 : 440} onClose={close}>
-      <EventSlides wide={wide} reserveCloseButton speakers={SPEAKERS} action={<Button large label="Mulai check-in" onPress={close} />} />
+      <EventSlides wide={wide} reserveCloseButton speakers={content.speakers} action={<Button large label="Mulai check-in" onPress={close} />} />
     </Modal>
   );
 }

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { formFieldsFrom, type FormField } from "../domain/formFields";
 import { BAWASLU, isHexColor, type ThemeColors } from "../domain/theme";
 import type { Settings } from "../types/guestbook";
 import { getSingleRow, publicObjectUrl } from "./rest";
@@ -33,8 +34,17 @@ export function useSettings() {
     settings: query.data ?? DEFAULT_SETTINGS,
     isLoading: query.isLoading,
     isError: query.isError,
+    // Above zero once an attempt failed, while TanStack Query still retries.
+    failureCount: query.failureCount,
     ready: !query.isPlaceholderData && !query.isError,
   };
+}
+
+// The check-in form's questions; null while the settings load, so the form does not first show
+// the default questions. After one failed attempt it uses the defaults rather than wait for retries.
+export function useFormFields(): FormField[] | null {
+  const { settings, ready, failureCount } = useSettings();
+  return ready || failureCount ? formFieldsFrom(settings.form_fields) : null;
 }
 
 export function brandImageUrl(path: string | null): string | null {

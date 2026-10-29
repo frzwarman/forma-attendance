@@ -2,11 +2,11 @@ import { View } from "react-native";
 import { CircleCheck } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { Button, Row, T } from "../components/ui";
-import type { CheckInInput } from "../domain/checkin";
 import { formatWib } from "../domain/time";
 import { useTheme } from "../theme";
 
-export type CheckInDetails = CheckInInput & { at: string; token?: string };
+// answers: the filled-in questions after E-mail, as [label, answer].
+export type CheckInDetails = { name: string; phone: string; email: string; answers: [string, string][]; at: string; token?: string };
 
 // Popup right after a successful check-in; closing it reveals the event information page.
 export function ThankYou({ details, onClose }: { details: CheckInDetails; onClose: () => void }) {
@@ -15,8 +15,7 @@ export function ThankYou({ details, onClose }: { details: CheckInDetails; onClos
     ["Nama", details.name],
     ["Nomor Telepon", details.phone],
     ["E-mail", details.email],
-    ["Divisi", details.divisi],
-    ...(details.room_number ? [["Kamar hotel", details.room_number] as [string, string]] : []),
+    ...details.answers,
     ["Waktu check-in", formatWib(details.at)],
   ];
   return (

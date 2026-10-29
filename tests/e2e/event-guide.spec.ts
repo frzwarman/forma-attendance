@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import fs from "node:fs";
 import { signInAsAdmin } from "./admin";
 import { fillForm } from "./form";
+import { pdfWithPages } from "./pdf";
 import { installSupabaseStub } from "./supabase-stub";
 
 async function download(page: Page, name: string) {
@@ -70,13 +71,16 @@ test("the rundown shows one page at a time with next and back, and each speaker'
   await expect(viewer).toHaveCount(0);
 });
 
-test("an admin's Mentimeter link and materials show on the attendee page in the same browser", async ({ page }) => {
-  await installSupabaseStub(page);
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+
+test("an admin uploads the rundown, a speaker's CV and profile picture, and a material; attendees see them", async ({ page }) => {
+  const state = await installSupabaseStub(page);
   await page.goto("/admin");
   await signInAsAdmin(page);
   await page.getByRole("link", { name: "Info acara" }).click();
   await expect(page.getByRole("heading", { name: "Info acara", exact: true })).toBeVisible();
-  await expect(page.getByText(/tersimpan di browser ini saja/)).toBeVisible();
+  // Nothing saved yet: the tab starts from the rundown and CVs built into the site.
+  await expect(page.getByLabel("Nama narasumber 9", { exact: true })).toHaveValue("Tim Positium");
 
   const link = page.getByLabel("Tautan Mentimeter", { exact: true });
   await link.fill("https://example.com/polling");
@@ -84,16 +88,42 @@ test("an admin's Mentimeter link and materials show on the attendee page in the 
   await expect(page.getByRole("alert")).toContainText("menti.com");
   await link.fill("https://www.menti.com/al1b2c3d4e5f");
 
-  await expect(page.getByRole("button", { name: "Tambah ruangan" })).toHaveCount(0);
+  const idle = () => expect(page.getByRole("status")).toHaveCount(0);
+  await page.getByLabel("Ganti rundown (PDF)", { exact: true }).setInputFiles({ name: "rundown.pdf", mimeType: "application/pdf", buffer: pdfWithPages(2) });
+  await idle();
+  await expect(page.getByText("2 halaman", { exact: true })).toBeVisible();
 
-  const upload = page.getByLabel("Tambah materi (PDF)", { exact: true });
-  await upload.setInputFiles({ name: "besar.pdf", mimeType: "application/pdf", buffer: Buffer.concat([Buffer.from("%PDF-"), Buffer.alloc(1100 * 1024)]) });
-  await expect(page.getByRole("alert")).toContainText("1 MB");
-  await upload.setInputFiles({ name: "paparan-narasumber.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n% contoh\n") });
-  await expect(page.getByLabel("Judul materi 3", { exact: true })).toHaveValue("paparan-narasumber");
+  await page.getByRole("button", { name: "Hapus narasumber 9", exact: true }).click();
+  await page.getByLabel("Tambah narasumber (CV PDF)", { exact: true }).setInputFiles({ name: "Budi Narasumber.pdf", mimeType: "application/pdf", buffer: pdfWithPages(3) });
+  await idle();
+  await expect(page.getByLabel("Nama narasumber 9", { exact: true })).toHaveValue("Budi Narasumber");
+  await page.getByRole("button", { name: "Naikkan narasumber 9", exact: true }).click();
+  await expect(page.getByLabel("Nama narasumber 8", { exact: true })).toHaveValue("Budi Narasumber");
+  await page.getByLabel("Foto profil narasumber 8", { exact: true }).setInputFiles({ name: "budi.png", mimeType: "image/png", buffer: PNG });
+  await idle();
+  await expect(page.getByText("CV 3 halaman", { exact: true })).toBeVisible();
+  // The eight built-in speakers kept have their cropped profile pictures, and the new one now has one too.
+  await expect(page.getByText("Foto profil diunggah", { exact: true })).toHaveCount(9);
+  await expect(page.getByText("Tanpa foto profil", { exact: true })).toHaveCount(0);
+
+  const material = page.getByLabel("Tambah materi (PDF)", { exact: true });
+  await material.setInputFiles({ name: "besar.pdf", mimeType: "application/pdf", buffer: Buffer.concat([Buffer.from("%PDF-"), Buffer.alloc(21 * 1024 * 1024)]) });
+  await expect(page.getByRole("alert")).toContainText("20 MB");
+  await page.getByLabel("Tambah materi (PDF)", { exact: true }).setInputFiles({ name: "paparan.pdf", mimeType: "application/pdf", buffer: pdfWithPages(1) });
+  await expect(page.getByLabel("Judul materi 3", { exact: true })).toHaveValue("paparan");
   await page.getByLabel("Judul materi 3", { exact: true }).fill("Paparan narasumber");
+
   await page.getByRole("button", { name: "Simpan", exact: true }).click();
-  await expect(page.getByText("Info acara disimpan di browser ini.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Info acara disimpan. HP peserta menampilkannya saat halaman dibuka lagi.", { exact: true })).toBeVisible();
+  // Every page became a JPEG in the public event bucket; the material stays a PDF.
+  const uploads = state.uploads.filter((u) => u.bucket === "guestbook-event");
+  expect(uploads.map((u) => [u.path.split("/")[0], u.contentType])).toEqual(
+    expect.arrayContaining([["docs", "image/jpeg"], ["profiles", "image/jpeg"], ["materials", "application/pdf"]]),
+  );
+  expect(uploads.filter((u) => u.path.startsWith("docs/"))).toHaveLength(5);
+  const saved = state.settings.event_content as { rundown: { path: string }[]; speakers: { name: string; profile: unknown }[] };
+  expect(saved.rundown).toHaveLength(2);
+  expect(saved.speakers.map((s) => s.name).slice(-2)).toEqual(["Budi Narasumber", "Karen Grace Sutoto"]);
 
   await page.evaluate(() =>
     localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at: "2026-11-02T03:05:00Z" }])),
@@ -101,15 +131,67 @@ test("an admin's Mentimeter link and materials show on the attendee page in the 
   await page.goto("/");
   const guide = page.getByRole("region", { name: "Panduan acara" });
   await expect(guide.getByRole("link", { name: "Ikut polling di Mentimeter" })).toHaveAttribute("href", "https://www.menti.com/al1b2c3d4e5f");
-  await expect(guide.getByRole("list", { name: "Materi" }).getByRole("listitem")).toHaveCount(3);
-  expect(await download(page, "Unduh Paparan narasumber")).toEqual({ name: "paparan-narasumber.pdf", head: "%PDF-" });
+  await expect(guide.getByRole("img", { name: "Rundown acara, halaman 1 dari 2" })).toHaveAttribute("src", /\/storage\/v1\/object\/public\/guestbook-event\/docs\/.+\/1\.jpg$/);
+  const speakers = guide.getByRole("list", { name: "Narasumber" }).getByRole("listitem");
+  await expect(speakers).toHaveCount(9);
+  await expect(speakers.nth(7)).toContainText("Budi Narasumber");
+  await expect(speakers.nth(7)).toContainText("3 halaman");
+  await expect(guide.getByRole("link", { name: "Unduh Paparan narasumber" })).toHaveAttribute("href", /guestbook-event\/materials\/.+\.pdf\?download=paparan\.pdf$/);
+  expect(await download(page, "Unduh Paparan narasumber")).toEqual({ name: "paparan.pdf", head: "%PDF-" });
 
+  // "Pakai data contoh" brings back the built-in rundown and CVs.
   await page.goto("/admin/acara");
   await page.getByRole("button", { name: "Pakai data contoh", exact: true }).click();
   await expect(page.getByLabel("Tautan Mentimeter", { exact: true })).toHaveValue("https://www.menti.com/");
+  await expect(page.getByLabel("Nama narasumber 9", { exact: true })).toHaveValue("Tim Positium");
   await page.getByRole("button", { name: "Simpan", exact: true }).click();
+  await expect(page.getByText(/^Info acara disimpan/)).toBeVisible();
   await page.goto("/");
   const materials = page.getByRole("region", { name: "Panduan acara" }).getByRole("list", { name: "Materi" });
   await expect(materials.getByRole("listitem")).toHaveCount(2);
   await expect(materials).not.toContainText("Paparan narasumber");
+});
+
+test("the opening popup shows the speakers the admin saved", async ({ page }) => {
+  const event_content = {
+    mentimeter_url: null,
+    rundown: [],
+    speakers: [
+      { name: "Sari Narasumber", pages: [{ path: "docs/s/1.jpg", width: 1240, height: 1754 }], profile: { path: "profiles/s.jpg", width: 800, height: 300 } },
+    ],
+    materials: [],
+  };
+  await installSupabaseStub(page, { intro: true, settings: { event_content } });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const popup = page.getByRole("dialog", { name: "Informasi acara" });
+  await expect(popup.getByRole("heading", { name: "Sari Narasumber" })).toBeVisible();
+  await expect(popup.getByRole("img", { name: "Profil Sari Narasumber" })).toHaveAttribute("src", /guestbook-event\/profiles\/s\.jpg$/);
+  await expect(popup.getByRole("region", { name: /^Slide \d dari 2$/ })).toHaveCount(2);
+  await popup.getByRole("button", { name: "Mulai check-in" }).click();
+  await fillForm(page);
+  await page.getByRole("button", { name: "Kirim", exact: true }).click();
+  await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
+  // An empty rundown and no materials hide those sections.
+  const guide = page.getByRole("region", { name: "Panduan acara" });
+  await expect(guide.getByText("Rundown acara", { exact: true })).toHaveCount(0);
+  await expect(guide.getByRole("list", { name: "Materi" })).toHaveCount(0);
+  await expect(guide.getByRole("list", { name: "Narasumber" }).getByRole("listitem")).toHaveCount(1);
+});
+
+test("before migration 20261030000000 is applied, saving explains what to run and attendees keep the built-in content", async ({ page }) => {
+  await installSupabaseStub(page, { legacyEventContent: true });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "Info acara" }).click();
+  await page.getByRole("button", { name: "Simpan", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("kolom event_content belum ada");
+  await expect(page.getByRole("alert")).toContainText("npm run db:push");
+});
+
+test("when the settings cannot be loaded the opening popup shows the built-in speakers without waiting for retries", async ({ page }) => {
+  await installSupabaseStub(page, { intro: true, failSettings: true });
+  await page.goto("/");
+  // TanStack Query retries for several seconds; the popup must not appear later over a half-filled form.
+  await expect(page.getByRole("dialog", { name: "Informasi acara" }).getByRole("heading", { name: "Dr. Agus Canny" })).toBeVisible({ timeout: 900 });
 });

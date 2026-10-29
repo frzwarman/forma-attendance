@@ -2,8 +2,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { TextInput, View, useWindowDimensions } from "react-native";
+import { SelectInput } from "../components/NativeInput";
 import { Button, Card, Divider, Field, SectionTitle, T } from "../components/ui";
-import { checkInSchema, type CheckInInput } from "../domain/checkin";
+import { checkInSchemaFor, type CheckInInput } from "../domain/checkin";
+import { maxLength, type Builtin, type FormField } from "../domain/formFields";
 import { formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
 import { uploadCheckInFile } from "../services/uploads";
@@ -11,23 +13,25 @@ import { useTheme } from "../theme";
 import type { CheckInDetails } from "./ThankYou";
 import { Attachment } from "./checkin/Attachment";
 
-const empty: CheckInInput = {
-  name: "",
-  phone: "",
-  email: "",
-  divisi: "",
-  room_number: "",
+// Hints for the two built-in questions, whatever the admin calls them.
+const BUILTIN_PROPS: Record<Builtin, Partial<React.ComponentProps<typeof Field>>> = {
+  divisi: { autoComplete: "organization-title", placeholder: "Contoh: Divisi Hukum" },
+  room_number: { placeholder: "Contoh: 1205", hint: "Opsional. Kosongkan jika tidak menginap di hotel acara.", autoComplete: "off", autoCapitalize: "characters" },
 };
 
-// The check-in form; the page shows the thank-you popup once onCheckedIn fires.
-export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails) => void }) {
+// The check-in form: Nama, Nomor Telepon and E-mail, then the questions the admin set up.
+// The page shows the thank-you popup once onCheckedIn fires.
+export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onCheckedIn: (details: CheckInDetails) => void }) {
   const c = useTheme();
   const { width } = useWindowDimensions();
   const {
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<CheckInInput>({ resolver: zodResolver(checkInSchema), defaultValues: empty });
+  } = useForm<CheckInInput>({
+    resolver: zodResolver(checkInSchemaFor(fields)),
+    defaultValues: { name: "", phone: "", email: "", answers: Object.fromEntries(fields.map((field) => [field.id, ""])) },
+  });
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState("");
   const [duplicateAt, setDuplicateAt] = useState("");
@@ -49,9 +53,17 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
           setUploading(false);
         }
       }
-      const result = await submitCheckIn(input, { file_path, honeypot });
+      const result = await submitCheckIn(input, fields, { file_path, honeypot });
       if (result.status === "duplicate") setDuplicateAt(result.created_at);
-      else onCheckedIn({ ...input, name: input.name.trim(), divisi: input.divisi.trim(), at: result.created_at, token: result.checkout_token });
+      else
+        onCheckedIn({
+          name: input.name.trim(),
+          phone: input.phone,
+          email: input.email,
+          answers: fields.flatMap((field) => (input.answers[field.id] ? [[field.label, input.answers[field.id]] as [string, string]] : [])),
+          at: result.created_at,
+          token: result.checkout_token,
+        });
     } catch (cause) {
       const message = (cause as Error).message;
       setError(message === "spam" ? "Pengiriman ditolak. Coba lagi." : message);
@@ -59,7 +71,7 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
   });
 
   const text = (
-    name: "name" | "phone" | "email" | "divisi" | "room_number",
+    name: "name" | "phone" | "email",
     label: string,
     props: Partial<React.ComponentProps<typeof Field>> = {},
   ) => (
@@ -93,14 +105,33 @@ export function CheckIn({ onCheckedIn }: { onCheckedIn: (details: CheckInDetails
       {text("name", "Nama", { autoComplete: "name", placeholder: "Nama lengkap" })}
       {text("phone", "Nomor Telepon", { keyboardType: "phone-pad", inputMode: "tel", autoComplete: "tel", placeholder: "0812 3456 7890" })}
       {text("email", "E-mail", { keyboardType: "email-address", autoCapitalize: "none", autoComplete: "email", placeholder: "nama@instansi.go.id" })}
-      {text("divisi", "Divisi", { autoComplete: "organization-title", placeholder: "Contoh: Divisi Hukum", maxLength: 120 })}
-      {text("room_number", "Nomor Kamar Hotel", {
-        placeholder: "Contoh: 1205",
-        hint: "Opsional. Kosongkan jika tidak menginap di hotel acara.",
-        maxLength: 20,
-        autoComplete: "off",
-        autoCapitalize: "characters",
-      })}
+      {fields.map((question) => (
+        <Controller
+          key={question.id}
+          control={control}
+          name={`answers.${question.id}`}
+          render={({ field }) => {
+            const error = errors.answers?.[question.id]?.message;
+            const hint = question.required ? undefined : "Opsional.";
+            return question.type === "select" ? (
+              <SelectInput label={question.label} value={field.value} options={question.options} onChange={field.onChange} error={error} hint={hint} disabled={isSubmitting} />
+            ) : (
+              <Field
+                label={question.label}
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                error={error}
+                hint={hint}
+                editable={!isSubmitting}
+                maxLength={maxLength(question)}
+                {...(question.type === "textarea" ? { multiline: true, style: { minHeight: 88, textAlignVertical: "top" as const } } : {})}
+                {...(question.builtin ? BUILTIN_PROPS[question.builtin] : {})}
+              />
+            );
+          }}
+        />
+      ))}
       <Divider />
       <SectionTitle title="Berkas pendukung" description="Opsional: foto surat tugas atau kartu identitas, atau berkas PDF." />
       <Attachment

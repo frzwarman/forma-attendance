@@ -10,6 +10,12 @@ export type Settings = {
   surface_color: string;
   text_color: string;
   whatsapp_number: string | null;
+  // The Info acara content (see src/domain/eventContent.ts); absent until migration
+  // 20261030000000_guestbook_event_content.sql is applied, null until an admin saves it.
+  event_content?: unknown;
+  // The questions after Nama, Nomor Telepon and E-mail (see src/domain/formFields.ts); absent until
+  // migration 20261031000000_guestbook_form_fields.sql is applied, null until an admin saves them.
+  form_fields?: unknown;
   updated_at: string;
 };
 
@@ -25,6 +31,9 @@ export type CheckIn = {
   divisi?: string | null;
   // Absent until migration 20261028000000_guestbook_room_number_optional_address.sql is applied.
   room_number?: string | null;
+  // Answers to the admin's added questions, label -> text; absent until migration
+  // 20261031000000_guestbook_form_fields.sql is applied.
+  answers?: Record<string, string> | null;
   // No longer collected on the form (no address, no map pin); older rows may still hold values.
   address: string | null;
   latitude: number | null;

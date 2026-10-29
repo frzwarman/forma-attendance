@@ -153,6 +153,7 @@ test("storage policies allow anonymous uploads only into checkins/ and admin rea
   const { rows: buckets } = await db.query("select id, public, file_size_limit::int as limit from storage.buckets where id like 'guestbook-%' order by id");
   assert.deepEqual(buckets, [
     { id: "guestbook-brand", public: true, limit: 5242880 },
+    { id: "guestbook-event", public: true, limit: 20971520 },
     { id: "guestbook-uploads", public: false, limit: 5242880 },
   ]);
   const insert = (bucket, name) => db.query("insert into storage.objects (bucket_id, name) values ($1, $2)", [bucket, name]);
@@ -167,11 +168,36 @@ test("storage policies allow anonymous uploads only into checkins/ and admin rea
     assert.equal((await db.query("select * from storage.objects")).rows.length, 0);
   });
   await assert.rejects(() => asUser(id(2), () => insert("guestbook-brand", "logo.png")), /policy/);
+  await assert.rejects(() => asUser(null, () => insert("guestbook-event", "docs/a/1.jpg"), "anon"), /policy/);
+  await assert.rejects(() => asUser(id(2), () => insert("guestbook-event", "docs/a/1.jpg")), /policy/);
   await asUser(id(1), async () => {
     await insert("guestbook-uploads", "checkins/b.jpg");
     await insert("guestbook-brand", "logo.png");
-    assert.equal((await db.query("select * from storage.objects")).rows.length, 2);
+    await insert("guestbook-event", "docs/a/1.jpg");
+    assert.equal((await db.query("select * from storage.objects")).rows.length, 3);
   });
+  // Event pages are public, like the brand images.
+  await asUser(null, async () => {
+    await db.exec("set local role postgres");
+    await insert("guestbook-event", "docs/b/1.jpg");
+    await db.exec("set local role anon");
+    assert.deepEqual((await db.query("select name from storage.objects")).rows, [{ name: "docs/b/1.jpg" }]);
+  }, "anon");
+});
+
+test("the event information is public, only admins change it, and it must be a small JSON object", async () => {
+  const content = { mentimeter_url: null, rundown: null, speakers: [], materials: [] };
+  const update = (value) => db.query("update public.guestbook_settings set event_content = $1::jsonb", [value]);
+  await asUser(id(2), async () => assert.equal((await update(JSON.stringify(content))).affectedRows, 0));
+  await assert.rejects(() => asUser(null, () => update(JSON.stringify(content)), "anon"), /permission denied/);
+  await asUser(id(1), async () => {
+    assert.equal((await update(JSON.stringify(content))).affectedRows, 1);
+    await asRole(null, "anon", async () => {
+      assert.deepEqual((await db.query("select event_content from public.guestbook_settings")).rows[0].event_content, content);
+    });
+  });
+  await assert.rejects(() => asUser(id(1), () => update("[]")), /check/);
+  await assert.rejects(() => asUser(id(1), () => update(JSON.stringify({ text: "x".repeat(200001) }))), /check/);
 });
 
 // Runs last: it leaves rows behind that earlier tests would otherwise count.
@@ -264,6 +290,45 @@ test("the division is stored trimmed, at most 120 characters, and optional for o
       { email: "divisi2@example.test", divisi: null },
     ]);
   });
+});
+
+test("answers to added questions are stored as label -> text, and anything else is refused", async () => {
+  const named = (email, phone, answers) =>
+    db.query(
+      `select public.guestbook_check_in(p_name => 'Tamu Pertanyaan', p_phone => $1, p_email => $2, p_jabatan => null,
+         p_address => null, p_latitude => null, p_longitude => null, p_file_path => null,
+         p_check_in_date => null, p_check_out_date => null, p_answers => $3::jsonb) as result`,
+      [phone, email, answers === undefined ? null : JSON.stringify(answers)],
+    );
+  await asRole(null, "anon", () => named("jawab1@example.test", "0821 4000 1000", { "Ukuran kaos": "M", "Asal instansi": "Bawaslu Jabar" }));
+  await asRole(null, "anon", () => named("jawab2@example.test", "0821 4000 2000", {}));
+  for (const [n, answers] of [
+    [3, ["M"]],
+    [4, { "Ukuran kaos": 3 }],
+    [5, { "Catatan": "x".repeat(1001) }],
+    [6, { "": "kosong" }],
+    [7, Object.fromEntries(Array.from({ length: 31 }, (_, i) => [`P${i}`, "ya"]))],
+  ])
+    await assert.rejects(() => asUser(null, () => named(`jawab${n}@example.test`, `0821 4000 ${n}000`, answers), "anon"), /Jawaban tidak valid/);
+  await asUser(id(1), async () => {
+    const { rows } = await db.query("select email, answers from public.guestbook_checkins where email like 'jawab%@example.test' order by email");
+    assert.deepEqual(rows, [
+      { email: "jawab1@example.test", answers: { "Ukuran kaos": "M", "Asal instansi": "Bawaslu Jabar" } },
+      { email: "jawab2@example.test", answers: null },
+    ]);
+  });
+});
+
+test("the form's questions are public, only admins change them, and they must be a JSON array", async () => {
+  const fields = [{ id: "f_kaos", label: "Ukuran kaos", type: "select", required: true, options: ["S", "M"] }];
+  const update = (value) => db.query("update public.guestbook_settings set form_fields = $1::jsonb", [value]);
+  await asUser(id(2), async () => assert.equal((await update(JSON.stringify(fields))).affectedRows, 0));
+  await assert.rejects(() => asUser(null, () => update(JSON.stringify(fields)), "anon"), /permission denied/);
+  await asUser(id(1), async () => {
+    assert.equal((await update(JSON.stringify(fields))).affectedRows, 1);
+    assert.deepEqual((await db.query("select form_fields from public.guestbook_settings")).rows[0].form_fields, fields);
+  });
+  await assert.rejects(() => asUser(id(1), () => update("{}")), /check/);
 });
 
 test("a check-in returns a check-out code that checks the attendee out once", async () => {

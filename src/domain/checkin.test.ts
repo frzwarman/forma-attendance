@@ -1,30 +1,49 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { checkInSchema } from "./checkin";
+import { checkInSchemaFor, splitAnswers } from "./checkin";
+import { BUILTIN_FIELDS, DEFAULT_FORM_FIELDS, type FormField } from "./formFields";
 
 const valid = {
   name: "Budi Santoso",
   phone: "0812 1111 2222",
   email: "budi@example.test",
-  divisi: "Divisi Hukum",
+  answers: { divisi: "Divisi Hukum", room_number: "" },
 };
+const schema = checkInSchemaFor(DEFAULT_FORM_FIELDS);
+const messages = (result: { error?: { issues: { message: string }[] } }) => result.error?.issues.map((issue) => issue.message).sort();
 
 it("accepts a complete check-in", () => {
-  assert.equal(checkInSchema.safeParse(valid).success, true);
+  assert.equal(schema.safeParse(valid).success, true);
 });
 
 it("reports every invalid field in Bahasa", () => {
-  const result = checkInSchema.safeParse({ ...valid, name: "A", phone: "12", email: "x", divisi: " " });
-  assert.equal(result.success, false);
-  assert.deepEqual(
-    result.error!.issues.map((issue) => issue.message).sort(),
-    ["Divisi wajib diisi", "E-mail tidak valid", "Nama wajib diisi", "Nomor telepon tidak valid"],
-  );
+  const result = schema.safeParse({ ...valid, name: "A", phone: "12", email: "x", answers: { divisi: " ", room_number: "" } });
+  assert.deepEqual(messages(result), ["Divisi wajib diisi", "E-mail tidak valid", "Nama wajib diisi", "Nomor telepon tidak valid"]);
 });
 
 it("takes an optional hotel room number of at most 20 characters", () => {
-  assert.equal(checkInSchema.safeParse({ ...valid, room_number: "" }).success, true);
-  assert.equal(checkInSchema.safeParse({ ...valid, room_number: " 1205 " }).data?.room_number, "1205");
-  const long = checkInSchema.safeParse({ ...valid, room_number: "x".repeat(21) });
-  assert.deepEqual(long.error?.issues.map((issue) => issue.message), ["Nomor kamar maksimal 20 karakter"]);
+  assert.equal(schema.safeParse({ ...valid, answers: { ...valid.answers, room_number: " 1205 " } }).data?.answers.room_number, "1205");
+  const long = schema.safeParse({ ...valid, answers: { ...valid.answers, room_number: "x".repeat(21) } });
+  assert.deepEqual(messages(long), ["Nomor Kamar Hotel maksimal 20 karakter"]);
+});
+
+const shirt: FormField = { id: "f_kaos", label: "Ukuran kaos", type: "select", required: true, options: ["S", "M", "L"] };
+const origin: FormField = { id: "f_asal", label: "Asal instansi", type: "textarea", required: false, options: [] };
+
+it("follows the questions the admin set up: removed ones are not asked, added ones are checked", () => {
+  const custom = checkInSchemaFor([shirt, origin]);
+  assert.deepEqual(messages(custom.safeParse({ ...valid, answers: { f_kaos: "", f_asal: "" } })), ["Ukuran kaos wajib diisi"]);
+  assert.deepEqual(messages(custom.safeParse({ ...valid, answers: { f_kaos: "XXL", f_asal: "" } })), ["Pilih salah satu Ukuran kaos"]);
+  assert.deepEqual(messages(custom.safeParse({ ...valid, answers: { f_kaos: "M", f_asal: "x".repeat(1001) } })), ["Asal instansi maksimal 1000 karakter"]);
+  // Divisi is no longer on this form, so leaving it out is fine.
+  assert.equal(custom.safeParse({ ...valid, answers: { f_kaos: "M", f_asal: "" } }).success, true);
+});
+
+it("stores Divisi and the room in their columns and other answers under their labels", () => {
+  const fields = [BUILTIN_FIELDS.divisi, shirt, origin, BUILTIN_FIELDS.room_number];
+  assert.deepEqual(splitAnswers(fields, { divisi: " Divisi Hukum ", f_kaos: "M", f_asal: "  ", room_number: "" }), {
+    divisi: "Divisi Hukum",
+    room_number: "",
+    answers: { "Ukuran kaos": "M" },
+  });
 });

@@ -79,3 +79,28 @@ test("admins check out one attendee, undo it, and check out everyone after confi
   await expect.poll(() => state.checkins.filter((c) => !c.checked_out_at).length).toBe(0);
   await expect(page.getByRole("row").filter({ hasText: "Siti Rahma" }).getByRole("button", { name: "Batalkan", exact: true })).toBeVisible();
 });
+
+test("on a laptop-width screen every column, including the check-out buttons, fits in the card", async ({ page }) => {
+  await installSupabaseStub(page, {
+    checkins: [
+      checkInRow({
+        name: "Muhammad Juan Al Qausar Siregar",
+        email: "muhammad.juan.alqausar@bawaslu.go.id",
+        divisi: "Divisi Penanganan Pelanggaran dan Data Informasi",
+        room_number: "1205",
+        checked_out_at: "2026-10-26T10:30:00Z",
+        file_path: "checkins/a.jpg",
+      }),
+      checkInRow({ name: "Budi Santoso" }),
+    ],
+  });
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  const table = page.getByRole("table");
+  for (const name of ["Check out", "Batalkan", "Lihat berkas"]) await expect(table.getByRole("button", { name }).first()).toBeInViewport({ ratio: 1 });
+  // Narrower still, the table scrolls sideways inside its card instead of cutting columns off.
+  await page.setViewportSize({ width: 920, height: 900 });
+  const scroller = table.locator("xpath=..");
+  expect(await scroller.evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
+});

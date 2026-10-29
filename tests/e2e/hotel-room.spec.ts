@@ -11,7 +11,7 @@ test("an attendee's hotel room number is saved, confirmed in the popup, and list
   await page.getByLabel("Nomor Kamar Hotel", { exact: true }).fill(" 1205 ");
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   const popup = page.getByRole("dialog", { name: "Check-in berhasil" });
-  await expect(popup.getByText("Kamar hotel", { exact: true })).toBeVisible();
+  await expect(popup.getByText("Nomor Kamar Hotel", { exact: true })).toBeVisible();
   await expect(popup.getByText("1205", { exact: true })).toBeVisible();
   await expect(popup.getByText("Divisi Hukum", { exact: true })).toBeVisible();
   expect(state.rpcCalls[0].body.p_room_number).toBe("1205");
@@ -38,7 +38,7 @@ test("without a room number the check-in request is the same as before", async (
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   const popup = page.getByRole("dialog", { name: "Check-in berhasil" });
   await expect(popup).toBeVisible();
-  await expect(popup.getByText("Kamar hotel", { exact: true })).toHaveCount(0);
+  await expect(popup.getByText("Nomor Kamar Hotel", { exact: true })).toHaveCount(0);
   expect("p_room_number" in state.rpcCalls[0].body).toBe(false);
 });
 

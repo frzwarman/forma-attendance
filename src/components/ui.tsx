@@ -157,9 +157,11 @@ export function Button({
 export function Badge({
   label,
   tone = "neutral",
+  icon: Icon,
 }: {
   label: string;
   tone?: "neutral" | "success" | "danger" | "gold";
+  icon?: IconComponent;
 }) {
   const c = useTheme();
   const colors = {
@@ -176,8 +178,12 @@ export function Badge({
         backgroundColor: colors.background,
         paddingHorizontal: 10,
         paddingVertical: 4,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
       }}
     >
+      {Icon && <Icon size={13} color={colors.text} strokeWidth={2.2} />}
       <T size={12} weight="semibold" color={colors.text}>
         {label}
       </T>
@@ -213,6 +219,31 @@ export function SectionTitle({
 }
 
 // A thin rule that separates groups of fields; it encodes structure, not decoration.
+// A section title with a coloured icon tile, so each part of an admin page is easy to find.
+export function IconHeading({ icon: Icon, tone, title, description }: { icon: IconComponent; tone: "navy" | "gold" | "red"; title: string; description: string }) {
+  const c = useTheme();
+  const colors = {
+    navy: { background: c.inputSurface, icon: c.background },
+    gold: { background: c.goldSoft, icon: "#7a5a1f" },
+    red: { background: c.accentSoft, icon: c.accent },
+  }[tone];
+  return (
+    <Row style={{ gap: 12, alignItems: "flex-start" }}>
+      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
+        <Icon size={20} color={colors.icon} strokeWidth={2.2} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <T size={17} weight="bold" accessibilityRole="header">
+          {title}
+        </T>
+        <T size={13} color={c.muted}>
+          {description}
+        </T>
+      </View>
+    </Row>
+  );
+}
+
 export function Divider() {
   const c = useTheme();
   return <View style={{ height: 1, backgroundColor: c.border }} />;

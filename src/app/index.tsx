@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { Backdrop, EventHeader } from "../components/Brand";
-import { T } from "../components/ui";
+import { Card, T } from "../components/ui";
 import { WhatsAppHelp } from "../components/WhatsAppHelp";
 import { CheckIn } from "../features/CheckIn";
 import { CheckOut } from "../features/CheckOut";
@@ -10,6 +10,7 @@ import { EventIntro } from "../features/intro/EventIntro";
 import { EventSlides } from "../features/intro/EventSlides";
 import { ThankYou, type CheckInDetails } from "../features/ThankYou";
 import { rememberCheckIn, storedCheckIns } from "../services/checkout";
+import { useFormFields } from "../services/settings";
 import { useTheme } from "../theme";
 
 export default function Index() {
@@ -19,6 +20,7 @@ export default function Index() {
   const [entries, setEntries] = useState(storedCheckIns);
   const [view, setView] = useState<"form" | "checkedIn">(entries.length ? "checkedIn" : "form");
   const [thanks, setThanks] = useState<CheckInDetails>();
+  const fields = useFormFields();
 
   function checkedIn(details: CheckInDetails) {
     if (details.token) rememberCheckIn({ token: details.token, name: details.name, at: details.at });
@@ -34,7 +36,14 @@ export default function Index() {
           <View style={{ width: "100%", maxWidth: 560, alignSelf: "center", gap: 28 }}>
             <EventHeader />
             {view === "form" ? (
-              <CheckIn onCheckedIn={checkedIn} />
+              fields ? (
+                // A new form when the admin's questions change, so its rules always match what it shows.
+                <CheckIn key={JSON.stringify(fields)} fields={fields} onCheckedIn={checkedIn} />
+              ) : (
+                <Card elevated>
+                  <T color={c.muted}>Memuat formulir…</T>
+                </Card>
+              )
             ) : (
               <>
                 {entries.length > 0 && (

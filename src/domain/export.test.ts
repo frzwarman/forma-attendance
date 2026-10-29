@@ -3,6 +3,7 @@ import { it } from "node:test";
 import * as XLSX from "xlsx";
 import { EXPORT_HEADERS, exportFileName, exportRows, toCsv, toXlsx } from "./export";
 import type { CheckIn, Winner } from "../types/guestbook";
+import { BUILTIN_FIELDS } from "./formFields";
 
 const checkin = (overrides: Partial<CheckIn> = {}): CheckIn => ({
   id: "c1",
@@ -80,4 +81,15 @@ it("names export files after the event and date", () => {
 
 it("neutralises spreadsheet formulas in attendee text while keeping phones and coordinates", () => {
   assert.equal(toCsv([["=1+1", "@cmd", "-SUM(1)", "+62 812", "-6.1754", "\tx"]]), "﻿'=1+1,'@cmd,'-SUM(1),+62 812,-6.1754,'\tx\r\n");
+});
+
+it("gives each added question a column after the room, keeping answers to questions removed since", () => {
+  const shirt = { id: "f_kaos", label: "Ukuran kaos", type: "select" as const, required: true, options: ["S", "M"] };
+  const rows = exportRows(
+    [checkin({ id: "a", answers: { "Ukuran kaos": "M" } }), checkin({ id: "b", created_at: "2026-10-26T02:00:00Z", answers: { "Asal instansi": "Bawaslu Jabar" } }), checkin({ id: "c", created_at: "2026-10-26T01:00:00Z" })],
+    [],
+    [BUILTIN_FIELDS.divisi, shirt],
+  );
+  assert.deepEqual(rows[0].slice(5, 10), ["Divisi", "Nomor Kamar Hotel", "Ukuran kaos", "Asal instansi", "Berkas"]);
+  assert.deepEqual(rows.slice(1).map((row) => row.slice(7, 9)), [["M", ""], ["", "Bawaslu Jabar"], ["", ""]]);
 });

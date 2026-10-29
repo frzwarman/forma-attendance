@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { Logo, Sphere, useBrandBackground } from "../../components/Brand";
 import { ChevronLeft, ChevronRight } from "../../components/icons";
-import type { Speaker } from "../../services/eventInfo";
+import type { Speaker } from "../../domain/eventContent";
 import { FONT_STACK, useTheme } from "../../theme";
 import { EVENT } from "./slides";
 

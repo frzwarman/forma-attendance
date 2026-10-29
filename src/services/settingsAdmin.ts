@@ -1,3 +1,4 @@
+import type { FormField } from "../domain/formFields";
 import type { Settings } from "../types/guestbook";
 import { DEFAULT_SETTINGS } from "./settings";
 import { getSupabase } from "./supabase";
@@ -5,6 +6,9 @@ import { compressImage } from "./uploads";
 
 export async function updateSettings(patch: Partial<Omit<Settings, "id" | "updated_at">>): Promise<Settings> {
   const { data, error } = await getSupabase().from("guestbook_settings").update(patch).eq("id", 1).select();
+  // PostgREST names a column the database does not have yet: a migration is still pending.
+  const missing = /Could not find the '(\w+)' column/.exec(error?.message ?? "")?.[1];
+  if (missing) throw new Error(`Database belum siap: kolom ${missing} belum ada. Jalankan migrasi terbaru (npm run db:push).`);
   if (error) throw new Error(error.message);
   // Row-level security turns a non-admin update into zero updated rows, not an error.
   const row = (data ?? [])[0] as Settings | undefined;
@@ -25,3 +29,5 @@ export async function uploadBrandImage(kind: "logo" | "background", file: File):
   if (error) throw new Error(`Gagal mengunggah gambar: ${error.message}`);
   return path;
 }
+
+export const saveFormFields = (fields: FormField[]) => updateSettings({ form_fields: fields });

@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import type { CheckIn, Winner } from "../types/guestbook";
+import type { FormField } from "./formFields";
 import { formatWib } from "./time";
 
 export const EXPORT_HEADERS = [
@@ -15,11 +16,15 @@ export const EXPORT_HEADERS = [
   "Waktu Undian (WIB)",
 ];
 
-export function exportRows(checkins: CheckIn[], winners: Winner[]): string[][] {
+// Answers to the admin's added questions get a column each after Nomor Kamar Hotel: the current
+// questions in their order, then labels only older rows have (a question removed or renamed since).
+export function exportRows(checkins: CheckIn[], winners: Winner[], fields: FormField[] = []): string[][] {
   const byCheckin = new Map(winners.map((winner) => [winner.checkin_id, winner]));
   const sorted = [...checkins].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const labels = [...new Set([...fields.filter((field) => !field.builtin).map((field) => field.label), ...checkins.flatMap((row) => Object.keys(row.answers ?? {}))])];
+  const split = EXPORT_HEADERS.indexOf("Berkas");
   return [
-    EXPORT_HEADERS,
+    [...EXPORT_HEADERS.slice(0, split), ...labels, ...EXPORT_HEADERS.slice(split)],
     ...sorted.map((row) => {
       const winner = byCheckin.get(row.id);
       return [
@@ -30,6 +35,7 @@ export function exportRows(checkins: CheckIn[], winners: Winner[]): string[][] {
         row.email,
         row.divisi ?? "",
         row.room_number ?? "",
+        ...labels.map((label) => row.answers?.[label] ?? ""),
         row.file_path ?? "",
         winner?.prize ?? "",
         winner ? formatWib(winner.drawn_at) : "",

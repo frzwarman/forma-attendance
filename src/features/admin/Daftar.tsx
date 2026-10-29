@@ -4,6 +4,7 @@ import { useState, type CSSProperties } from "react";
 import { View, useWindowDimensions } from "react-native";
 import { Badge, Button, Card, Empty, Field, Row, Stat, T } from "../../components/ui";
 import { exportFileName, exportRows, toCsv, toXlsx } from "../../domain/export";
+import { formFieldsFrom } from "../../domain/formFields";
 import { formatWib } from "../../domain/time";
 import { useAdminApi, useCheckIns, useWinners } from "../../services/adminContext";
 import { downloadFile } from "../../services/download";
@@ -33,7 +34,7 @@ export function Daftar() {
   const winnerById = new Map((winners.data ?? []).map((w) => [w.checkin_id, w]));
   const needle = query.trim().toLowerCase();
   const filtered = needle
-    ? rows.filter((row) => [row.name, row.divisi ?? "", row.phone, row.email, row.room_number ?? ""].some((value) => value.toLowerCase().includes(needle)))
+    ? rows.filter((row) => [row.name, row.divisi ?? "", row.phone, row.email, row.room_number ?? "", ...Object.values(row.answers ?? {})].some((value) => value.toLowerCase().includes(needle)))
     : rows;
   const todayKey = formatWib(new Date().toISOString()).slice(0, 10);
   const today = rows.filter((row) => formatWib(row.created_at).slice(0, 10) === todayKey).length;
@@ -85,7 +86,7 @@ export function Daftar() {
   }
 
   function exportAs(ext: "csv" | "xlsx") {
-    const table = exportRows(rows, winners.data ?? []);
+    const table = exportRows(rows, winners.data ?? [], formFieldsFrom(settings.form_fields));
     const name = exportFileName(settings.event_name, ext);
     if (ext === "csv") downloadFile(name, new Blob([toCsv(table)], { type: "text/csv;charset=utf-8" }));
     else
@@ -216,6 +217,18 @@ function CheckOutAction({ row, busy, onToggle }: { row: CheckIn; busy: boolean; 
   );
 }
 
+// "26/10/2026" over "10:00 WIB", so the time columns stay narrow.
+function DateTime({ at }: { at: string }) {
+  const text = formatWib(at);
+  const space = text.indexOf(" ");
+  return (
+    <>
+      <div>{text.slice(0, space)}</div>
+      <div>{text.slice(space + 1)}</div>
+    </>
+  );
+}
+
 function CheckInTable({
   rows,
   winnerById,
@@ -232,66 +245,76 @@ function CheckInTable({
   const c = useTheme();
   const head: CSSProperties = {
     textAlign: "left",
-    padding: "10px 12px",
+    padding: "10px",
     fontSize: 12,
     fontWeight: 600,
     color: c.muted,
     borderBottom: `1px solid ${c.border}`,
     whiteSpace: "nowrap",
   };
-  const cell: CSSProperties = { padding: "12px", verticalAlign: "top", borderBottom: `1px solid ${c.border}`, fontSize: 14, color: c.text };
+  const cell: CSSProperties = { padding: "12px 10px", verticalAlign: "top", borderBottom: `1px solid ${c.border}`, fontSize: 14, color: c.text };
   const sub: CSSProperties = { color: c.muted, fontSize: 13, marginTop: 2 };
   return (
-    <table style={{ width: "100%", fontFamily: FONT_STACK }}>
-      <thead>
-        <tr>
-          {["Waktu check-in", "Peserta", "Kontak", "Kamar", "Check-out", "Berkas"].map((label) => (
-            <th key={label} style={head}>
-              {label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row) => {
-          const winner = winnerById.get(row.id);
-          return (
-            <tr key={row.id}>
-              <td style={{ ...cell, whiteSpace: "nowrap", color: c.muted }}>{formatWib(row.created_at)}</td>
-              <td style={cell}>
-                <div style={{ fontWeight: 700 }}>{row.name}</div>
-                {!!row.divisi && <div style={sub}>{row.divisi}</div>}
-                {winner && (
-                  <div style={{ marginTop: 6 }}>
-                    <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />
+    // Scrolls sideways on its own when the columns need more room than the card, so no column is cut off.
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", fontFamily: FONT_STACK }}>
+        <thead>
+          <tr>
+            {["Waktu check-in", "Peserta", "Kontak", "Kamar", "Check-out", "Berkas"].map((label) => (
+              <th key={label} style={head}>
+                {label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const winner = winnerById.get(row.id);
+            return (
+              <tr key={row.id}>
+                <td style={{ ...cell, whiteSpace: "nowrap", color: c.muted }}>
+                  <DateTime at={row.created_at} />
+                </td>
+                <td style={cell}>
+                  <div style={{ fontWeight: 700 }}>{row.name}</div>
+                  {!!row.divisi && <div style={sub}>{row.divisi}</div>}
+                  {Object.entries(row.answers ?? {}).map(([label, value]) => (
+                    <div key={label} style={{ ...sub, overflowWrap: "anywhere" }}>
+                      {label}: {value}
+                    </div>
+                  ))}
+                  {winner && (
+                    <div style={{ marginTop: 6 }}>
+                      <Badge tone="gold" label={`Pemenang ${winner.prize || "undian"}`} />
+                    </div>
+                  )}
+                </td>
+                <td style={cell}>
+                  <div>{row.phone}</div>
+                  <div style={{ ...sub, overflowWrap: "anywhere" }}>{row.email}</div>
+                </td>
+                <td style={{ ...cell, whiteSpace: "nowrap" }}>{row.room_number || <span style={{ color: c.muted }}>Tidak ada</span>}</td>
+                <td style={cell}>
+                  <div style={{ whiteSpace: "nowrap", color: row.checked_out_at ? c.text : c.muted }}>
+                    {row.checked_out_at ? <DateTime at={row.checked_out_at} /> : "Belum"}
                   </div>
-                )}
-              </td>
-              <td style={cell}>
-                <div>{row.phone}</div>
-                <div style={sub}>{row.email}</div>
-              </td>
-              <td style={{ ...cell, whiteSpace: "nowrap" }}>{row.room_number || <span style={{ color: c.muted }}>Tidak ada</span>}</td>
-              <td style={cell}>
-                <div style={{ whiteSpace: "nowrap", color: row.checked_out_at ? c.text : c.muted }}>
-                  {row.checked_out_at ? formatWib(row.checked_out_at) : "Belum"}
-                </div>
-                <div style={{ marginTop: 6 }}>
-                  <CheckOutAction row={row} busy={busy === row.id} onToggle={onToggle} />
-                </div>
-              </td>
-              <td style={cell}>
-                {row.file_path ? (
-                  <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />
-                ) : (
-                  <span style={{ color: c.muted }}>Tidak ada</span>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+                  <div style={{ marginTop: 6 }}>
+                    <CheckOutAction row={row} busy={busy === row.id} onToggle={onToggle} />
+                  </div>
+                </td>
+                <td style={cell}>
+                  {row.file_path ? (
+                    <Button small variant="secondary" label="Lihat berkas" onPress={() => onOpenFile(row.file_path!)} />
+                  ) : (
+                    <span style={{ color: c.muted }}>Tidak ada</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -324,6 +347,11 @@ function CheckInRow({
           {row.divisi}
         </T>
       )}
+      {Object.entries(row.answers ?? {}).map(([label, value]) => (
+        <T key={label} size={13} color={c.muted}>
+          {label}: {value}
+        </T>
+      ))}
       <T size={14}>{row.phone}</T>
       <T size={13} color={c.muted}>
         {row.email}

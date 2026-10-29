@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { View } from "react-native";
 import { FONT_STACK, useTheme } from "../theme";
+import type { IconComponent } from "./icons";
 import { Row, T } from "./ui";
 
 // Web-only native inputs (date, file, colour) styled like Field.
@@ -26,25 +27,37 @@ export function FileInput({
   onChange,
   error,
   hint,
+  icon: Icon,
+  buttonLabel = "Pilih berkas",
+  compact = false,
 }: {
   label: string;
   accept: string;
   onChange: (file: File | null) => void;
   error?: string;
   hint?: string;
+  icon?: IconComponent;
+  // The text on the button, e.g. "Unggah CV"; the input's accessible name stays label.
+  buttonLabel?: string;
+  // Just the button: the label stays for screen readers, and no "Belum ada berkas" line.
+  compact?: boolean;
 }) {
   const c = useTheme();
   const [name, setName] = useState("");
   return (
     <View style={{ gap: 8 }}>
-      <T size={14} weight="semibold">
-        {label}
-      </T>
+      {!compact && (
+        <T size={14} weight="semibold">
+          {label}
+        </T>
+      )}
       <Row style={{ gap: 12 }}>
         <label
           style={{
             position: "relative",
-            display: "inline-block",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
             padding: "10px 18px",
             borderRadius: 999,
             border: `1px solid ${c.border}`,
@@ -57,7 +70,8 @@ export function FileInput({
             whiteSpace: "nowrap",
           }}
         >
-          Pilih berkas
+          {Icon && <Icon size={17} color={c.text} strokeWidth={2.2} />}
+          {buttonLabel}
           <input
             type="file"
             accept={accept}
@@ -70,9 +84,11 @@ export function FileInput({
             style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, opacity: 0, overflow: "hidden" }}
           />
         </label>
-        <T size={13} color={c.muted} style={{ flex: 1 }}>
-          {name || "Belum ada berkas"}
-        </T>
+        {!compact && (
+          <T size={13} color={c.muted} style={{ flex: 1 }}>
+            {name || "Belum ada berkas"}
+          </T>
+        )}
       </Row>
       {!!hint && (
         <T size={12} color={c.muted}>
@@ -115,6 +131,53 @@ export function ColorInput({
           {value}
         </T>
       </Row>
+    </View>
+  );
+}
+
+// A dropdown for a question with fixed answers; "" is "nothing chosen yet".
+export function SelectInput({
+  label,
+  value,
+  options,
+  onChange,
+  error,
+  hint,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+  disabled?: boolean;
+}) {
+  const c = useTheme();
+  const style = useInputStyle(error);
+  return (
+    <View style={{ gap: 7 }}>
+      <T size={14} weight="semibold">
+        {label}
+      </T>
+      <select aria-label={label} aria-invalid={!!error} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} style={{ ...style, color: value ? c.text : c.muted }}>
+        <option value="">Pilih…</option>
+        {options.map((option) => (
+          <option key={option} value={option} style={{ color: c.text }}>
+            {option}
+          </option>
+        ))}
+      </select>
+      {!!hint && !error && (
+        <T size={12} color={c.muted}>
+          {hint}
+        </T>
+      )}
+      {!!error && (
+        <T size={12} color={c.danger} accessibilityRole="alert">
+          {error}
+        </T>
+      )}
     </View>
   );
 }

@@ -19,6 +19,8 @@ type Seed = {
   settingsWriteDenied?: boolean;
   failSettings?: boolean;
   newRowAfterFirstPage?: boolean;
+  // A database without migration 20261030000000: no event_content column to save Info acara into.
+  legacyEventContent?: boolean;
   // The event slideshow opens on a first visit; tests opt in to see it.
   intro?: boolean;
   // A database without migrations 20261028000000 and 20261029000000: no p_room_number or p_divisi
@@ -136,6 +138,8 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       if (wantsObject(request)) return json(route, { code: "PGRST116", message: "Cannot coerce the result to a single JSON object" }, 406);
       return json(route, []);
     }
+    if (request.method() === "PATCH" && seed.legacyEventContent && "event_content" in parseBody(request))
+      return json(route, { code: "PGRST204", message: "Could not find the 'event_content' column of 'guestbook_settings' in the schema cache" }, 400);
     if (request.method() === "PATCH") {
       Object.assign(state.settings, parseBody(request), { updated_at: new Date().toISOString() });
     } else if (seed.failSettings) {
@@ -148,7 +152,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     const body = parseBody(request);
     state.rpcCalls.push({ name: "guestbook_check_in", body });
     if (body.p_honeypot) return json(route, { message: "spam" }, 400);
-    if (seed.legacyCheckIn && ("p_room_number" in body || "p_divisi" in body))
+    if (seed.legacyCheckIn && ("p_room_number" in body || "p_divisi" in body || "p_answers" in body))
       return json(route, { code: "PGRST202", message: "Could not find the function public.guestbook_check_in in the schema cache" }, 404);
     if (seed.legacyCheckIn && !String(body.p_address ?? "").trim()) return json(route, { code: "P0001", message: "Alamat wajib diisi" }, 400);
     const key = phoneKey(String(body.p_phone || ""));
@@ -165,6 +169,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       jabatan: (body.p_jabatan as string | null) ?? null,
       divisi: (body.p_divisi as string | null) ?? null,
       room_number: (body.p_room_number as string | null) ?? null,
+      answers: (body.p_answers as Record<string, string> | null) ?? null,
       address: (body.p_address as string | null) ?? null,
       latitude: (body.p_latitude as number | null) ?? null,
       longitude: (body.p_longitude as number | null) ?? null,
@@ -264,7 +269,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     state.signedPaths.push(path.split("/").slice(1).join("/"));
     return json(route, { signedURL: `/object/sign/${path}?token=stub` });
   });
-  await page.route(/\/storage\/v1\/object\/(guestbook-uploads|guestbook-brand)\//, async (route, request) => {
+  await page.route(/\/storage\/v1\/object\/(guestbook-uploads|guestbook-brand|guestbook-event)\//, async (route, request) => {
     const after = request.url().split("/storage/v1/object/")[1].split("?")[0];
     const [bucket, ...rest] = after.split("/");
     const path = decodeURIComponent(rest.join("/"));
@@ -272,7 +277,14 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     state.uploads.push({ bucket, path, contentType, bytes });
     return json(route, { Key: `${bucket}/${path}`, Id: uuid() });
   });
-  await page.route(/\/storage\/v1\/object\/public\//, (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG_1x1 }));
+  // Like Storage, ?download=<name> serves the object as an attachment with that file name.
+  await page.route(/\/storage\/v1\/object\/public\//, (route, request) => {
+    const url = new URL(request.url());
+    if (!url.pathname.endsWith(".pdf")) return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1x1 });
+    const name = url.searchParams.get("download");
+    const headers: Record<string, string> = name ? { "Content-Disposition": `attachment; filename="${name}"` } : {};
+    return route.fulfill({ status: 200, contentType: "application/pdf", headers, body: "%PDF-1.4\n% stub\n" });
+  });
   await page.route(/tile\.openstreetmap\.org/, (route) => route.fulfill({ status: 200, contentType: "image/png", body: PNG_1x1 }));
   return state;
 }
