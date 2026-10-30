@@ -26,7 +26,7 @@ function rememberSeen() {
 export function EventIntro() {
   const { width } = useWindowDimensions();
   const wide = width >= 700;
-  // Attendees returning to check out have seen the event information already.
+  // Attendees back on this phone (to check in again) have seen the event information already.
   const [open, setOpen] = useState(() => !alreadySeen() && storedCheckIns().length === 0);
   const content = useEventContent();
   // Opens once the settings are in, with the speakers the admin saved.

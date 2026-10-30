@@ -41,7 +41,8 @@ export function Daftar() {
     ? rows.filter((row) => [row.name, row.divisi ?? "", row.phone, row.email, row.room_number ?? "", ...Object.values(row.answers ?? {})].some((value) => value.toLowerCase().includes(needle)))
     : rows;
   const todayKey = formatWib(new Date().toISOString()).slice(0, 10);
-  const today = rows.filter((row) => formatWib(row.created_at).slice(0, 10) === todayKey).length;
+  // Came today, first time or again.
+  const today = rows.filter((row) => formatWib(row.last_checked_in_at ?? row.created_at).slice(0, 10) === todayKey).length;
   const checkedOut = rows.filter((row) => row.checked_out_at).length;
   const present = rows.length - checkedOut;
 
@@ -279,6 +280,12 @@ function CheckInTable({
               <tr key={row.id}>
                 <td style={{ ...cell, whiteSpace: "nowrap", color: c.muted }}>
                   <DateTime at={row.created_at} />
+                  {!!row.last_checked_in_at && (
+                    <>
+                      <div style={{ ...sub, marginTop: 8 }}>Terakhir ({row.checkin_count}×)</div>
+                      <DateTime at={row.last_checked_in_at} />
+                    </>
+                  )}
                 </td>
                 <td style={cell}>
                   <div style={{ fontWeight: 700 }}>{row.name}</div>
@@ -364,6 +371,11 @@ function CheckInRow({
       {!!row.room_number && (
         <T size={13} color={c.muted}>
           Kamar hotel {row.room_number}
+        </T>
+      )}
+      {!!row.last_checked_in_at && (
+        <T size={13} color={c.muted}>
+          Check-in terakhir: {formatWib(row.last_checked_in_at)} ({row.checkin_count}×)
         </T>
       )}
       <T size={13} color={c.muted}>

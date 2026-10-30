@@ -160,7 +160,12 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     const existing = state.checkins
       .filter((c) => phoneKey(c.phone) === key || c.email.trim().toLowerCase() === email)
       .sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
-    if (existing) return json(route, { status: "duplicate", created_at: existing.created_at });
+    // Mirrors the RPC: a repeat check-in adds no row, it records the visit on the person's row.
+    if (existing && seed.legacyCheckIn) return json(route, { status: "duplicate", created_at: existing.created_at });
+    if (existing) {
+      Object.assign(existing, { last_checked_in_at: new Date().toISOString(), checkin_count: (existing.checkin_count ?? 1) + 1, checked_out_at: null });
+      return json(route, { status: "returning", created_at: existing.created_at, last_checked_in_at: existing.last_checked_in_at });
+    }
     const row = checkInRow({
       created_at: new Date().toISOString(),
       name: String(body.p_name),

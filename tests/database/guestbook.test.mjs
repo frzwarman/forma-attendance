@@ -81,18 +81,22 @@ test("phone keys normalise formatting and the +62 prefix", async () => {
   assert.equal((await db.query("select public.guestbook_phone_key($1) as k", ["+1 415 555 0100"])).rows[0].k, "14155550100");
 });
 
-test("anonymous check-in succeeds once and reports the duplicate's time", async () => {
+test("checking in again with the same phone or e-mail is welcomed and recorded on the one row", async () => {
   const first = await asRole(null, "anon", () => checkIn());
   assert.equal(first.status, "created");
   assert.equal(typeof first.created_at, "string");
-  const second = await asRole(null, "anon", () => checkIn({ phone: "+62 812-1111-2222", email: "lain@example.test" }));
-  assert.deepEqual(second, { status: "duplicate", created_at: first.created_at });
+  const second = await asRole(null, "anon", () => checkIn({ name: "Orang Lain", phone: "+62 812-1111-2222", email: "lain@example.test" }));
+  assert.equal(second.status, "returning");
+  assert.equal(second.created_at, first.created_at);
+  assert.equal(typeof second.last_checked_in_at, "string");
+  assert.equal(second.checkout_token, undefined);
   const third = await asRole(null, "anon", () => checkIn({ phone: "0813 0000 0000", email: "BUDI@example.test" }));
-  assert.equal(third.status, "duplicate");
+  assert.equal(third.status, "returning");
   await assert.rejects(() => asUser(null, () => db.query("select * from public.guestbook_checkins"), "anon"), /permission denied/);
   await asUser(id(1), async () => {
-    const { rows } = await db.query("select phone from public.guestbook_checkins");
-    assert.deepEqual(rows, [{ phone: "0812 1111 2222" }]);
+    // The stored details stay: typing someone's number does not rename them.
+    const { rows } = await db.query("select name, phone, email, checkin_count, last_checked_in_at is not null as again from public.guestbook_checkins");
+    assert.deepEqual(rows, [{ name: "Budi Santoso", phone: "0812 1111 2222", email: "budi@example.test", checkin_count: 3, again: true }]);
   });
 });
 
@@ -336,9 +340,9 @@ test("a check-in returns a check-out code that checks the attendee out once", as
   const created = await asRole(null, "anon", () => checkIn(wati));
   assert.equal(created.status, "created");
   assert.match(created.checkout_token, /^[0-9a-f-]{36}$/);
-  const duplicate = await asRole(null, "anon", () => checkIn(wati));
-  assert.equal(duplicate.status, "duplicate");
-  assert.equal(duplicate.checkout_token, undefined);
+  const repeat = await asRole(null, "anon", () => checkIn(wati));
+  assert.equal(repeat.status, "returning");
+  assert.equal(repeat.checkout_token, undefined);
   const checkOut = async (token) => (await db.query("select public.guestbook_check_out($1) as r", [token])).rows[0].r;
   const first = await asRole(null, "anon", () => checkOut(created.checkout_token));
   assert.equal(first.status, "checked_out");
@@ -353,6 +357,12 @@ test("a check-in returns a check-out code that checks the attendee out once", as
       [created.checkout_token],
     );
     assert.deepEqual(rows, [{ out: true, hashed: true }]);
+  });
+  // Back for the next session: present again.
+  await asRole(null, "anon", () => checkIn(wati));
+  await asUser(id(1), async () => {
+    const { rows } = await db.query("select checked_out_at, checkin_count from public.guestbook_checkins where email = 'wati@example.test'");
+    assert.deepEqual(rows, [{ checked_out_at: null, checkin_count: 3 }]);
   });
 });
 

@@ -46,28 +46,32 @@ it("maps check-ins and winners to export rows", () => {
   assert.equal(EXPORT_HEADERS.some((header) => header.startsWith("Tanggal")), false);
   assert.equal(rows[1].includes("Staf"), false);
   assert.equal(rows[1][0], "26/10/2026 10:05 WIB");
-  assert.equal(rows[0][1], "Waktu Check-out (WIB)");
-  assert.equal(rows[1][1], "26/10/2026 17:30 WIB");
-  assert.equal(rows[1][3], "081234567890");
-  assert.equal(rows[0][5], "Divisi");
-  assert.equal(rows[1][5], "Divisi Hukum");
-  assert.equal(rows[0][6], "Nomor Kamar Hotel");
-  assert.equal(rows[1][6], "1205");
-  assert.equal(rows[1][7], "checkins/abc.jpg");
-  assert.equal(rows[1][8], "Hadiah 1");
-  assert.equal(rows[1][9], "26/10/2026 11:00 WIB");
+  assert.equal(rows[0][3], "Waktu Check-out (WIB)");
+  assert.equal(rows[1][3], "26/10/2026 17:30 WIB");
+  assert.equal(rows[1][5], "081234567890");
+  assert.equal(rows[0][7], "Divisi");
+  assert.equal(rows[1][7], "Divisi Hukum");
+  assert.equal(rows[0][8], "Nomor Kamar Hotel");
+  assert.equal(rows[1][8], "1205");
+  assert.equal(rows[1][9], "checkins/abc.jpg");
+  assert.equal(rows[1][10], "Hadiah 1");
+  assert.equal(rows[1][11], "26/10/2026 11:00 WIB");
+  // Someone who came once has no later check-in.
+  assert.deepEqual(rows[0].slice(1, 3), ["Check-in Terakhir (WIB)", "Jumlah Check-in"]);
+  assert.deepEqual(rows[1].slice(1, 3), ["", "1"]);
+  assert.deepEqual(exportRows([checkin({ last_checked_in_at: "2026-10-27T06:15:00Z", checkin_count: 3 })], [])[1].slice(1, 3), ["27/10/2026 13:15 WIB", "3"]);
   const none = exportRows([checkin({ divisi: null, room_number: null, address: null, file_path: null, checked_out_at: null })], []);
-  assert.equal(none[1][1], "");
-  assert.deepEqual(none[1].slice(5), ["", "", "", "", ""]);
+  assert.equal(none[1][3], "");
+  assert.deepEqual(none[1].slice(7), ["", "", "", "", ""]);
   // Rows read before the room-number and division migrations have no such fields.
   const { room_number: _, divisi: __, ...older } = checkin();
-  assert.deepEqual(exportRows([older as CheckIn], [])[1].slice(5, 7), ["", ""]);
+  assert.deepEqual(exportRows([older as CheckIn], [])[1].slice(7, 9), ["", ""]);
 });
 
 it("keeps phone numbers as text cells in Excel", () => {
   const rows = exportRows([checkin()], [winner()]);
   const workbook = XLSX.read(toXlsx(rows), { type: "array" });
-  const cell = workbook.Sheets["Check-in"]["D2"];
+  const cell = workbook.Sheets["Check-in"]["F2"];
   assert.equal(cell.t, "s");
   assert.equal(cell.v, "081234567890");
 });
@@ -90,6 +94,6 @@ it("gives each added question a column after the room, keeping answers to questi
     [],
     [BUILTIN_FIELDS.divisi, shirt],
   );
-  assert.deepEqual(rows[0].slice(5, 10), ["Divisi", "Nomor Kamar Hotel", "Ukuran kaos", "Asal instansi", "Berkas"]);
-  assert.deepEqual(rows.slice(1).map((row) => row.slice(7, 9)), [["M", ""], ["", "Bawaslu Jabar"], ["", ""]]);
+  assert.deepEqual(rows[0].slice(7, 12), ["Divisi", "Nomor Kamar Hotel", "Ukuran kaos", "Asal instansi", "Berkas"]);
+  assert.deepEqual(rows.slice(1).map((row) => row.slice(9, 11)), [["M", ""], ["", "Bawaslu Jabar"], ["", ""]]);
 });

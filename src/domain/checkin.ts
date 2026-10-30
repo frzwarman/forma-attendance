@@ -2,7 +2,7 @@ import { z } from "zod";
 import { answerSchema, maxLength, type FormField } from "./formFields";
 import { phoneDigits } from "./phone";
 
-// Always asked: they identify the attendee for duplicates, check-out and the lucky draw.
+// Always asked: they recognise someone checking in again, and identify them in the lucky draw.
 const fixed = {
   name: z.string().trim().min(2, "Nama wajib diisi").max(120, "Nama maksimal 120 karakter"),
   phone: z.string().refine((value) => {

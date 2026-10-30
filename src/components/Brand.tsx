@@ -88,7 +88,8 @@ export function Sphere({ width, testID }: { width: number; testID?: string }) {
   );
 }
 
-export function EventHeader() {
+// title: in place of the event name and welcome text (which asks to check in), e.g. after check-in.
+export function EventHeader({ title }: { title?: string }) {
   const c = useTheme();
   const { settings } = useSettings();
   const { width } = useWindowDimensions();
@@ -106,11 +107,13 @@ export function EventHeader() {
       </View>
       <View style={{ gap: 8 }}>
         <T size={34} weight="extra" color={c.onBackground} accessibilityRole="header" style={{ maxWidth: 520 }}>
-          {settings.event_name}
+          {title ?? settings.event_name}
         </T>
-        <T size={16} color={c.onBackgroundMuted} style={{ maxWidth: 480 }}>
-          {settings.welcome_text}
-        </T>
+        {!title && (
+          <T size={16} color={c.onBackgroundMuted} style={{ maxWidth: 480 }}>
+            {settings.welcome_text}
+          </T>
+        )}
       </View>
     </View>
   );

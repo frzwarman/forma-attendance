@@ -72,7 +72,7 @@ test("an admin adds and removes questions; attendees answer them and admins see 
   const csvDownload = page.waitForEvent("download");
   await page.getByRole("button", { name: "Ekspor CSV", exact: true }).click();
   const [header, first] = fs.readFileSync((await (await csvDownload).path())!, "utf8").replace(/^﻿/, "").split("\r\n");
-  expect(header.split(",").slice(5, 10)).toEqual(["Divisi", "Nomor Kamar Hotel", "Asal instansi", "Ukuran kaos", "Berkas"]);
+  expect(header.split(",").slice(7, 12)).toEqual(["Divisi", "Nomor Kamar Hotel", "Asal instansi", "Ukuran kaos", "Berkas"]);
   expect(first).toContain("Bawaslu Provinsi Jawa Barat");
 });
 

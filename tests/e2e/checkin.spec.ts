@@ -62,14 +62,26 @@ test("without an organiser number there is no WhatsApp button", async ({ page })
   await expect(page.getByRole("link", { name: "Hubungi Panitia via WhatsApp" })).toHaveCount(0);
 });
 
-test("a repeated phone number is reported with the earlier check-in time and not saved again", async ({ page }) => {
+test("someone checking in again (next session) is welcomed, and their one row records the visit", async ({ page }) => {
   const state = await installSupabaseStub(page, {
-    checkins: [checkInRow({ phone: "081211112222", email: "budi@example.test", created_at: "2026-10-26T03:05:00Z" })],
+    checkins: [checkInRow({ name: "Budi Santoso", phone: "081211112222", email: "budi@example.test", created_at: "2026-10-26T03:05:00Z" })],
   });
   await page.goto("/");
   await fillForm(page, { phone: "+62 812-1111-2222", email: "lain@example.test" });
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("sudah terdaftar pada 26/10/2026 10:05 WIB");
+  await expect(page.getByRole("dialog", { name: "Check-in berhasil" }).getByRole("heading", { name: "Terima kasih, Budi Santoso!" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(state.checkins).toHaveLength(1);
+  expect(state.checkins[0].checkin_count).toBe(2);
+  expect(state.checkins[0].last_checked_in_at).toBeTruthy();
+});
+
+test("before the repeat check-in migration, checking in again is still welcomed", async ({ page }) => {
+  const state = await installSupabaseStub(page, { legacyCheckIn: true, checkins: [checkInRow({ phone: "081211112222", email: "budi@example.test" })] });
+  await page.goto("/");
+  await fillForm(page);
+  await page.getByRole("button", { name: "Kirim", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Check-in berhasil" })).toBeVisible();
   expect(state.checkins).toHaveLength(1);
 });
 

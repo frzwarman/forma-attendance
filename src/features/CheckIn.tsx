@@ -7,7 +7,6 @@ import { SelectInput } from "../components/NativeInput";
 import { Button, Card, Divider, Field, SectionTitle, T } from "../components/ui";
 import { checkInSchemaFor, sampleCheckIn, type CheckInInput } from "../domain/checkin";
 import { maxLength, type Builtin, type FormField } from "../domain/formFields";
-import { formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
 import { uploadCheckInFile } from "../services/uploads";
 import { useTheme } from "../theme";
@@ -36,7 +35,6 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
   });
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState("");
-  const [duplicateAt, setDuplicateAt] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -44,7 +42,6 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
   const submit = handleSubmit(async (input) => {
     if (fileError) return;
     setError("");
-    setDuplicateAt("");
     try {
       let file_path: string | null = null;
       if (file) {
@@ -56,16 +53,15 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
         }
       }
       const result = await submitCheckIn(input, fields, { file_path, honeypot });
-      if (result.status === "duplicate") setDuplicateAt(result.created_at);
-      else
-        onCheckedIn({
-          name: input.name.trim(),
-          phone: input.phone,
-          email: input.email,
-          answers: fields.flatMap((field) => (input.answers[field.id] ? [[field.label, input.answers[field.id]] as [string, string]] : [])),
-          at: result.created_at,
-          token: result.checkout_token,
-        });
+      // Someone checking in again (every session) is welcomed like the first time.
+      onCheckedIn({
+        name: input.name.trim(),
+        phone: input.phone,
+        email: input.email,
+        answers: fields.flatMap((field) => (input.answers[field.id] ? [[field.label, input.answers[field.id]] as [string, string]] : [])),
+        at: result.status === "created" ? result.created_at : result.last_checked_in_at ?? new Date().toISOString(),
+        token: result.checkout_token,
+      });
     } catch (cause) {
       const message = (cause as Error).message;
       setError(message === "spam" ? "Pengiriman ditolak. Coba lagi." : message);
@@ -157,11 +153,6 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
         autoComplete="off"
         style={{ position: "absolute", left: -10000, width: 1, height: 1, opacity: 0 }}
       />
-      {!!duplicateAt && (
-        <T accessibilityRole="alert" color={c.danger}>
-          Nomor telepon atau e-mail ini sudah terdaftar pada {formatWib(duplicateAt)}. Periksa kembali data Anda. Untuk check-out, buka tautan ini di HP yang dipakai saat check-in, atau hubungi panitia.
-        </T>
-      )}
       {!!error && (
         <T accessibilityRole="alert" color={c.danger}>
           {error}

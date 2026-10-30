@@ -40,11 +40,6 @@ export function ThankYou({ details, onClose }: { details: CheckInDetails; onClos
             </Row>
           ))}
         </View>
-        {!!details.token && (
-          <T size={14} color={c.muted}>
-            Saat pulang, buka tautan ini lagi di HP ini lalu tekan Check out sekarang.
-          </T>
-        )}
         <Button large label="Lihat informasi acara" onPress={onClose} />
       </View>
     </Modal>

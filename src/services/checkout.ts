@@ -1,6 +1,5 @@
-import { callFunction } from "./rest";
-
-// Check-ins made on this phone, so the attendee can check out with one tap later.
+// Check-ins made on this phone, so it opens on the checked-in page. The key and the token (the
+// check-out code) date from when attendees checked themselves out.
 const KEY = "guestbook.checkouts";
 export type StoredCheckIn = { token: string; name: string; at: string };
 
@@ -19,13 +18,12 @@ function save(entries: StoredCheckIn[]) {
   try {
     localStorage.setItem(KEY, JSON.stringify(entries));
   } catch {
-    /* storage unavailable: the organisers can still check this attendee out */
+    /* storage unavailable: the phone opens on the form, which checks the attendee in again */
   }
 }
 
 export const rememberCheckIn = (entry: StoredCheckIn) =>
   save([...storedCheckIns().filter((stored) => stored.token !== entry.token), entry]);
-export const forgetCheckIn = (token: string) => save(storedCheckIns().filter((stored) => stored.token !== token));
-
-export type CheckOutResult = { status: "checked_out" | "already"; name: string; checked_out_at: string };
-export const checkOut = (token: string) => callFunction<CheckOutResult>("guestbook_check_out", { p_token: token });
+// A repeat check-in comes without a code; it moves this person's time on instead.
+export const refreshCheckIn = (name: string, at: string) =>
+  save(storedCheckIns().map((stored) => (stored.name === name ? { ...stored, at } : stored)));

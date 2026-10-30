@@ -43,6 +43,10 @@ export type CheckIn = {
   // Legacy visit date; check-out time is checked_out_at.
   check_out_date: string | null;
   checked_out_at: string | null;
+  // The latest repeat check-in and how many there were in all; absent until migration
+  // 20261101000000_guestbook_repeat_checkin.sql is applied, null for someone who came once.
+  last_checked_in_at?: string | null;
+  checkin_count?: number;
 };
 
 export type Winner = {
@@ -53,5 +57,12 @@ export type Winner = {
   drawn_by: string | null;
 };
 
-// checkout_token comes back only for a new check-in; the phone keeps it to check out later.
-export type CheckInResult = { status: "created" | "duplicate"; created_at: string; checkout_token?: string };
+// checkout_token comes back only for a new check-in. A repeat check-in (same phone or e-mail) is
+// "returning", with the time of this visit; a database without migration
+// 20261101000000_guestbook_repeat_checkin.sql answers "duplicate" and records nothing.
+export type CheckInResult = {
+  status: "created" | "returning" | "duplicate";
+  created_at: string;
+  last_checked_in_at?: string;
+  checkout_token?: string;
+};
