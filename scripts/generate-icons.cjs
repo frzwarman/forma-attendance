@@ -12,7 +12,7 @@ const icons = {
   Presentation: 'presentation', Download: 'download',
   ArrowUp: 'arrow-up', ArrowDown: 'arrow-down', Trash: 'trash-2', ImagePlus: 'image-plus', UserRound: 'user-round',
   UserPlus: 'user-round-plus', FilePlus: 'file-plus', CalendarDays: 'calendar-days', Link: 'link',
-  ClipboardList: 'clipboard-list', Lock: 'lock', Plus: 'plus',
+  ClipboardList: 'clipboard-list', Lock: 'lock', Plus: 'plus', Wand: 'wand-sparkles',
 };
 // lucide-react-native is no longer a dependency: unpack it anywhere (npm pack lucide-react-native@0.577.0)
 // and pass LUCIDE_DIR=<unpacked>/package, or install it to use the default.

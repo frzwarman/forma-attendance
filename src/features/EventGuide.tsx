@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { View } from "react-native";
-import { ChevronLeft, ChevronRight, Download, FileText, Presentation } from "../components/icons";
+import { ChevronLeft, ChevronRight, Download, FileText, Presentation, UserRound } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { Card, Divider, SectionTitle, T } from "../components/ui";
 import { formatFileSize } from "../domain/files";
@@ -9,15 +9,40 @@ import type { Material, PagedDoc } from "../domain/eventContent";
 import { useEventContent } from "../services/eventInfo";
 import { FONT_STACK, useTheme } from "../theme";
 
+// ponytail: mock. Every speaker offers the same sample PDF; when the real files arrive, give each
+// speaker their own materials (a list on StoredSpeaker, uploaded in Info acara) and link those here.
+const SPEAKER_MATERIAL = "/materi/materi-kecerdasan-buatan.pdf";
+
 // What a checked-in attendee needs during the event: polling, the rundown, materials and speaker CVs.
 export function EventGuide() {
   const c = useTheme();
   const content = useEventContent();
   const [cv, setCv] = useState<PagedDoc | null>(null);
+  // The speaker whose choices are open; one at a time.
+  const [openSpeaker, setOpenSpeaker] = useState<string | null>(null);
   if (!content) return null;
   const { mentimeter_url, rundown, speakers, materials } = content;
   const menti = mentimeter_url && isMentimeterUrl(mentimeter_url) ? mentimeter_url : null;
   const sections: ReactNode[] = [];
+  // Lihat CV and Unduh materi under an opened speaker.
+  const choice: CSSProperties = {
+    flex: "1 1 140px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 44,
+    padding: "0 16px",
+    borderRadius: 999,
+    border: `1px solid ${c.border}`,
+    backgroundColor: c.surface,
+    color: c.text,
+    fontFamily: FONT_STACK,
+    fontWeight: 600,
+    fontSize: 14,
+    textDecoration: "none",
+    cursor: "pointer",
+  };
   if (menti)
     sections.push(
       <View key="menti" style={{ gap: 14 }}>
@@ -64,31 +89,49 @@ export function EventGuide() {
   if (speakers.length)
     sections.push(
       <View key="speakers" style={{ gap: 12 }}>
-        <SectionTitle title="Narasumber" description="Ketuk nama narasumber untuk melihat profil dan CV." />
+        <SectionTitle title="Narasumber" description="Ketuk nama narasumber untuk melihat CV atau mengunduh materinya." />
         <View role="list" aria-label="Narasumber" style={{ gap: 8 }}>
-          {speakers.map((speaker) => (
-            <View key={speaker.title} role="listitem">
-              <button
-                type="button"
-                aria-label={`Lihat CV ${speaker.title}`}
-                onClick={() => setCv(speaker)}
-                style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, borderRadius: 12, border: "none", backgroundColor: c.ground, cursor: "pointer", textAlign: "left", width: "100%" }}
-              >
-                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: c.surface, alignItems: "center", justifyContent: "center" }}>
-                  <FileText size={20} color={c.muted} />
-                </View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <T size={14} weight="semibold">
-                    {speaker.title}
-                  </T>
-                  <T size={12} color={c.muted}>
-                    {speaker.pages.length} halaman
-                  </T>
-                </View>
-                <ChevronRight size={20} color={c.muted} />
-              </button>
-            </View>
-          ))}
+          {speakers.map((speaker, i) => {
+            const open = openSpeaker === speaker.title;
+            return (
+              <View key={speaker.title} role="listitem" style={{ borderRadius: 12, backgroundColor: c.ground }}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={`narasumber-${i}`}
+                  onClick={() => setOpenSpeaker(open ? null : speaker.title)}
+                  style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, border: "none", background: "transparent", cursor: "pointer", textAlign: "left", width: "100%" }}
+                >
+                  <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: c.surface, alignItems: "center", justifyContent: "center" }}>
+                    <UserRound size={20} color={c.muted} />
+                  </View>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <T size={14} weight="semibold">
+                      {speaker.title}
+                    </T>
+                    <T size={12} color={c.muted}>
+                      CV dan materi
+                    </T>
+                  </View>
+                  <View style={{ transform: [{ rotate: open ? "90deg" : "0deg" }] }}>
+                    <ChevronRight size={20} color={c.muted} />
+                  </View>
+                </button>
+                {open && (
+                  <div id={`narasumber-${i}`} style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "0 12px 12px" }}>
+                    <button type="button" aria-label={`Lihat CV ${speaker.title}`} onClick={() => setCv(speaker)} style={choice}>
+                      <FileText size={18} color={c.text} />
+                      Lihat CV
+                    </button>
+                    <a href={SPEAKER_MATERIAL} download={`Materi ${speaker.title}.pdf`} aria-label={`Unduh materi ${speaker.title}`} style={choice}>
+                      <Download size={18} color={c.text} />
+                      Unduh materi
+                    </a>
+                  </div>
+                )}
+              </View>
+            );
+          })}
         </View>
       </View>,
     );

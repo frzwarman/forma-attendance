@@ -18,8 +18,12 @@ export function Modal({
   const c = useTheme();
   const dialog = useRef<HTMLDivElement>(null);
 
+  // preventScroll: focusing the popup, or handing focus back, must not scroll the page under it
+  // (it jumped to the top). On close, focus returns to what opened it, e.g. Lihat CV.
   useEffect(() => {
-    dialog.current?.focus();
+    const opener = document.activeElement as HTMLElement | null;
+    dialog.current?.focus({ preventScroll: true });
+    return () => opener?.focus?.({ preventScroll: true });
   }, []);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {

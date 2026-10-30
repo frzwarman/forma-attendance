@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { answerSchema, type FormField } from "./formFields";
+import { answerSchema, maxLength, type FormField } from "./formFields";
 import { phoneDigits } from "./phone";
 
 // Always asked: they identify the attendee for duplicates, check-out and the lucky draw.
@@ -33,4 +33,19 @@ export function splitAnswers(fields: FormField[], answers: Record<string, string
     else result.answers[field.label] = value;
   }
   return result;
+}
+
+// Made-up answers for trying the form on localhost. The phone and e-mail differ each time so the
+// check-in is never a duplicate, and the @example.com address is one supabase/seed/remove-demo-checkins.sql
+// deletes, should the local page be talking to the real database.
+export function sampleCheckIn(fields: FormField[], seed = Date.now()): CheckInInput {
+  const n = String(seed).slice(-8).padStart(8, "0");
+  const answer = (field: FormField) =>
+    field.type === "select" ? field.options[0] ?? "" : field.builtin === "room_number" ? "1205" : `Contoh ${field.label}`.slice(0, maxLength(field));
+  return {
+    name: `Peserta Uji ${n.slice(-4)}`,
+    phone: `0812${n}`,
+    email: `uji.${n}@example.com`,
+    answers: Object.fromEntries(fields.map((field) => [field.id, answer(field)])),
+  };
 }

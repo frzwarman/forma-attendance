@@ -30,9 +30,11 @@ test("an attendee checks in, sees a thank-you popup, then the event information 
   await expect(popup).toHaveCount(0);
   const info = page.getByRole("region", { name: "Informasi acara" });
   await expect(info).toBeVisible();
-  // The event theme picture alone, without the opening popup's key visual and speakers.
-  await expect(info.getByRole("img", { name: /^Ekosistem Digitalisasi Pemilu 2029/ })).toBeVisible();
-  await expect(info.getByRole("region", { name: /^Slide/ })).toHaveCount(1);
+  // The opening popup's banner as a plain picture, no slides.
+  const banner = info.getByRole("img", { name: /Jakarta, 1 - 6 November 2026\. Bersama rakyat awasi pemilu/ });
+  await expect(banner).toBeVisible();
+  await expect.poll(() => banner.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(960);
+  await expect(info.getByRole("region", { name: /^Slide/ })).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Check-in untuk orang lain" })).toHaveCount(0);
@@ -93,4 +95,19 @@ test("the hidden honeypot blocks bots", async ({ page }) => {
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Pengiriman ditolak. Coba lagi.");
   expect(state.checkins).toHaveLength(0);
+});
+
+test("the autofill button appears only on localhost, and fills a check-in that goes through", async ({ page, baseURL }) => {
+  const state = await installSupabaseStub(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible();
+  // The test site is served as 127.0.0.1: like the real site, no autofill there.
+  await expect(page.getByRole("button", { name: "Isi otomatis (localhost)" })).toHaveCount(0);
+  await page.goto(baseURL!.replace("127.0.0.1", "localhost"));
+  await page.getByRole("button", { name: "Isi otomatis (localhost)" }).click();
+  await expect(page.getByLabel("Nama", { exact: true })).toHaveValue(/^Peserta Uji \d{4}$/);
+  await expect(page.getByLabel("Divisi", { exact: true })).toHaveValue("Contoh Divisi");
+  await page.getByRole("button", { name: "Kirim", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Check-in berhasil" })).toBeVisible();
+  expect(String(state.rpcCalls[0].body.p_email)).toMatch(/^uji\.\d{8}@example\.com$/);
 });

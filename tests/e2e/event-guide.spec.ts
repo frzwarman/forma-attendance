@@ -62,7 +62,18 @@ test("the rundown shows one page at a time with next and back, and each speaker'
 
   const speakers = guide.getByRole("list", { name: "Narasumber" });
   await expect(speakers.getByRole("listitem")).toHaveCount(9);
+  // Each speaker opens like an accordion, one at a time, with Lihat CV and Unduh materi.
   await expect(speakers.getByRole("link")).toHaveCount(0);
+  const agus = speakers.getByRole("button", { name: /^Dr\. Agus Canny/ });
+  await expect(agus).toHaveAttribute("aria-expanded", "false");
+  await agus.click();
+  await expect(agus).toHaveAttribute("aria-expanded", "true");
+  // ponytail: the materials are one sample PDF for everyone for now.
+  expect(await download(page, "Unduh materi Dr. Agus Canny")).toEqual({ name: "Materi Dr. Agus Canny.pdf", head: "%PDF-" });
+  await speakers.getByRole("button", { name: /^Nicholas Khoo/ }).click();
+  await expect(agus).toHaveAttribute("aria-expanded", "false");
+  await expect(speakers.getByRole("link", { name: "Unduh materi Dr. Agus Canny" })).toHaveCount(0);
+  await agus.click();
   await speakers.getByRole("button", { name: "Lihat CV Dr. Agus Canny", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "CV Dr. Agus Canny" });
   const pages = viewer.getByRole("img", { name: /^Dr\. Agus Canny, halaman \d+ dari 9$/ });
@@ -136,7 +147,10 @@ test("an admin uploads the rundown, a speaker's CV and profile picture, and a ma
   const speakers = guide.getByRole("list", { name: "Narasumber" }).getByRole("listitem");
   await expect(speakers).toHaveCount(9);
   await expect(speakers.nth(7)).toContainText("Budi Narasumber");
-  await expect(speakers.nth(7)).toContainText("3 halaman");
+  await speakers.nth(7).getByRole("button", { name: /^Budi Narasumber/ }).click();
+  await speakers.nth(7).getByRole("button", { name: "Lihat CV Budi Narasumber" }).click();
+  await expect(page.getByRole("dialog", { name: "CV Budi Narasumber" }).getByRole("img", { name: /^Budi Narasumber, halaman \d dari 3$/ })).toHaveCount(3);
+  await page.keyboard.press("Escape");
   await expect(guide.getByRole("link", { name: "Unduh Paparan narasumber" })).toHaveAttribute("href", /guestbook-event\/materials\/.+\.pdf\?download=paparan\.pdf$/);
   expect(await download(page, "Unduh Paparan narasumber")).toEqual({ name: "paparan.pdf", head: "%PDF-" });
 
@@ -166,12 +180,11 @@ test("the opening popup shows the speakers the admin saved", async ({ page }) =>
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const popup = page.getByRole("dialog", { name: "Informasi acara" });
-  // After the two opening pictures.
-  await popup.getByRole("button", { name: "Slide berikutnya" }).click();
+  // After the opening banner.
   await popup.getByRole("button", { name: "Slide berikutnya" }).click();
   await expect(popup.getByRole("heading", { name: "Sari Narasumber" })).toBeInViewport();
   await expect(popup.getByRole("img", { name: "Profil Sari Narasumber" })).toHaveAttribute("src", /guestbook-event\/profiles\/s\.jpg$/);
-  await expect(popup.getByRole("region", { name: /^Slide \d dari 4$/ })).toHaveCount(4);
+  await expect(popup.getByRole("region", { name: /^Slide \d dari 2$/ })).toHaveCount(2);
   await finishIntro(page);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
@@ -198,4 +211,28 @@ test("when the settings cannot be loaded the opening popup shows the built-in sp
   await page.goto("/");
   // TanStack Query retries for several seconds; the popup must not appear later over a half-filled form.
   await expect(page.getByRole("dialog", { name: "Informasi acara" }).getByRole("heading", { name: "Dr. Agus Canny" })).toBeVisible({ timeout: 900 });
+});
+
+test("closing a CV leaves the page where the attendee was, with focus back on Lihat CV", async ({ page }) => {
+  await installSupabaseStub(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await fillForm(page);
+  await page.getByRole("button", { name: "Kirim", exact: true }).click();
+  await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
+  const list = page.getByRole("list", { name: "Narasumber" });
+  await list.getByRole("button", { name: /^Indra Hardianto/ }).click();
+  const cv = list.getByRole("button", { name: "Lihat CV Indra Hardianto" });
+  await cv.scrollIntoViewIfNeeded();
+  // The page scrolls inside its own container, not the window.
+  const scrolled = () => page.evaluate(() => Math.max(...Array.from(document.querySelectorAll("div")).map((el) => el.scrollTop)));
+  const before = await scrolled();
+  expect(before).toBeGreaterThan(500);
+  await cv.click();
+  await expect(page.getByRole("dialog", { name: "CV Indra Hardianto" })).toBeVisible();
+  expect(await scrolled()).toBe(before);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "CV Indra Hardianto" })).toHaveCount(0);
+  expect(await scrolled()).toBe(before);
+  await expect(cv).toBeFocused();
 });

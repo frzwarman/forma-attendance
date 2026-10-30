@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { checkInSchemaFor, splitAnswers } from "./checkin";
+import { checkInSchemaFor, sampleCheckIn, splitAnswers } from "./checkin";
 import { BUILTIN_FIELDS, type FormField } from "./formFields";
 
 const valid = {
@@ -47,4 +47,15 @@ it("stores Divisi and the room in their columns and other answers under their la
     room_number: "",
     answers: { "Ukuran kaos": "M" },
   });
+});
+
+it("makes up a valid, never-duplicate check-in for the questions on the form", () => {
+  const fields = [BUILTIN_FIELDS.divisi, shirt, origin, BUILTIN_FIELDS.room_number];
+  const one = sampleCheckIn(fields, 1761800000123);
+  assert.equal(checkInSchemaFor(fields).safeParse(one).success, true);
+  assert.equal(one.answers.f_kaos, "S");
+  assert.match(one.email, /@example\.com$/);
+  const other = sampleCheckIn(fields, 1761800000999);
+  assert.notEqual(other.phone, one.phone);
+  assert.notEqual(other.email, one.email);
 });

@@ -7,7 +7,7 @@ import { CheckIn } from "../features/CheckIn";
 import { CheckOut } from "../features/CheckOut";
 import { EventGuide } from "../features/EventGuide";
 import { EventIntro } from "../features/intro/EventIntro";
-import { EventSlides } from "../features/intro/EventSlides";
+import { OPENING } from "../features/intro/slides";
 import { ThankYou, type CheckInDetails } from "../features/ThankYou";
 import { rememberCheckIn, storedCheckIns } from "../services/checkout";
 import { useFormFields } from "../services/settings";
@@ -60,7 +60,14 @@ export default function Index() {
                   aria-label="Informasi acara"
                   style={{ borderRadius: 16, overflow: "hidden", backgroundColor: c.surface, boxShadow: c.shadow }}
                 >
-                  <EventSlides wide={false} />
+                  {/* The banner from the opening popup's first slide. */}
+                  <img
+                    src={OPENING[0].src()}
+                    width={OPENING[0].width}
+                    height={OPENING[0].height}
+                    alt={OPENING[0].alt}
+                    style={{ display: "block", width: "100%", height: "auto" }}
+                  />
                 </section>
                 <EventGuide />
               </>

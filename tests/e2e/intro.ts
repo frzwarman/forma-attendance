@@ -3,17 +3,23 @@ import { expect, type Page } from "@playwright/test";
 // The opening popup can only be left from its last slide: page through, then tap Mulai check-in.
 export async function finishIntro(page: Page) {
   const dialog = page.getByRole("dialog", { name: "Informasi acara" });
-  const next = dialog.getByRole("button", { name: "Slide berikutnya" });
-  await expect(next).toBeVisible();
   const track = dialog.locator(".intro-track");
-  const atEnd = () => track.evaluate((el) => el.scrollLeft >= el.scrollWidth - el.clientWidth - 1);
-  while (!(await atEnd())) {
-    const before = await track.evaluate((el) => el.scrollLeft);
+  const next = dialog.getByRole("button", { name: "Slide berikutnya" });
+  const start = dialog.getByRole("button", { name: "Mulai check-in", exact: true });
+  // Not mid-scroll: on a slide boundary and still there a moment later. A tap sent while a slide
+  // change is under way can hit the next arrow just as Mulai check-in replaces it.
+  const settled = () =>
+    track.evaluate(async (el) => {
+      const at = el.scrollLeft;
+      await new Promise((done) => setTimeout(done, 150));
+      return el.scrollLeft === at && Math.abs(at / el.clientWidth - Math.round(at / el.clientWidth)) < 0.01;
+    });
+  await expect(dialog).toBeVisible();
+  for (;;) {
+    await expect.poll(settled).toBe(true);
+    if (await start.isVisible()) break;
     await next.click();
-    // Wait until the slide has arrived, so the last tap is not sent while the arrow is being disabled.
-    await expect.poll(() => track.evaluate((el, from) => el.scrollLeft - from >= el.clientWidth - 1, before)).toBe(true);
   }
-  await expect(next).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Mulai check-in", exact: true }).click();
+  await start.click();
   await expect(dialog).toHaveCount(0);
 }

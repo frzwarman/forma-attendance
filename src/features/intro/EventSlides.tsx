@@ -2,14 +2,13 @@ import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNod
 import { ChevronLeft, ChevronRight } from "../../components/icons";
 import type { Speaker } from "../../domain/eventContent";
 import { FONT_STACK, useTheme } from "../../theme";
-import { CLOSING, OPENING, type SlidePicture } from "./slides";
+import { OPENING, type SlidePicture } from "./slides";
 
 type Picture = { src: string; width: number; height: number; alt: string };
 
-// The event information carousel: swipe, arrows, dots, and arrow keys once focused.
-// In the opening popup: the pictures in ./slides.ts, then the speakers, one per slide
-// with the name-and-photo part of their CV, then the closing picture. After check-in
-// the page shows the closing picture alone.
+// The opening popup's carousel: swipe, arrows, dots, and arrow keys once focused. The
+// pictures in ./slides.ts, then the speakers, one per slide with the name-and-photo part
+// of their CV; the action (Mulai check-in) comes with the last one.
 //
 // Every slide gets the same height, so the centred popup keeps its size and the arrows stay
 // put: when it resized to each slide, they jumped under the finger and the next tap missed.
@@ -17,14 +16,11 @@ export function EventSlides({
   wide,
   action,
   speakers = [],
-  opening = false,
 }: {
   wide: boolean;
   // Takes the place of the counter and the next arrow on the last slide, e.g. Mulai check-in.
   action?: ReactNode;
   speakers?: Speaker[];
-  // Starts with the opening pictures (the opening popup).
-  opening?: boolean;
 }) {
   const c = useTheme();
   const [index, setIndex] = useState(0);
@@ -34,10 +30,9 @@ export function EventSlides({
   // The slide an arrow tap is heading to. A second quick tap counts on from there, not from the slide
   // still on screen while the first one scrolls (which would turn two taps into one step).
   const aim = useRef<number | null>(null);
-  const pictures = opening ? OPENING : [];
+  const pictures = OPENING;
   const first = pictures.length;
-  const count = first + speakers.length + 1;
-  const carousel = count > 1;
+  const count = first + speakers.length;
   const last = index === count - 1;
   const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -79,24 +74,20 @@ export function EventSlides({
   };
   const pad = wide ? 32 : 20;
 
-  // In the carousel a picture fits inside its slide whole; alone (after check-in) it takes its own height.
-  const show = (picture: Picture, style: CSSProperties) =>
-    carousel ? (
-      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        <img {...picture} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
-      </div>
-    ) : (
-      <img {...picture} style={{ display: "block", ...style }} />
-    );
+  // A picture fits inside its slide whole.
+  const show = (picture: Picture) => (
+    <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+      <img {...picture} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" }} />
+    </div>
+  );
   const pictureSlide = (picture: SlidePicture, n: number) => (
     <section
       key={picture.alt}
       aria-roledescription="slide"
       aria-label={`Slide ${n + 1} dari ${count}`}
-      // Edge to edge in the popup; alone on the page (after check-in) it is framed like a card picture.
-      style={carousel ? { ...slide, position: "relative", overflow: "hidden", backgroundColor: c.background } : { ...slide, padding: pad }}
+      style={{ ...slide, position: "relative", overflow: "hidden", backgroundColor: c.background }}
     >
-      {loaded.has(n) && carousel && (
+      {loaded.has(n) && (
         // The room around a wide picture filled with a blurred, darkened copy of it rather than empty bands.
         <img
           src={picture.src()}
@@ -105,8 +96,7 @@ export function EventSlides({
           style={{ position: "absolute", inset: -24, width: "calc(100% + 48px)", height: "calc(100% + 48px)", objectFit: "cover", filter: "blur(18px) brightness(0.55)" }}
         />
       )}
-      {loaded.has(n) &&
-        show({ src: picture.src(), width: picture.width, height: picture.height, alt: picture.alt }, { width: "100%", height: "auto", borderRadius: 8, border: `1px solid ${c.border}` })}
+      {loaded.has(n) && show({ src: picture.src(), width: picture.width, height: picture.height, alt: picture.alt })}
     </section>
   );
 
@@ -125,8 +115,8 @@ export function EventSlides({
           overflowY: "hidden",
           scrollSnapType: "x mandatory",
           flexShrink: 0,
-          // Short enough for the arrows below on small phones; the after-check-in picture takes its own height.
-          height: carousel ? (wide ? "min(480px, calc(100dvh - 220px))" : "min(380px, calc(100dvh - 200px))") : undefined,
+          // Short enough for the arrows below on small phones.
+          height: wide ? "min(480px, calc(100dvh - 220px))" : "min(380px, calc(100dvh - 200px))",
         }}
       >
         {pictures.map((picture, i) => pictureSlide(picture, i))}
@@ -140,51 +130,48 @@ export function EventSlides({
             </div>
             {/* Only the name-and-photo part of the CV, fitted into the rest of the slide. */}
             <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: `4px ${pad}px 12px` }}>
-              {loaded.has(first + i) && show({ ...speaker.profile, alt: `Profil ${speaker.title}` }, {})}
+              {loaded.has(first + i) && show({ ...speaker.profile, alt: `Profil ${speaker.title}` })}
             </div>
           </section>
         ))}
-        {pictureSlide(CLOSING, count - 1)}
       </div>
-      {carousel && (
-        // minHeight: the row is as tall on every slide, including the last with its bigger button.
-        <div style={{ padding: wide ? "16px 32px 24px" : "14px 20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 54 }}>
-          <button type="button" aria-label="Slide sebelumnya" aria-disabled={index === 0} onClick={() => step(-1)} style={{ ...round, opacity: index === 0 ? 0.35 : 1 }}>
-            <ChevronLeft size={20} color={c.text} />
-          </button>
-          {last && action ? (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>{action}</div>
-          ) : (
-            <>
-              {/* A dot per speaker no longer fits beside the arrows on a phone, so it counts instead. */}
-              {!wide ? (
-                <p aria-live="polite" style={{ margin: 0, fontFamily: FONT_STACK, fontSize: 14, color: c.muted }}>
-                  {index + 1} dari {count}
-                </p>
-              ) : (
-                <div style={{ display: "flex", gap: 2 }}>
-                  {Array.from({ length: count }, (_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      aria-label={`Ke slide ${i + 1}`}
-                      aria-current={i === index ? "true" : undefined}
-                      onClick={() => go(i)}
-                      style={{ width: 24, height: 24, padding: 0, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                    >
-                      <span style={{ display: "block", height: 8, width: i === index ? 20 : 8, borderRadius: 999, backgroundColor: i === index ? c.accent : c.border, transition: "width 200ms ease" }} />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {/* aria-disabled, not disabled: a disabled button drops focus out of the popup. */}
-              <button type="button" aria-label="Slide berikutnya" aria-disabled={last} onClick={() => step(1)} style={{ ...round, opacity: last ? 0.35 : 1 }}>
-                <ChevronRight size={20} color={c.text} />
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      {/* minHeight: the row is as tall on every slide, including the last with its bigger button. */}
+      <div style={{ padding: wide ? "16px 32px 24px" : "14px 20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 54 }}>
+        <button type="button" aria-label="Slide sebelumnya" aria-disabled={index === 0} onClick={() => step(-1)} style={{ ...round, opacity: index === 0 ? 0.35 : 1 }}>
+          <ChevronLeft size={20} color={c.text} />
+        </button>
+        {last && action ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>{action}</div>
+        ) : (
+          <>
+            {/* A dot per speaker no longer fits beside the arrows on a phone, so it counts instead. */}
+            {!wide ? (
+              <p aria-live="polite" style={{ margin: 0, fontFamily: FONT_STACK, fontSize: 14, color: c.muted }}>
+                {index + 1} dari {count}
+              </p>
+            ) : (
+              <div style={{ display: "flex", gap: 2 }}>
+                {Array.from({ length: count }, (_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Ke slide ${i + 1}`}
+                    aria-current={i === index ? "true" : undefined}
+                    onClick={() => go(i)}
+                    style={{ width: 24, height: 24, padding: 0, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                  >
+                    <span style={{ display: "block", height: 8, width: i === index ? 20 : 8, borderRadius: 999, backgroundColor: i === index ? c.accent : c.border, transition: "width 200ms ease" }} />
+                  </button>
+                ))}
+              </div>
+            )}
+            {/* aria-disabled, not disabled: a disabled button drops focus out of the popup. */}
+            <button type="button" aria-label="Slide berikutnya" aria-disabled={last} onClick={() => step(1)} style={{ ...round, opacity: last ? 0.35 : 1 }}>
+              <ChevronRight size={20} color={c.text} />
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

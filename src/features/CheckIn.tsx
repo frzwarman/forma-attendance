@@ -2,9 +2,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { TextInput, View, useWindowDimensions } from "react-native";
+import { Wand } from "../components/icons";
 import { SelectInput } from "../components/NativeInput";
 import { Button, Card, Divider, Field, SectionTitle, T } from "../components/ui";
-import { checkInSchemaFor, type CheckInInput } from "../domain/checkin";
+import { checkInSchemaFor, sampleCheckIn, type CheckInInput } from "../domain/checkin";
 import { maxLength, type Builtin, type FormField } from "../domain/formFields";
 import { formatWib } from "../domain/time";
 import { submitCheckIn } from "../services/checkins";
@@ -27,6 +28,7 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
   const {
     control,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<CheckInInput>({
     resolver: zodResolver(checkInSchemaFor(fields)),
@@ -164,6 +166,10 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
         <T accessibilityRole="alert" color={c.danger}>
           {error}
         </T>
+      )}
+      {/* Only when the page is opened on localhost: fills the form to save time while trying it out. */}
+      {typeof location !== "undefined" && location.hostname === "localhost" && (
+        <Button variant="secondary" small icon={Wand} label="Isi otomatis (localhost)" disabled={isSubmitting} onPress={() => reset(sampleCheckIn(fields))} />
       )}
       <View style={{ marginTop: 4 }}>
         <Button
