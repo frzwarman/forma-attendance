@@ -2,13 +2,13 @@ import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNod
 import { ChevronLeft, ChevronRight } from "../../components/icons";
 import type { Speaker } from "../../domain/eventContent";
 import { FONT_STACK, useTheme } from "../../theme";
-import { OPENING, type SlidePicture } from "./slides";
+import { CLOSING, OPENING, type SlidePicture } from "./slides";
 
 type Picture = { src: string; width: number; height: number; alt: string };
 
 // The opening popup's carousel: swipe, arrows, dots, and arrow keys once focused. The
-// pictures in ./slides.ts, then the speakers, one per slide with the name-and-photo part
-// of their CV; the action (Mulai check-in) comes with the last one.
+// opening pictures in ./slides.ts, then the speakers, one per slide with the name-and-photo
+// part of their CV, then the closing picture, which comes with the action (Mulai check-in).
 //
 // Every slide gets the same height, so the centred popup keeps its size and the arrows stay
 // put: when it resized to each slide, they jumped under the finger and the next tap missed.
@@ -32,7 +32,7 @@ export function EventSlides({
   const aim = useRef<number | null>(null);
   const pictures = OPENING;
   const first = pictures.length;
-  const count = first + speakers.length;
+  const count = first + speakers.length + 1;
   const last = index === count - 1;
   const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -134,6 +134,7 @@ export function EventSlides({
             </div>
           </section>
         ))}
+        {pictureSlide(CLOSING, count - 1)}
       </div>
       {/* minHeight: the row is as tall on every slide, including the last with its bigger button. */}
       <div style={{ padding: wide ? "16px 32px 24px" : "14px 20px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 54 }}>

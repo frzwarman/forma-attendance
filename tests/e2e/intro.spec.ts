@@ -8,13 +8,13 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
   await page.goto("/");
   const dialog = page.getByRole("dialog", { name: "Informasi acara" });
   await expect(dialog).toBeVisible();
-  // The banner first, then the speakers, each with only the name-and-photo part of their CV;
-  // no picture after them.
+  // The banner first, then the speakers, each with only the name-and-photo part of their CV,
+  // then the list of materials.
   const loadedWidth = (image: ReturnType<typeof dialog.getByRole>) => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth);
   const opening = dialog.getByRole("img", { name: /Jakarta, 1 - 6 November 2026\. Bersama rakyat awasi pemilu/ });
   await expect(opening).toBeInViewport({ ratio: 0.9 });
   await expect.poll(() => loadedWidth(opening)).toBe(960);
-  await expect(dialog.getByText("1 dari 10", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("1 dari 11", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("img", { name: /halaman/ })).toHaveCount(0);
   // No way out before the last slide: no close button, and Mulai check-in waits there.
   await expect(dialog.getByRole("button", { name: "Tutup" })).toHaveCount(0);
@@ -33,23 +33,24 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
   await next.click();
   await expect(dialog.getByRole("heading", { name: "Dr. Agus Canny" })).toBeInViewport();
   await expect(dialog.getByRole("img", { name: "Profil Dr. Agus Canny" })).toBeInViewport();
-  await expect(dialog.getByText("2 dari 10", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("2 dari 11", { exact: true })).toBeVisible();
   await stayed();
   // On a phone the arrows stay inside the popup.
   expect(arrowsAt[1].x + 44).toBeLessThanOrEqual((await dialog.boundingBox())!.x + (await dialog.boundingBox())!.width);
-  for (let slide = 3; slide <= 9; slide++) {
+  for (let slide = 3; slide <= 10; slide++) {
     await next.click();
-    await expect(dialog.getByText(`${slide} dari 10`, { exact: true })).toBeVisible();
+    await expect(dialog.getByText(`${slide} dari 11`, { exact: true })).toBeVisible();
     await stayed();
   }
   await next.click();
   await stayed();
-  // The last speaker is the last slide, and Mulai check-in takes the place of the counter and the next arrow.
-  await expect(dialog.getByRole("heading", { name: "Tim Positium" })).toBeInViewport();
-  await expect(dialog.getByRole("img", { name: /Grand Sahid Jaya Hotel/ })).toHaveCount(0);
+  // The materials picture closes the slideshow, and Mulai check-in takes the place of the counter and the next arrow.
+  const closing = dialog.getByRole("img", { name: /^Materi\. Sentinel 1: Sistem Data Posisi Seluler \(SDPS\)/ });
+  await expect(closing).toBeInViewport({ ratio: 0.9 });
+  await expect.poll(() => loadedWidth(closing)).toBe(1400);
   await expect(dialog.getByRole("button", { name: "Mulai check-in", exact: true })).toBeInViewport();
   await expect(next).toHaveCount(0);
-  await expect(dialog.getByText("10 dari 10", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("11 dari 11", { exact: true })).toHaveCount(0);
   // The last slide lines up with the popup instead of stopping short of it.
   await expect
     .poll(() => dialog.locator(".intro-track").evaluate((el) => el.scrollWidth - el.clientWidth - el.scrollLeft))
@@ -97,10 +98,10 @@ test("on a laptop screen the slides share one height, so the arrows stay put", a
   await expect(next).toBeVisible();
   await page.waitForTimeout(500); // the popup's opening animation
   const at = (await previous.boundingBox())!;
-  for (let slide = 2; slide <= 10; slide++) {
+  for (let slide = 2; slide <= 11; slide++) {
     await next.click();
     // On the last slide Mulai check-in takes the place of the dots.
-    if (slide < 10) await expect(dialog.getByRole("button", { name: `Ke slide ${slide}` })).toHaveAttribute("aria-current", "true");
+    if (slide < 11) await expect(dialog.getByRole("button", { name: `Ke slide ${slide}` })).toHaveAttribute("aria-current", "true");
     await page.waitForTimeout(400);
     const box = (await previous.boundingBox())!;
     expect([box.x, box.y], `slide ${slide}`).toEqual([at.x, at.y]);

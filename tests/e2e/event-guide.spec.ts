@@ -184,7 +184,7 @@ test("the opening popup shows the speakers the admin saved", async ({ page }) =>
   await popup.getByRole("button", { name: "Slide berikutnya" }).click();
   await expect(popup.getByRole("heading", { name: "Sari Narasumber" })).toBeInViewport();
   await expect(popup.getByRole("img", { name: "Profil Sari Narasumber" })).toHaveAttribute("src", /guestbook-event\/profiles\/s\.jpg$/);
-  await expect(popup.getByRole("region", { name: /^Slide \d dari 2$/ })).toHaveCount(2);
+  await expect(popup.getByRole("region", { name: /^Slide \d dari 3$/ })).toHaveCount(3);
   await finishIntro(page);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
