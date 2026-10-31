@@ -1,14 +1,19 @@
+import { formatWib } from "../domain/time";
 import { callFunction } from "./rest";
 
 // Check-ins made on this phone, so the attendee can check out with one tap later.
 const KEY = "guestbook.checkouts";
 export type StoredCheckIn = { token: string; name: string; at: string };
 
+// Today's only (WIB date): the database checks everyone out at the end of each day, so the phone
+// starts the next day on the form.
+const sameDay = (at: string) => formatWib(at).slice(0, 10) === formatWib(new Date().toISOString()).slice(0, 10);
+
 export function storedCheckIns(): StoredCheckIn[] {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) || "[]");
     return Array.isArray(value)
-      ? value.filter((entry) => typeof entry?.token === "string" && typeof entry?.name === "string" && typeof entry?.at === "string")
+      ? value.filter((entry) => typeof entry?.token === "string" && typeof entry?.name === "string" && typeof entry?.at === "string" && sameDay(entry.at))
       : [];
   } catch {
     return [];

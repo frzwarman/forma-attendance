@@ -69,11 +69,24 @@ test("the slideshow does not open again for an attendee returning to check out",
 test("an unknown check-out code is explained and can be removed from the phone", async ({ page }) => {
   await installSupabaseStub(page);
   await page.addInitScript(() =>
-    localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "unknown-code", name: "Budi Santoso", at: "2026-10-26T03:05:00Z" }])),
+    localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "unknown-code", name: "Budi Santoso", at: new Date().toISOString() }])),
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Kode check-out tidak dikenal");
   await page.getByRole("button", { name: "Hapus dari HP ini", exact: true }).click();
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
+});
+
+test("a check-in from an earlier day is forgotten: the next day starts on the form", async ({ page }) => {
+  await installSupabaseStub(page);
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "guestbook.checkouts",
+      JSON.stringify([{ token: "kemarin", name: "Budi Santoso", at: new Date(Date.now() - 36 * 3600 * 1000).toISOString() }]),
+    ),
+  );
+  await page.goto("/");
+  await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
 });

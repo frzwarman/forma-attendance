@@ -138,7 +138,7 @@ test("an admin uploads the rundown, a speaker's CV and profile picture, and a ma
   expect(saved.speakers.map((s) => s.name).slice(-2)).toEqual(["Budi Narasumber", "Karen Grace Sutoto"]);
 
   await page.evaluate(() =>
-    localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at: "2026-11-02T03:05:00Z" }])),
+    localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at: new Date().toISOString() }])),
   );
   await page.goto("/");
   const guide = page.getByRole("region", { name: "Panduan acara" });

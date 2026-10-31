@@ -485,3 +485,20 @@ test("check-ins are copied to the Google Sheet: added, updated, deleted, and not
       delete from private.guestbook_sheet;`);
   }
 });
+
+test("every night at 23:59 WIB everyone still checked in is checked out, and the next check-in starts a new visit", async () => {
+  const job = (await db.query("select schedule, command from cron.jobs where name = 'guestbook-auto-check-out'")).rows[0];
+  assert.deepEqual(job, { schedule: "59 16 * * *", command: "select private.guestbook_auto_check_out()" });
+  await assert.rejects(() => asUser(id(1), () => db.query("select private.guestbook_auto_check_out()")), /permission denied/);
+  const lupa = { name: "Lupa Checkout", phone: "0899 1100 2200", email: "lupa@example.test", in: null, out: null };
+  await asRole(null, "anon", () => checkIn(lupa));
+  const open = (await db.query("select count(*)::int as n from public.guestbook_checkins where checked_out_at is null")).rows[0].n;
+  assert.ok(open >= 1);
+  assert.equal((await db.query("select private.guestbook_auto_check_out() as n")).rows[0].n, open);
+  assert.equal((await db.query("select count(*)::int as n from public.guestbook_checkins where checked_out_at is null")).rows[0].n, 0);
+  // Next morning: welcomed, present again, with a code to check out.
+  const next = await asRole(null, "anon", () => checkIn(lupa));
+  assert.equal(next.status, "returning");
+  assert.ok(next.checkout_token);
+  assert.equal((await db.query("select checked_out_at from public.guestbook_checkins where email = 'lupa@example.test'")).rows[0].checked_out_at, null);
+});

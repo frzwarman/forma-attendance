@@ -34,11 +34,17 @@ export async function guestbookDatabase() {
     create table net.sent (id bigserial primary key, url text, body jsonb);
     create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 5000)
     returns bigint language sql as $$ insert into net.sent (url, body) values (url, body) returning id $$;
+    -- pg_cron: schedule only records the job, here in cron.jobs.
+    create schema cron;
+    create table cron.jobs (name text primary key, schedule text, command text);
+    create function cron.schedule(name text, schedule text, command text) returns bigint language sql as $$
+      insert into cron.jobs values (name, schedule, command) on conflict (name) do update set schedule = excluded.schedule, command = excluded.command returning 1::bigint
+    $$;
   `);
   const files = (await readdir(migrations)).filter((name) => /^\d+_guestbook.*\.sql$/.test(name)).sort();
   for (const name of files) {
-    // PGlite has no pg_net extension; the stand-in above takes its place.
-    const sql = (await readFile(new URL(name, migrations), "utf8")).replace("create extension if not exists pg_net with schema extensions;", "");
+    // PGlite has no pg_net or pg_cron extension; the stand-ins above take their place.
+    const sql = (await readFile(new URL(name, migrations), "utf8")).replace(/create extension if not exists pg_(net|cron) [^;]*;/g, "");
     await db.exec(sql);
   }
   return db;
