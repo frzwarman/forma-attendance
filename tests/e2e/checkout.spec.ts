@@ -18,11 +18,20 @@ test("a returning attendee checks out with one tap on the same phone", async ({ 
   await expect(page.getByText(/Budi Santoso/)).toBeVisible();
   await expect(page.getByLabel("Nama", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Sampai jumpa, Budi Santoso!" })).toBeVisible();
-  await expect(page.getByText(/Check-out tercatat pada \d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB/)).toBeVisible();
+  // A popup, over the registration form the page went back to (from the top).
+  const popup = page.getByRole("dialog", { name: "Check-out berhasil" });
+  await expect(popup.getByRole("heading", { name: "Sampai jumpa, Budi Santoso!" })).toBeVisible();
+  await expect(popup.getByText(/Check-out tercatat pada \d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB/)).toBeVisible();
   expect(state.checkins[0].checked_out_at).toBeTruthy();
+  await popup.getByRole("button", { name: "Selesai", exact: true }).click();
+  await expect(popup).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: /Sampai jumpa/ })).toHaveCount(0);
+  await expect(page.getByLabel("Nama", { exact: true })).toBeInViewport();
+  await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Buku Tamu" })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Sampai jumpa/ })).toHaveCount(0);
 });
 
 test("checked out after the morning session, the attendee checks in again and can check out again", async ({ page }) => {
@@ -32,8 +41,7 @@ test("checked out after the morning session, the attendee checks in again and ca
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
   await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Sampai jumpa, Budi Santoso!" })).toBeVisible();
-  await page.reload();
+  await page.getByRole("dialog", { name: "Check-out berhasil" }).getByRole("button", { name: "Selesai", exact: true }).click();
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByText(/Saat pulang, buka tautan ini lagi/)).toBeVisible();
@@ -41,7 +49,7 @@ test("checked out after the morning session, the attendee checks in again and ca
   expect(state.checkins).toHaveLength(1);
   expect(state.checkins[0].checked_out_at).toBeNull();
   await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
-  await expect(page.getByText(/^Check-out tercatat pada/)).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Check-out berhasil" }).getByText(/^Check-out tercatat pada/)).toBeVisible();
   expect(state.checkins[0].checked_out_at).toBeTruthy();
 });
 

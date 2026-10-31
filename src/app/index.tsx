@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { View } from "react-native";
+import { useRef, useState, type ComponentRef } from "react";
+import { ScrollView, View } from "react-native";
 import { Backdrop, EventHeader } from "../components/Brand";
 import { Card, T } from "../components/ui";
 import { WhatsAppHelp } from "../components/WhatsAppHelp";
 import { CheckIn } from "../features/CheckIn";
-import { CheckOut } from "../features/CheckOut";
+import { CheckOut, Goodbye, type CheckedOut } from "../features/CheckOut";
 import { EventGuide } from "../features/EventGuide";
 import { EventIntro } from "../features/intro/EventIntro";
 import { OPENING } from "../features/intro/slides";
@@ -20,6 +20,10 @@ export default function Index() {
   const [entries, setEntries] = useState(storedCheckIns);
   const [view, setView] = useState<"form" | "checkedIn">(entries.length ? "checkedIn" : "form");
   const [thanks, setThanks] = useState<CheckInDetails>();
+  const [goodbye, setGoodbye] = useState<CheckedOut>();
+  // The page changes under a button near the bottom (Kirim, Check out): start the new one at the top.
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const toTop = () => scroll.current?.scrollTo({ y: 0, animated: false });
   const fields = useFormFields();
 
   function checkedIn(details: CheckInDetails) {
@@ -27,12 +31,14 @@ export default function Index() {
     else refreshCheckIn(details.name, details.at);
     setEntries(storedCheckIns());
     setView("checkedIn");
+    setGoodbye(undefined);
     setThanks(details);
+    toTop();
   }
 
   return (
     <>
-      <Backdrop>
+      <Backdrop scrollRef={scroll}>
         <View style={{ paddingHorizontal: 20, paddingTop: 36, paddingBottom: 104 }}>
           <View style={{ width: "100%", maxWidth: 560, alignSelf: "center", gap: 28 }}>
             <EventHeader title={view === "checkedIn" ? "Informasi acara" : undefined} />
@@ -51,9 +57,11 @@ export default function Index() {
                   <CheckOut
                     key={entries.map((entry) => entry.token).join()}
                     entries={entries}
+                    onCheckedOut={setGoodbye}
                     onEmpty={() => {
                       setEntries([]);
                       setView("form");
+                      toTop();
                     }}
                   />
                 )}
@@ -82,6 +90,7 @@ export default function Index() {
       <WhatsAppHelp />
       <EventIntro />
       {thanks && <ThankYou details={thanks} onClose={() => setThanks(undefined)} />}
+      {goodbye && <Goodbye done={goodbye} onClose={() => setGoodbye(undefined)} />}
     </>
   );
 }

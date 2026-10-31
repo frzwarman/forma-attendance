@@ -28,6 +28,8 @@ test("an attendee checks in, sees a thank-you popup, then the event information 
   expect(state.checkins[0].phone).toBe("0812 1111 2222");
   await popup.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
   await expect(popup).toHaveCount(0);
+  // The page starts at the top, not where the Kirim button was.
+  await expect(page.getByRole("heading", { name: "Informasi acara", exact: true })).toBeInViewport();
   const info = page.getByRole("region", { name: "Informasi acara" });
   await expect(info).toBeVisible();
   // The opening popup's banner as a plain picture, no slides.

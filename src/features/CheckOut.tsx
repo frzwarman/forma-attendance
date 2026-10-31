@@ -1,17 +1,51 @@
 import { useState } from "react";
 import { View } from "react-native";
+import { CircleCheck } from "../components/icons";
+import { Modal } from "../components/Modal";
 import { Button, Card, Row, T } from "../components/ui";
 import { formatWib } from "../domain/time";
 import { checkOut, forgetCheckIn, type StoredCheckIn } from "../services/checkout";
 import { useTheme } from "../theme";
 
-// Shown instead of the form when this phone holds a check-in that has not checked out.
-export function CheckOut({ entries, onEmpty }: { entries: StoredCheckIn[]; onEmpty: () => void }) {
+export type CheckedOut = { name: string; at: string; already: boolean };
+
+// Popup after a check-out, like the thank-you one after a check-in.
+export function Goodbye({ done, onClose }: { done: CheckedOut; onClose: () => void }) {
+  const c = useTheme();
+  return (
+    <Modal label="Check-out berhasil" maxWidth={440} onClose={onClose}>
+      <View style={{ padding: 24, paddingTop: 28, gap: 18 }}>
+        <CircleCheck size={48} color={c.success} strokeWidth={2} />
+        <View style={{ gap: 6 }}>
+          <T size={26} weight="extra" accessibilityRole="header">
+            Sampai jumpa, {done.name}!
+          </T>
+          <T color={c.muted}>
+            {done.already ? "Check-out sudah tercatat" : "Check-out tercatat"} pada {formatWib(done.at)}. Terima kasih atas kehadiran Anda.
+          </T>
+        </View>
+        <Button large label="Selesai" onPress={onClose} />
+      </View>
+    </Modal>
+  );
+}
+
+// Shown instead of the form when this phone holds a check-in that has not checked out. Each
+// check-out goes to onCheckedOut (the popup); once none is left, onEmpty takes the page back to
+// the form, for the next session.
+export function CheckOut({
+  entries,
+  onCheckedOut,
+  onEmpty,
+}: {
+  entries: StoredCheckIn[];
+  onCheckedOut: (done: CheckedOut) => void;
+  onEmpty: () => void;
+}) {
   const c = useTheme();
   const [pending, setPending] = useState<StoredCheckIn[]>(entries);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState<{ token: string; message: string }>();
-  const [done, setDone] = useState<{ name: string; at: string; already: boolean }>();
 
   async function submit(entry: StoredCheckIn) {
     if (busy) return;
@@ -20,8 +54,10 @@ export function CheckOut({ entries, onEmpty }: { entries: StoredCheckIn[]; onEmp
     try {
       const result = await checkOut(entry.token);
       forgetCheckIn(entry.token);
-      setPending((list) => list.filter((item) => item.token !== entry.token));
-      setDone({ name: result.name, at: result.checked_out_at, already: result.status === "already" });
+      onCheckedOut({ name: result.name, at: result.checked_out_at, already: result.status === "already" });
+      const rest = pending.filter((item) => item.token !== entry.token);
+      if (!rest.length) return onEmpty();
+      setPending(rest);
     } catch (cause) {
       setError({ token: entry.token, message: (cause as Error).message });
     } finally {
@@ -34,21 +70,11 @@ export function CheckOut({ entries, onEmpty }: { entries: StoredCheckIn[]; onEmp
     setError(undefined);
     const rest = pending.filter((item) => item.token !== token);
     setPending(rest);
-    if (!rest.length && !done) onEmpty();
+    if (!rest.length) onEmpty();
   }
 
   return (
     <Card elevated style={{ gap: 18 }}>
-      {done && (
-        <View style={{ gap: 6 }}>
-          <T size={26} weight="extra" accessibilityRole="header">
-            Sampai jumpa, {done.name}!
-          </T>
-          <T color={c.muted}>
-            {done.already ? "Check-out sudah tercatat" : "Check-out tercatat"} pada {formatWib(done.at)}. Terima kasih atas kehadiran Anda.
-          </T>
-        </View>
-      )}
       {pending.length > 0 && (
         <View style={{ gap: 14 }}>
           <T size={22} weight="extra" accessibilityRole="header">

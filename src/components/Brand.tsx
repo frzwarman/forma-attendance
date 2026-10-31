@@ -1,5 +1,5 @@
 import { Asset } from "expo-asset";
-import type { ReactNode } from "react";
+import type { ComponentRef, ReactNode, RefObject } from "react";
 import { ScrollView, View, useWindowDimensions } from "react-native";
 import { brandImageUrl, useSettings } from "../services/settings";
 import { useTheme } from "../theme";
@@ -19,7 +19,8 @@ export function useBrandBackground() {
 }
 
 // The site is web only, so the backdrop and logo are plain DOM elements.
-export function Backdrop({ children }: { children: ReactNode }) {
+// scrollRef: the page's scroller, e.g. to go back to the top.
+export function Backdrop({ children, scrollRef }: { children: ReactNode; scrollRef?: RefObject<ComponentRef<typeof ScrollView> | null> }) {
   const c = useTheme();
   const { settings } = useSettings();
   const image = brandImageUrl(settings.background_path) ?? bundledUri(bundled.background);
@@ -40,7 +41,7 @@ export function Backdrop({ children }: { children: ReactNode }) {
           backgroundRepeat: "no-repeat",
         }}
       />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
         {children}
       </ScrollView>
     </View>
