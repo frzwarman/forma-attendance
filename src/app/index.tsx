@@ -4,7 +4,7 @@ import { Backdrop, EventHeader } from "../components/Brand";
 import { Card, T } from "../components/ui";
 import { WhatsAppHelp } from "../components/WhatsAppHelp";
 import { CheckIn } from "../features/CheckIn";
-import { CheckedIn } from "../features/CheckedIn";
+import { CheckOut } from "../features/CheckOut";
 import { EventGuide } from "../features/EventGuide";
 import { EventIntro } from "../features/intro/EventIntro";
 import { OPENING } from "../features/intro/slides";
@@ -15,8 +15,8 @@ import { useTheme } from "../theme";
 
 export default function Index() {
   const c = useTheme();
-  // A phone that already checked someone in opens on the checked-in page, with the event
-  // information. Otherwise the form.
+  // A phone that already checked someone in opens on the checked-in page: check-out
+  // plus the event information. Otherwise the form.
   const [entries, setEntries] = useState(storedCheckIns);
   const [view, setView] = useState<"form" | "checkedIn">(entries.length ? "checkedIn" : "form");
   const [thanks, setThanks] = useState<CheckInDetails>();
@@ -47,7 +47,16 @@ export default function Index() {
               )
             ) : (
               <>
-                {entries.length > 0 && <CheckedIn entries={entries} />}
+                {entries.length > 0 && (
+                  <CheckOut
+                    key={entries.map((entry) => entry.token).join()}
+                    entries={entries}
+                    onEmpty={() => {
+                      setEntries([]);
+                      setView("form");
+                    }}
+                  />
+                )}
                 <section
                   aria-label="Informasi acara"
                   style={{ borderRadius: 16, overflow: "hidden", backgroundColor: c.surface, boxShadow: c.shadow }}

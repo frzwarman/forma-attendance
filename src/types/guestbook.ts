@@ -57,8 +57,9 @@ export type Winner = {
   drawn_by: string | null;
 };
 
-// checkout_token comes back only for a new check-in. A repeat check-in (same phone or e-mail) is
-// "returning", with the time of this visit; a database without migration
+// checkout_token: the phone keeps it to check out later. A repeat check-in (same phone or e-mail) is
+// "returning", with the time of this visit, and gets a new code when the name typed is the stored
+// one (from migration 20261102000000_guestbook_repeat_checkout_code.sql). A database without
 // 20261101000000_guestbook_repeat_checkin.sql answers "duplicate" and records nothing.
 export type CheckInResult = {
   status: "created" | "returning" | "duplicate";

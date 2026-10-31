@@ -164,7 +164,13 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     if (existing && seed.legacyCheckIn) return json(route, { status: "duplicate", created_at: existing.created_at });
     if (existing) {
       Object.assign(existing, { last_checked_in_at: new Date().toISOString(), checkin_count: (existing.checkin_count ?? 1) + 1, checked_out_at: null });
-      return json(route, { status: "returning", created_at: existing.created_at, last_checked_in_at: existing.last_checked_in_at });
+      const visit = { status: "returning", created_at: existing.created_at, last_checked_in_at: existing.last_checked_in_at };
+      if (existing.name.toLowerCase() !== String(body.p_name).trim().toLowerCase()) return json(route, visit);
+      // A new code replacing the earlier one.
+      for (const [code, id] of tokens) if (id === existing.id) tokens.delete(code);
+      const token = crypto.randomUUID();
+      tokens.set(token, existing.id);
+      return json(route, { ...visit, checkout_token: token });
     }
     const row = checkInRow({
       created_at: new Date().toISOString(),
