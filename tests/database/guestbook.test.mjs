@@ -409,3 +409,79 @@ test("the demo seed adds 48 attendees, about half checked out, hotel rooms for 3
   assert.deepEqual(await counts(), { checkins: 0, out: 0, rooms: 0, winners: 0 });
   assert.equal((await db.query("select count(*)::int as n from public.guestbook_checkins")).rows[0].n, before);
 });
+
+test("check-ins are copied to the Google Sheet: added, updated, deleted, and nothing before it is set up", async () => {
+  const sent = async () => (await db.query("select body from net.sent order by id")).rows.map((row) => row.body);
+  const cells = (row) => Object.fromEntries(row.cells);
+  await db.exec("delete from net.sent");
+  const sari = { name: "Sari Dewi", phone: "0899 3000 4000", email: "sari.sheet@example.test", in: null, out: null };
+  await asRole(null, "anon", () => checkIn(sari));
+  assert.deepEqual(await sent(), []);
+
+  // Closed to attendees and admins; a URL that is not an Apps Script web app is refused.
+  await assert.rejects(() => asUser(id(1), () => db.query("select * from private.guestbook_sheet")), /permission denied/);
+  await assert.rejects(() => asUser(null, () => db.query("select private.guestbook_sheet_resend()"), "anon"), /permission denied/);
+  await assert.rejects(() => db.query("insert into private.guestbook_sheet (url, secret) values ('https://example.com/x', $1)", ["s".repeat(32)]), /check/);
+  await db.query("insert into private.guestbook_sheet (url, secret) values ('https://script.google.com/a/macros/pensieve.id/s/AKfy_1/exec', $1)", ["s".repeat(32)]);
+  await db.exec("delete from private.guestbook_sheet");
+  const url = "https://script.google.com/macros/s/AKfycbx-test_123/exec";
+  await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", [url, "s".repeat(32)]);
+
+  await asRole(null, "anon", () => checkIn({ name: "Tono Wijaya", phone: "0899 5000 6000", email: "tono.sheet@example.test", in: null, out: null }));
+  let [request] = await sent();
+  assert.equal(request.secret, "s".repeat(32));
+  assert.equal(request.rows.length, 1);
+  const tono = request.rows[0];
+  assert.deepEqual(tono.cells.map(([header]) => header), [
+    "Waktu Check-in (WIB)", "Check-in Terakhir (WIB)", "Jumlah Check-in", "Waktu Check-out (WIB)", "Nama", "Nomor Telepon", "E-mail",
+    "Divisi", "Nomor Kamar Hotel", "Berkas", "Hadiah", "Waktu Undian (WIB)",
+  ]);
+  assert.match(cells(tono)["Waktu Check-in (WIB)"], /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/);
+  assert.equal(cells(tono)["Nomor Telepon"], "0899 5000 6000");
+  assert.equal(cells(tono)["Jumlah Check-in"], "1");
+  assert.equal(cells(tono)["Check-in Terakhir (WIB)"], "");
+
+  // Checking in again and checking out update the same row, matched by ID.
+  await db.exec("delete from net.sent");
+  const repeat = await asRole(null, "anon", () => checkIn({ name: "Tono Wijaya", phone: "0899 5000 6000", email: "tono.sheet@example.test", in: null, out: null }));
+  await asRole(null, "anon", () => db.query("select public.guestbook_check_out($1)", [repeat.checkout_token]));
+  const [again, out] = await sent();
+  assert.equal(again.rows[0].id, tono.id);
+  assert.equal(cells(again.rows[0])["Jumlah Check-in"], "2");
+  assert.match(cells(out.rows[0])["Waktu Check-out (WIB)"], /WIB$/);
+
+  // A prize shows on the winner's row.
+  await db.exec("delete from net.sent");
+  await db.query("insert into public.guestbook_draw_winners (checkin_id, prize) values ($1, 'Sepeda')", [tono.id]);
+  [request] = await sent();
+  assert.equal(cells(request.rows[0])["Hadiah"], "Sepeda");
+
+  // Check out semua: one statement, every changed row in requests of at most 100.
+  await db.exec("delete from net.sent");
+  const open = (await db.query("select count(*)::int as n from public.guestbook_checkins where checked_out_at is null")).rows[0].n;
+  await asRole(id(1), "authenticated", () => db.query("select public.guestbook_check_out_all()"));
+  const all = await sent();
+  assert.equal(all.flatMap((body) => body.rows).length, open);
+  assert.ok(all.every((body) => body.rows.length <= 100));
+
+  // Resending sends every check-in; a deleted one is removed from the sheet.
+  await db.exec("delete from net.sent");
+  const total = (await db.query("select private.guestbook_sheet_resend() as n")).rows[0].n;
+  assert.equal((await sent()).flatMap((body) => body.rows).length, total);
+  await db.exec("delete from net.sent");
+  await db.query("delete from public.guestbook_checkins where email = 'tono.sheet@example.test'");
+  assert.deepEqual((await sent()).map((body) => body.delete).filter(Boolean), [[tono.id]]);
+
+  // A failing send never blocks a check-in.
+  await db.exec(`alter function net.http_post(text, jsonb, jsonb, jsonb, int) rename to http_post_ok;
+    create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 5000)
+    returns bigint language plpgsql as $$ begin raise exception 'down'; end $$;`);
+  try {
+    const result = await asRole(null, "anon", () => checkIn({ name: "Rina Putri", phone: "0899 7000 8000", email: "rina.sheet@example.test", in: null, out: null }));
+    assert.equal(result.status, "created");
+  } finally {
+    await db.exec(`drop function net.http_post(text, jsonb, jsonb, jsonb, int);
+      alter function net.http_post_ok(text, jsonb, jsonb, jsonb, int) rename to http_post;
+      delete from private.guestbook_sheet;`);
+  }
+});

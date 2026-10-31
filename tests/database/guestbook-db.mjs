@@ -29,8 +29,17 @@ export async function guestbookDatabase() {
     $$;
     grant usage on schema storage to anon, authenticated;
     grant all on storage.buckets, storage.objects to anon, authenticated;
+    -- pg_net: http_post only queues the request, here into net.sent for the tests to read.
+    create schema net;
+    create table net.sent (id bigserial primary key, url text, body jsonb);
+    create function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{}', timeout_milliseconds int default 5000)
+    returns bigint language sql as $$ insert into net.sent (url, body) values (url, body) returning id $$;
   `);
   const files = (await readdir(migrations)).filter((name) => /^\d+_guestbook.*\.sql$/.test(name)).sort();
-  for (const name of files) await db.exec(await readFile(new URL(name, migrations), "utf8"));
+  for (const name of files) {
+    // PGlite has no pg_net extension; the stand-in above takes its place.
+    const sql = (await readFile(new URL(name, migrations), "utf8")).replace("create extension if not exists pg_net with schema extensions;", "");
+    await db.exec(sql);
+  }
   return db;
 }
