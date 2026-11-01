@@ -1,13 +1,13 @@
-import { useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "../../components/icons";
 import type { Speaker } from "../../domain/eventContent";
 import { FONT_STACK, useTheme } from "../../theme";
-import { CLOSING, OPENING, type SlidePicture } from "./slides";
+import { CLOSING, INTRO, OPENING, type SlidePicture } from "./slides";
 
 type Picture = { src: string; width: number; height: number; alt: string };
 
 // The opening popup's carousel: swipe, arrows, dots, and arrow keys once focused. The
-// opening pictures in ./slides.ts, then the speakers, one per slide with the name-and-photo
+// opening animation and pictures in ./slides.ts, then the speakers, one per slide with the name-and-photo
 // part of their CV, then the closing picture, which comes with the action (Mulai check-in).
 //
 // Every slide gets the same height, so the centred popup keeps its size and the arrows stay
@@ -31,7 +31,8 @@ export function EventSlides({
   // still on screen while the first one scrolls (which would turn two taps into one step).
   const aim = useRef<number | null>(null);
   const pictures = OPENING;
-  const first = pictures.length;
+  // The animation is slide 0, the pictures follow, then the speakers from here.
+  const first = 1 + pictures.length;
   const count = first + speakers.length + 1;
   const last = index === count - 1;
   const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -73,6 +74,8 @@ export function EventSlides({
     cursor: "pointer",
   };
   const pad = wide ? 32 : 20;
+  // The room around a wide picture filled with a blurred, darkened copy of it rather than empty bands.
+  const blurred: CSSProperties = { position: "absolute", inset: -24, width: "calc(100% + 48px)", height: "calc(100% + 48px)", objectFit: "cover", filter: "blur(18px) brightness(0.55)" };
 
   // A picture fits inside its slide whole.
   const show = (picture: Picture) => (
@@ -87,15 +90,7 @@ export function EventSlides({
       aria-label={`Slide ${n + 1} dari ${count}`}
       style={{ ...slide, position: "relative", overflow: "hidden", backgroundColor: c.background }}
     >
-      {loaded.has(n) && (
-        // The room around a wide picture filled with a blurred, darkened copy of it rather than empty bands.
-        <img
-          src={picture.src()}
-          alt=""
-          aria-hidden
-          style={{ position: "absolute", inset: -24, width: "calc(100% + 48px)", height: "calc(100% + 48px)", objectFit: "cover", filter: "blur(18px) brightness(0.55)" }}
-        />
-      )}
+      {loaded.has(n) && <img src={picture.src()} alt="" aria-hidden style={blurred} />}
       {loaded.has(n) && show({ src: picture.src(), width: picture.width, height: picture.height, alt: picture.alt })}
     </section>
   );
@@ -119,7 +114,11 @@ export function EventSlides({
           height: wide ? "min(480px, calc(100dvh - 220px))" : "min(380px, calc(100dvh - 200px))",
         }}
       >
-        {pictures.map((picture, i) => pictureSlide(picture, i))}
+        <section aria-roledescription="slide" aria-label={`Slide 1 dari ${count}`} style={{ ...slide, position: "relative", overflow: "hidden", backgroundColor: c.background }}>
+          <img src={INTRO.poster()} alt="" aria-hidden style={blurred} />
+          <IntroVideo reduceMotion={reduceMotion} active={index === 0} />
+        </section>
+        {pictures.map((picture, i) => pictureSlide(picture, 1 + i))}
         {speakers.map((speaker, i) => (
           <section key={speaker.title} aria-roledescription="slide" aria-label={`Slide ${first + i + 1} dari ${count}`} style={slide}>
             <div style={{ padding: `${wide ? 24 : 20}px ${pad}px 12px`, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -174,5 +173,41 @@ export function EventSlides({
         )}
       </div>
     </div>
+  );
+}
+
+// The opening animation. Only its small poster loads with the page; the video starts loading once
+// the page has finished, so it never holds the page up. It loops, like the GIF it was made from, while
+// its slide is showing, and pauses on the others. With reduced motion, or where the video cannot play
+// (autoplay refused, as in iOS Low Power Mode), its last frame (the logos) shows as a picture instead,
+// and the video is not downloaded.
+function IntroVideo({ reduceMotion, active }: { reduceMotion: boolean; active: boolean }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [still, setStill] = useState(reduceMotion);
+  const [pageLoaded, setPageLoaded] = useState(() => typeof document !== "undefined" && document.readyState === "complete");
+  useEffect(() => {
+    if (pageLoaded) return;
+    const loaded = () => setPageLoaded(true);
+    window.addEventListener("load", loaded, { once: true });
+    return () => window.removeEventListener("load", loaded);
+  }, [pageLoaded]);
+  useEffect(() => {
+    const element = video.current;
+    if (still || !pageLoaded || !element) return;
+    if (!active) return element.pause();
+    // Muted before play(): browsers only start silent video on their own. A pause() before play()
+    // settles rejects it with AbortError, which is no reason to give up on the video.
+    element.muted = true;
+    element.play().catch((error: Error) => error.name !== "AbortError" && setStill(true));
+  }, [active, pageLoaded, still]);
+  const fit: CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" };
+  return still ? (
+    <img src={INTRO.end()} alt={INTRO.label} style={fit} />
+  ) : (
+    <video ref={video} aria-label={INTRO.label} poster={INTRO.poster()} muted loop playsInline preload="none" style={fit}>
+      {/* The browser plays the first it can: AV1 where supported, H.264 elsewhere (Safari). */}
+      <source src={INTRO.webm()} type='video/webm; codecs="av01.0.04M.08"' />
+      <source src={INTRO.mp4()} type="video/mp4" />
+    </video>
   );
 }

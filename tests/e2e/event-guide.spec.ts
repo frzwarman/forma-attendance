@@ -180,11 +180,13 @@ test("the opening popup shows the speakers the admin saved", async ({ page }) =>
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   const popup = page.getByRole("dialog", { name: "Informasi acara" });
-  // After the opening banner.
+  // After the opening animation and the banner.
+  await popup.getByRole("button", { name: "Slide berikutnya" }).click();
+  await expect(popup.getByText("2 dari 4", { exact: true })).toBeVisible();
   await popup.getByRole("button", { name: "Slide berikutnya" }).click();
   await expect(popup.getByRole("heading", { name: "Sari Narasumber" })).toBeInViewport();
   await expect(popup.getByRole("img", { name: "Profil Sari Narasumber" })).toHaveAttribute("src", /guestbook-event\/profiles\/s\.jpg$/);
-  await expect(popup.getByRole("region", { name: /^Slide \d dari 3$/ })).toHaveCount(3);
+  await expect(popup.getByRole("region", { name: /^Slide \d dari 4$/ })).toHaveCount(4);
   await finishIntro(page);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();

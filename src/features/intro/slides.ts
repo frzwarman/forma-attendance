@@ -1,11 +1,26 @@
 import { Asset } from "expo-asset";
 
-// The picture slides of the opening popup, before and after the speakers; the page after check-in
-// shows the first one. To change one, replace its file in assets/event/ (WebP; the first loads on
+// The opening popup: INTRO (an animation), then the picture slides before and after the speakers; the
+// page after check-in shows the first picture. To change one, replace its file in assets/event/ (WebP; the first loads on
 // every first visit, so keep it near 1000 px wide) and update its size and the description read
 // out by screen readers.
 export type SlidePicture = { src: () => string; width: number; height: number; alt: string };
 const picture = (module: number, width: number, height: number, alt: string): SlidePicture => ({ src: () => Asset.fromModule(module).uri, width, height, alt });
+
+// The first slide: the Bawaslu logo reveal, made from a 29 MB GIF (1760 x 1040, 5 s, 25 fps) as 960 px
+// video, about 250 KB, of which a phone downloads one: AV1 in WebM (Chrome, Android, Firefox) and
+// H.264 in MP4 (Safari). The poster is its first frame (4.5 KB), shown until the video plays; end is
+// its last frame (the logos, 32 KB), shown instead of the video with reduced motion or where it cannot
+// play. To replace it, encode the new animation the same way:
+//   ffmpeg -i in.gif -vf "hqdn3d=3:3:4:4,scale=960:-2:flags=lanczos,format=yuv420p" -c:v libsvtav1 -preset 4 -crf 46 -an intro.webm
+//   ffmpeg -i in.gif -vf "(same)" -c:v libx264 -preset veryslow -crf 32 -profile:v high -level:v 4.0 -movflags +faststart -an intro.mp4
+export const INTRO = {
+  webm: () => Asset.fromModule(require("../../../assets/event/intro.webm")).uri,
+  mp4: () => Asset.fromModule(require("../../../assets/event/intro.mp4")).uri,
+  poster: () => Asset.fromModule(require("../../../assets/event/intro-poster.webp")).uri,
+  end: () => Asset.fromModule(require("../../../assets/event/intro-end.webp")).uri,
+  label: "Animasi pembuka: lambang Garuda Pancasila, lalu logo Bawaslu",
+};
 
 // From the 488 x 310 cm banner PDF, rendered large and scaled to 960 px so the first visit stays light.
 export const OPENING: SlidePicture[] = [

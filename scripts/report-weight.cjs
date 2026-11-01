@@ -1,5 +1,5 @@
 // Gate for the public page weight budget. Measures what a browser actually downloads
-// on a first visit to "/" from the built site: gzipped JavaScript and images.
+// on a first visit to "/" from the built site: gzipped JavaScript, images and video.
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
@@ -8,9 +8,11 @@ const { chromium } = require('@playwright/test');
 
 const JS_LIMIT = 512000;
 const IMAGE_LIMIT = 307200;
+// The opening animation (one of its files; Chrome takes the AV1 one). It loads after the page.
+const VIDEO_LIMIT = 307200;
 const PORT = 4174;
 const root = path.resolve('dist');
-const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.json': 'application/json', '.ico': 'image/x-icon' };
+const types = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.json': 'application/json', '.ico': 'image/x-icon', '.webm': 'video/webm', '.mp4': 'video/mp4' };
 const kb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
 
 const server = http.createServer((req, res) => {
@@ -26,6 +28,7 @@ async function main() {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const scripts = new Map();
   const images = new Map();
+  const videos = new Map();
   page.on('response', async (response) => {
     const url = new URL(response.url());
     if (url.hostname !== '127.0.0.1') return;
@@ -33,6 +36,7 @@ async function main() {
       const body = await response.body();
       if (url.pathname.endsWith('.js')) scripts.set(url.pathname, zlib.gzipSync(body, { level: 9 }).length);
       else if ((response.headers()['content-type'] || '').startsWith('image/')) images.set(url.pathname, body.length);
+      else if ((response.headers()['content-type'] || '').startsWith('video/')) videos.set(url.pathname, body.length);
     } catch { /* aborted */ }
   });
   await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle' });
@@ -49,9 +53,11 @@ async function main() {
   };
   const js = report('JavaScript downloaded for / (gzipped)', scripts);
   const img = report('Images downloaded for /', images);
+  const video = report('Video downloaded for /', videos);
   console.log(`Public JavaScript: ${kb(js)} (limit ${kb(JS_LIMIT)})`);
   console.log(`Images: ${kb(img)} (limit ${kb(IMAGE_LIMIT)})`);
-  if (js > JS_LIMIT || img > IMAGE_LIMIT) {
+  console.log(`Video: ${kb(video)} (limit ${kb(VIDEO_LIMIT)})`);
+  if (js > JS_LIMIT || img > IMAGE_LIMIT || video > VIDEO_LIMIT) {
     console.error('Weight budget exceeded.');
     process.exit(1);
   }
