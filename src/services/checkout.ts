@@ -38,3 +38,6 @@ export const forgetCheckIn = (token: string) => save(storedCheckIns().filter((st
 
 export type CheckOutResult = { status: "checked_out" | "already"; name: string; checked_out_at: string };
 export const checkOut = (token: string) => callFunction<CheckOutResult>("guestbook_check_out", { p_token: token });
+// Kesan & Pesan, stored under the check-in this code belongs to (migration 20261106000000_guestbook_feedback.sql).
+export const sendFeedback = (token: string, message: string) =>
+  callFunction<{ status: "sent"; created_at: string }>("guestbook_send_feedback", { p_token: token, p_message: message });

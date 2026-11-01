@@ -15,7 +15,7 @@ test("a returning attendee checks out with one tap on the same phone", async ({ 
   // The page header names the page instead of asking to check in.
   await expect(page.getByRole("heading", { name: "Informasi acara", exact: true })).toBeVisible();
   await expect(page.getByText("Silakan isi data diri Anda untuk check-in.")).toHaveCount(0);
-  await expect(page.getByText(/Budi Santoso/)).toBeVisible();
+  await expect(page.getByText("Budi Santoso", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Nama", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
   // A popup, over the registration form the page went back to (from the top).

@@ -144,6 +144,7 @@ export function SelectInput({
   error,
   hint,
   disabled,
+  placeholder = "Pilih…",
 }: {
   label: string;
   value: string;
@@ -152,6 +153,8 @@ export function SelectInput({
   error?: string;
   hint?: string;
   disabled?: boolean;
+  // The empty first choice.
+  placeholder?: string;
 }) {
   const c = useTheme();
   const style = useInputStyle(error);
@@ -161,7 +164,7 @@ export function SelectInput({
         {label}
       </T>
       <select aria-label={label} aria-invalid={!!error} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} style={{ ...style, color: value ? c.text : c.muted }}>
-        <option value="">Pilih…</option>
+        <option value="">{placeholder}</option>
         {options.map((option) => (
           <option key={option} value={option} style={{ color: c.text }}>
             {option}

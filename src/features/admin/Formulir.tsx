@@ -10,6 +10,8 @@ import {
   FIXED_LABELS,
   formFieldsFrom,
   formFieldsProblem,
+  PLACEHOLDER_MAX,
+  placeholderOf,
   type FieldType,
   type FormField,
 } from "../../domain/formFields";
@@ -76,6 +78,7 @@ function Editor({ initial }: { initial: FormField[] }) {
     const next = fields.map((field) => ({
       ...field,
       label: field.label.trim(),
+      placeholder: field.placeholder?.trim() || undefined,
       options: field.type === "select" ? [...new Set(field.options.map((option) => option.trim()).filter(Boolean))] : [],
     }));
     const problem = formFieldsProblem(next);
@@ -141,6 +144,21 @@ function Editor({ initial }: { initial: FormField[] }) {
                   Wajib diisi
                 </label>
               </Row>
+              <View style={{ gap: 6 }}>
+                <T size={13} weight="semibold">
+                  Placeholder
+                </T>
+                {/* Its own greyed text is what attendees see while this is left empty. */}
+                <Field
+                  labelHidden
+                  label={`Placeholder pertanyaan ${i + 1}`}
+                  placeholder={placeholderOf({ ...field, placeholder: "" }) || (field.type === "select" ? "Pilih…" : "Tanpa placeholder")}
+                  value={field.placeholder ?? ""}
+                  onChangeText={(placeholder) => setField(i, { placeholder })}
+                  maxLength={PLACEHOLDER_MAX}
+                  hint={field.type === "select" ? "Teks pilihan kosong di daftar, sebelum peserta memilih." : "Teks samar di kolom isian sebelum peserta mengetik."}
+                />
+              </View>
               {field.type === "select" && (
                 <View style={{ gap: 6 }}>
                   <T size={13} weight="semibold">

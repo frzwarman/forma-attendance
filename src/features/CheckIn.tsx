@@ -6,17 +6,17 @@ import { Wand } from "../components/icons";
 import { SelectInput } from "../components/NativeInput";
 import { Button, Card, Divider, Field, SectionTitle, T } from "../components/ui";
 import { checkInSchemaFor, sampleCheckIn, type CheckInInput } from "../domain/checkin";
-import { maxLength, type Builtin, type FormField } from "../domain/formFields";
+import { maxLength, placeholderOf, type Builtin, type FormField } from "../domain/formFields";
 import { submitCheckIn } from "../services/checkins";
 import { uploadCheckInFile } from "../services/uploads";
 import { useTheme } from "../theme";
 import type { CheckInDetails } from "./ThankYou";
 import { Attachment } from "./checkin/Attachment";
 
-// Hints for the two built-in questions, whatever the admin calls them.
+// Hints for the two built-in questions, whatever the admin calls them; placeholders come from placeholderOf.
 const BUILTIN_PROPS: Record<Builtin, Partial<React.ComponentProps<typeof Field>>> = {
-  divisi: { autoComplete: "organization-title", placeholder: "Contoh: Divisi Hukum" },
-  room_number: { placeholder: "Contoh: 1205", hint: "Opsional. Kosongkan jika tidak menginap di hotel acara.", autoComplete: "off", autoCapitalize: "characters" },
+  divisi: { autoComplete: "organization-title" },
+  room_number: { hint: "Opsional. Kosongkan jika tidak menginap di hotel acara.", autoComplete: "off", autoCapitalize: "characters" },
 };
 
 // The check-in form: Nama, Nomor Telepon and E-mail, then the questions the admin set up.
@@ -112,7 +112,16 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
             const error = errors.answers?.[question.id]?.message;
             const hint = question.required ? undefined : "Opsional.";
             return question.type === "select" ? (
-              <SelectInput label={question.label} value={field.value} options={question.options} onChange={field.onChange} error={error} hint={hint} disabled={isSubmitting} />
+              <SelectInput
+                label={question.label}
+                value={field.value}
+                options={question.options}
+                onChange={field.onChange}
+                error={error}
+                hint={hint}
+                disabled={isSubmitting}
+                placeholder={placeholderOf(question) || undefined}
+              />
             ) : (
               <Field
                 label={question.label}
@@ -123,6 +132,7 @@ export function CheckIn({ fields, onCheckedIn }: { fields: FormField[]; onChecke
                 hint={hint}
                 editable={!isSubmitting}
                 maxLength={maxLength(question)}
+                placeholder={placeholderOf(question) || undefined}
                 {...(question.type === "textarea" ? { multiline: true, style: { minHeight: 88, textAlignVertical: "top" as const } } : {})}
                 {...(question.builtin ? BUILTIN_PROPS[question.builtin] : {})}
               />

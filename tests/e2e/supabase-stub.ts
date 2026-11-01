@@ -6,6 +6,8 @@ export type StubState = {
   checkins: CheckIn[];
   winners: Winner[];
   rpcCalls: { name: string; body: Record<string, unknown> }[];
+  // Kesan & Pesan, by the check-in the code belongs to.
+  feedback: { checkin_id: string; message: string }[];
   uploads: { bucket: string; path: string; contentType: string; bytes: number }[];
   signedPaths: string[];
   rangeHeaders: string[];
@@ -124,6 +126,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     checkins: [...(seed.checkins || [])],
     winners: [...(seed.winners || [])],
     rpcCalls: [],
+    feedback: [],
     uploads: [],
     signedPaths: [],
     rangeHeaders: [],
@@ -205,6 +208,16 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     const status = row.checked_out_at ? "already" : "checked_out";
     row.checked_out_at ??= new Date().toISOString();
     return json(route, { status, name: row.name, checked_out_at: row.checked_out_at });
+  });
+  await page.route("**/rest/v1/rpc/guestbook_send_feedback", async (route, request) => {
+    const body = parseBody(request);
+    state.rpcCalls.push({ name: "guestbook_send_feedback", body });
+    const checkin = tokens.get(String(body.p_token));
+    if (!checkin) return json(route, { message: "Kode check-in tidak dikenal" }, 400);
+    const message = String(body.p_message ?? "").trim();
+    if (!message || message.length > 2000) return json(route, { message: "Kesan & pesan wajib diisi (maksimal 2000 karakter)" }, 400);
+    state.feedback.push({ checkin_id: checkin, message });
+    return json(route, { status: "sent", created_at: new Date().toISOString() });
   });
   await page.route("**/rest/v1/rpc/guestbook_admin_check_out", async (route, request) => {
     const body = parseBody(request);

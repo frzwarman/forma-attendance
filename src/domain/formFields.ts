@@ -6,7 +6,8 @@ import { z } from "zod";
 // keeps its meaning in the export even after the question is removed or renamed.
 export type FieldType = "text" | "textarea" | "select";
 export type Builtin = "divisi" | "room_number";
-export type FormField = { id: string; label: string; type: FieldType; required: boolean; options: string[]; builtin?: Builtin };
+// placeholder: the greyed example in the empty box (for Pilihan, in place of "Pilih…"), set by the admin.
+export type FormField = { id: string; label: string; type: FieldType; required: boolean; options: string[]; builtin?: Builtin; placeholder?: string };
 
 export const FIELD_TYPES: Record<FieldType, string> = { text: "Teks singkat", textarea: "Teks panjang", select: "Pilihan" };
 export const BUILTIN_FIELDS: Record<Builtin, FormField> = {
@@ -15,6 +16,10 @@ export const BUILTIN_FIELDS: Record<Builtin, FormField> = {
 };
 // The form until an admin saves one (and before migration 20261031000000_guestbook_form_fields.sql).
 export const DEFAULT_FORM_FIELDS: FormField[] = [BUILTIN_FIELDS.divisi];
+// What a built-in question's box shows while the admin has set no placeholder.
+export const BUILTIN_PLACEHOLDERS: Record<Builtin, string> = { divisi: "Contoh: Divisi Hukum", room_number: "Contoh: 1205" };
+export const placeholderOf = (field: FormField) => field.placeholder || (field.builtin ? BUILTIN_PLACEHOLDERS[field.builtin] : "");
+export const PLACEHOLDER_MAX = 120;
 // Nama, Nomor Telepon and E-mail: always asked, so no added question may take their labels.
 export const FIXED_LABELS = ["Nama", "Nomor Telepon", "E-mail"];
 
@@ -39,7 +44,8 @@ export function parseFormFields(raw: unknown): FormField[] | null {
     const type = builtin ? "text" : v?.type === "textarea" || v?.type === "select" ? v.type : "text";
     const options = type === "select" && Array.isArray(v?.options) ? [...new Set(v.options.filter((o): o is string => typeof o === "string").map((o) => o.trim().slice(0, 100)).filter(Boolean))].slice(0, 50) : [];
     if (type === "select" && !options.length) return [];
-    return [{ id, label, type, required: v?.required === true, options, ...(builtin ? { builtin } : {}) }];
+    const placeholder = typeof v?.placeholder === "string" ? v.placeholder.trim().slice(0, PLACEHOLDER_MAX) : "";
+    return [{ id, label, type, required: v?.required === true, options, ...(builtin ? { builtin } : {}), ...(placeholder ? { placeholder } : {}) }];
   });
 }
 

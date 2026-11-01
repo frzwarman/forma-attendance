@@ -62,13 +62,13 @@ test("guestbook tables have RLS and no direct client writes", async () => {
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'guestbook_%' order by 1
   `);
-  assert.deepEqual(rows.map((r) => r.relname), ["guestbook_admins", "guestbook_checkins", "guestbook_draw_winners", "guestbook_settings"]);
+  assert.deepEqual(rows.map((r) => r.relname), ["guestbook_admins", "guestbook_checkins", "guestbook_draw_winners", "guestbook_feedback", "guestbook_settings"]);
   for (const row of rows) {
     assert.equal(row.relrowsecurity, true, row.relname);
     for (const flag of ["anon_insert", "anon_update", "anon_delete"]) assert.equal(row[flag], false, `${row.relname}: ${flag}`);
   }
   const byName = Object.fromEntries(rows.map((r) => [r.relname, r]));
-  for (const table of ["guestbook_checkins", "guestbook_admins"]) {
+  for (const table of ["guestbook_checkins", "guestbook_admins", "guestbook_feedback"]) {
     assert.equal(byName[table].auth_insert, false, table);
     assert.equal(byName[table].auth_update, false, table);
   }
@@ -520,4 +520,58 @@ test("a repeat check-in keeps its answers: they replace earlier ones question by
   await visit("Jawab Dulu", null, null);
   const { rows } = await db.query("select name, divisi, answers from public.guestbook_checkins where email = 'jawab@example.test'");
   assert.deepEqual(rows, [{ name: "Jawab Dulu", divisi: "Divisi Teknis", answers: { "Ukuran kaos": "L", "Asal Instansi": "Bawaslu DKI" } }]);
+});
+
+test("Kesan & Pesan: sent with the phone's check-out code, stored under the sender, read only by admins, copied to the sheet", async () => {
+  const send = (token, message) => asRole(null, "anon", async () => (await db.query("select public.guestbook_send_feedback($1, $2) as r", [token, message])).rows[0].r);
+  const tamu = await asRole(null, "anon", () => checkIn({ name: "Tamu Pesan", phone: "0899 6600 7700", email: "pesan@example.test", in: null, out: null }));
+  const url = "https://script.google.com/macros/s/AKfycbx-pesan/exec";
+  await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", [url, "s".repeat(32)]);
+  await db.exec("delete from net.sent");
+  try {
+    const sent = await send(tamu.checkout_token, "  Materinya sangat bermanfaat.  ");
+    assert.equal(sent.status, "sent");
+    assert.equal(typeof sent.created_at, "string");
+    await asUser(id(1), async () => {
+      const { rows } = await db.query(
+        "select f.message, c.email from public.guestbook_feedback f join public.guestbook_checkins c on c.id = f.checkin_id where c.email = 'pesan@example.test'",
+      );
+      assert.deepEqual(rows, [{ message: "Materinya sangat bermanfaat.", email: "pesan@example.test" }]);
+    });
+
+    // To the sheet: the message with its sender's details and the check-in's ID.
+    const [request] = (await db.query("select body from net.sent order by id")).rows.map((row) => row.body);
+    assert.equal(request.secret, "s".repeat(32));
+    assert.equal(request.rows, undefined);
+    const cells = Object.fromEntries(request.feedback[0].cells);
+    assert.deepEqual(request.feedback[0].cells.map(([header]) => header), ["Waktu (WIB)", "Nama", "Nomor Telepon", "E-mail", "Divisi", "Kesan & Pesan", "ID"]);
+    assert.equal(cells["Nama"], "Tamu Pesan");
+    assert.equal(cells["Kesan & Pesan"], "Materinya sangat bermanfaat.");
+    assert.match(cells["Waktu (WIB)"], /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/);
+
+    // Refused: an unknown or missing code, an empty or too long message.
+    await assert.rejects(() => send("00000000-0000-4000-8000-000000000000", "Halo"), /tidak dikenal/);
+    await assert.rejects(() => send(null, "Halo"), /tidak dikenal/);
+    await assert.rejects(() => send(tamu.checkout_token, "   "), /wajib diisi/);
+    await assert.rejects(() => send(tamu.checkout_token, "x".repeat(2001)), /maksimal 2000/);
+
+    // Attendees and other users cannot read or write the messages directly.
+    await assert.rejects(() => asUser(null, () => db.query("select * from public.guestbook_feedback"), "anon"), /permission denied/);
+    await assert.rejects(() => asUser(null, () => db.query("insert into public.guestbook_feedback (checkin_id, message) values ($1, 'x')", [cells["ID"]]), "anon"), /permission denied/);
+    await asUser(id(2), async () => assert.equal((await db.query("select count(*)::int as n from public.guestbook_feedback")).rows[0].n, 0));
+
+    // At most 50 per attendee.
+    for (let i = 2; i <= 50; i++) await send(tamu.checkout_token, `Pesan ${i}`);
+    await assert.rejects(() => send(tamu.checkout_token, "Pesan 51"), /Batas/);
+
+    // A resend sends the messages too; deleting the check-in deletes its messages.
+    await db.exec("delete from net.sent");
+    await db.query("select private.guestbook_sheet_resend()");
+    const resent = (await db.query("select body from net.sent order by id")).rows.flatMap((row) => row.body.feedback ?? []);
+    assert.equal(resent.length, 50);
+    await db.query("delete from public.guestbook_checkins where email = 'pesan@example.test'");
+    assert.equal((await db.query("select count(*)::int as n from public.guestbook_feedback")).rows[0].n, 0);
+  } finally {
+    await db.exec("delete from private.guestbook_sheet");
+  }
 });

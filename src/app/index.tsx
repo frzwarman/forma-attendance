@@ -7,6 +7,7 @@ import { CheckIn } from "../features/CheckIn";
 import { CheckOut, Goodbye, type CheckedOut } from "../features/CheckOut";
 import { EventGuide } from "../features/EventGuide";
 import { EventIntro } from "../features/intro/EventIntro";
+import { KesanPesan } from "../features/KesanPesan";
 import { OPENING } from "../features/intro/slides";
 import { ThankYou, type CheckInDetails } from "../features/ThankYou";
 import { refreshCheckIn, rememberCheckIn, storedCheckIns } from "../services/checkout";
@@ -15,8 +16,8 @@ import { useTheme } from "../theme";
 
 export default function Index() {
   const c = useTheme();
-  // A phone that already checked someone in opens on the checked-in page: check-out
-  // plus the event information. Otherwise the form.
+  // A phone that already checked someone in opens on the checked-in page: the event information,
+  // Kesan & Pesan and check-out. Otherwise the form.
   const [entries, setEntries] = useState(storedCheckIns);
   const [view, setView] = useState<"form" | "checkedIn">(entries.length ? "checkedIn" : "form");
   const [thanks, setThanks] = useState<CheckInDetails>();
@@ -53,18 +54,6 @@ export default function Index() {
               )
             ) : (
               <>
-                {entries.length > 0 && (
-                  <CheckOut
-                    key={entries.map((entry) => entry.token).join()}
-                    entries={entries}
-                    onCheckedOut={setGoodbye}
-                    onEmpty={() => {
-                      setEntries([]);
-                      setView("form");
-                      toTop();
-                    }}
-                  />
-                )}
                 <section
                   aria-label="Informasi acara"
                   style={{ borderRadius: 16, overflow: "hidden", backgroundColor: c.surface, boxShadow: c.shadow }}
@@ -79,6 +68,21 @@ export default function Index() {
                   />
                 </section>
                 <EventGuide />
+                {/* Last: Kesan & Pesan, then check-out at the very bottom. The newest check-in on this phone sends it.
+                    No key: CheckOut's key is the same code, and siblings must not share one. */}
+                {entries.length > 0 && <KesanPesan entry={entries[entries.length - 1]} />}
+                {entries.length > 0 && (
+                  <CheckOut
+                    key={entries.map((entry) => entry.token).join()}
+                    entries={entries}
+                    onCheckedOut={setGoodbye}
+                    onEmpty={() => {
+                      setEntries([]);
+                      setView("form");
+                      toTop();
+                    }}
+                  />
+                )}
               </>
             )}
             <T size={12} color={c.onBackgroundMuted}>

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { DEFAULT_FORM_FIELDS, formFieldsFrom, formFieldsProblem, parseFormFields, type FormField } from "./formFields";
+import { BUILTIN_FIELDS, DEFAULT_FORM_FIELDS, formFieldsFrom, formFieldsProblem, parseFormFields, placeholderOf, type FormField } from "./formFields";
 
 it("asks for Divisi only until an admin saves a form", () => {
   assert.deepEqual(DEFAULT_FORM_FIELDS.map((field) => field.label), ["Divisi"]);
@@ -33,4 +33,18 @@ it("explains what to fix before saving", () => {
   assert.equal(formFieldsProblem([field("e-mail")]), 'Judul "e-mail" dipakai lebih dari sekali.');
   assert.equal(formFieldsProblem([field("Asal"), field("asal ")]), 'Judul "asal" dipakai lebih dari sekali.');
   assert.equal(formFieldsProblem([field("Ukuran kaos", { type: "select", options: [" "] })]), '"Ukuran kaos" butuh minimal satu pilihan.');
+});
+
+it("keeps an admin's placeholder trimmed and capped; built-in questions fall back to their example", () => {
+  const [kaos, divisi, blank] = parseFormFields([
+    { id: "f_kaos", label: "Ukuran kaos", type: "text", placeholder: `  ${"x".repeat(130)}  ` },
+    { id: "divisi", builtin: "divisi", label: "Divisi", placeholder: " Contoh: Divisi Teknis " },
+    { id: "f_asal", label: "Asal", type: "text", placeholder: "   " },
+  ])!;
+  assert.equal(kaos.placeholder, "x".repeat(120));
+  assert.equal(placeholderOf(divisi), "Contoh: Divisi Teknis");
+  assert.equal("placeholder" in blank, false);
+  assert.equal(placeholderOf(blank), "");
+  assert.equal(placeholderOf(BUILTIN_FIELDS.divisi), "Contoh: Divisi Hukum");
+  assert.equal(placeholderOf(BUILTIN_FIELDS.room_number), "Contoh: 1205");
 });

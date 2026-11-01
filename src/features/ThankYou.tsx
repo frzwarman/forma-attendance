@@ -42,7 +42,7 @@ export function ThankYou({ details, onClose }: { details: CheckInDetails; onClos
         </View>
         {!!details.token && (
           <T size={14} color={c.muted}>
-            Saat pulang, buka tautan ini lagi di HP ini lalu tekan Check out sekarang.
+            Saat pulang, buka tautan ini lagi di HP ini lalu tekan Check out sekarang di bagian bawah halaman.
           </T>
         )}
         <Button large label="Lihat informasi acara" onPress={onClose} />

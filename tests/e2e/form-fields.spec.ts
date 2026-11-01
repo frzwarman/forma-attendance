@@ -94,3 +94,33 @@ test("before migration 20261031000000 is applied, saving the form explains what 
   await expect(page.getByRole("dialog", { name: "Check-in berhasil" })).toBeVisible();
   expect(state.rpcCalls.at(-1)?.body.p_address).toBe("-");
 });
+
+test("an admin sets placeholders; attendees see them in the empty boxes, and built-in questions keep their example otherwise", async ({ page }) => {
+  const state = await installSupabaseStub(page);
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "Formulir" }).click();
+  // Divisi has none set; its box shows the example attendees see meanwhile.
+  const divisi = page.getByLabel("Placeholder pertanyaan 1", { exact: true });
+  await expect(divisi).toHaveValue("");
+  await expect(divisi).toHaveAttribute("placeholder", "Contoh: Divisi Hukum");
+  await page.getByRole("button", { name: "Tambah pertanyaan", exact: true }).click();
+  await page.getByLabel("Judul pertanyaan 2", { exact: true }).fill("Asal instansi");
+  await page.getByLabel("Placeholder pertanyaan 2", { exact: true }).fill("  Contoh: Bawaslu Provinsi Jawa Barat  ");
+  await page.getByRole("button", { name: "Tambah pertanyaan", exact: true }).click();
+  await page.getByLabel("Judul pertanyaan 3", { exact: true }).fill("Ukuran kaos");
+  await page.getByRole("radiogroup", { name: "Jenis jawaban pertanyaan 3" }).getByRole("radio", { name: "Pilihan" }).click();
+  await page.getByLabel("Pilihan jawaban pertanyaan 3", { exact: true }).fill("S\nM");
+  await page.getByLabel("Placeholder pertanyaan 3", { exact: true }).fill("Pilih ukuran kaos");
+  await page.getByRole("button", { name: "Simpan", exact: true }).click();
+  await expect(page.getByText("Formulir disimpan. Peserta melihatnya saat halaman dibuka lagi.", { exact: true })).toBeVisible();
+  const saved = state.settings.form_fields as Record<string, unknown>[];
+  expect(saved[0]).not.toHaveProperty("placeholder");
+  expect(saved[1]).toEqual(expect.objectContaining({ label: "Asal instansi", placeholder: "Contoh: Bawaslu Provinsi Jawa Barat" }));
+  expect(saved[2]).toEqual(expect.objectContaining({ label: "Ukuran kaos", placeholder: "Pilih ukuran kaos" }));
+
+  await page.goto("/");
+  await expect(page.getByLabel("Divisi", { exact: true })).toHaveAttribute("placeholder", "Contoh: Divisi Hukum");
+  await expect(page.getByLabel("Asal instansi", { exact: true })).toHaveAttribute("placeholder", "Contoh: Bawaslu Provinsi Jawa Barat");
+  await expect(page.getByLabel("Ukuran kaos", { exact: true }).locator("option").first()).toHaveText("Pilih ukuran kaos");
+});
