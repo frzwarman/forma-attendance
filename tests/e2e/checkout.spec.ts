@@ -90,3 +90,38 @@ test("a check-in from an earlier day is forgotten: the next day starts on the fo
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
 });
+
+// Today in the other session (Sesi 1 before 12:00 WIB, Sesi 2 from 12:00): 09:00 or 13:00 WIB.
+function otherSessionToday() {
+  const wib = new Date(Date.now() + 7 * 3600 * 1000);
+  const day = wib.toISOString().slice(0, 10);
+  return new Date(`${day}T${wib.getUTCHours() < 12 ? "13:00" : "09:00"}:00+07:00`).toISOString();
+}
+
+test("a check-in from the other session today is not current: after 12:00 the page starts on the form again", async ({ page }) => {
+  await installSupabaseStub(page);
+  const at = otherSessionToday();
+  await page.addInitScript((at) => localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "sesi-lain", name: "Budi Santoso", at }])), at);
+  await page.goto("/");
+  await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
+});
+
+test("a page left open since the last session moves on to the form when looked at again", async ({ page }) => {
+  await installSupabaseStub(page);
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("guestbook.checkouts"))
+      localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at: new Date().toISOString() }]));
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toBeVisible();
+  await expect(page.getByText(/otomatis pukul 12\.00 dan 23\.59 WIB/)).toBeVisible();
+  // 12:00 (or midnight) passes while the phone is locked: the stored check-in now belongs to an earlier session.
+  const at = otherSessionToday();
+  await page.evaluate((at) => {
+    localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at }]));
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, at);
+  await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
+});

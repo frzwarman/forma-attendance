@@ -575,3 +575,23 @@ test("Kesan & Pesan: sent with the phone's check-out code, stored under the send
     await db.exec("delete from private.guestbook_sheet");
   }
 });
+
+test("at 12:00 WIB everyone still checked in from before 12:00 is checked out; a check-in from 12:00 on stays", async () => {
+  const job = (await db.query("select schedule, command from cron.jobs where name = 'guestbook-midday-check-out'")).rows[0];
+  assert.deepEqual(job, { schedule: "0 5 * * *", command: "select private.guestbook_midday_check_out()" });
+  await assert.rejects(() => asUser(id(1), () => db.query("select private.guestbook_midday_check_out()")), /permission denied/);
+  await asRole(null, "anon", () => checkIn({ name: "Tamu Pagi", phone: "0899 8800 1100", email: "pagi@example.test", in: null, out: null }));
+  await asRole(null, "anon", () => checkIn({ name: "Tamu Siang", phone: "0899 8800 2200", email: "siang@example.test", in: null, out: null }));
+  // Today's 12:00 in Jakarta. Pagi last checked in before it (last night); Siang checked in again at 12:00 exactly.
+  const noon = "(date_trunc('day', now() at time zone 'Asia/Jakarta') + interval '12 hours') at time zone 'Asia/Jakarta'";
+  await db.query(`update public.guestbook_checkins set created_at = ${noon} - interval '16 hours' where email in ('pagi@example.test', 'siang@example.test')`);
+  await db.query(`update public.guestbook_checkins set last_checked_in_at = ${noon}, checkin_count = 2 where email = 'siang@example.test'`);
+  await db.query("select private.guestbook_midday_check_out()");
+  const { rows } = await db.query(
+    "select email, checked_out_at is not null as out from public.guestbook_checkins where email in ('pagi@example.test', 'siang@example.test') order by email",
+  );
+  assert.deepEqual(rows, [
+    { email: "pagi@example.test", out: true },
+    { email: "siang@example.test", out: false },
+  ]);
+});

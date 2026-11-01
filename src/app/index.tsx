@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentRef } from "react";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { ScrollView, View } from "react-native";
 import { Backdrop, EventHeader } from "../components/Brand";
 import { Card, T } from "../components/ui";
@@ -26,6 +26,19 @@ export default function Index() {
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const toTop = () => scroll.current?.scrollTo({ y: 0, animated: false });
   const fields = useFormFields();
+  // A page left open since before 12:00 or midnight moves on to the form when looked at again: the
+  // database has checked that session's attendees out, and they check in again for the next one.
+  useEffect(() => {
+    if (view !== "checkedIn") return;
+    const refresh = () => {
+      if (document.visibilityState !== "visible" || storedCheckIns().length) return;
+      setEntries([]);
+      setView("form");
+      toTop();
+    };
+    document.addEventListener("visibilitychange", refresh);
+    return () => document.removeEventListener("visibilitychange", refresh);
+  }, [view]);
 
   function checkedIn(details: CheckInDetails) {
     if (details.token) rememberCheckIn({ token: details.token, name: details.name, at: details.at });

@@ -7,7 +7,7 @@
 // numbered by "Check-in ke-" and each with that visit's time (the database keeps one row per person
 // and counts the visits). A check-out or prize updates the row of the latest visit; earlier rows stay.
 // Each row goes to the Check-in tab (every check-in) and to the tab of its session, e.g.
-// "02-11-2026 Sesi 2 Siang", created when that session's first check-in arrives. Everyone is checked
+// "02-11-2026 Sesi 2", created when that session's first check-in arrives. Everyone is checked
 // out at the end of each day (20261104000000_guestbook_auto_checkout.sql). Kesan & Pesan messages
 // (20261106000000_guestbook_feedback.sql) go to their own tab, a row per message with its sender.
 // Setup steps are in the README ("Google Sheet").
@@ -17,18 +17,12 @@ const ID_HEADER = "ID";
 const VISIT_HEADER = "Check-in ke-";
 const FEEDBACK_TAB = "Kesan & Pesan";
 const FEEDBACK_ID_HEADER = "ID Pesan";
-// The sessions of each day of the rundown (Jadwal Kegiatan), by WIB start time, earliest first. A
-// check-in belongs to the last session started by then, so one during a break (Ishoma 12.00-13.00,
-// 17.00-19.00) counts for the session after it. Days not listed use DEFAULT_SESSIONS.
-const SCHEDULE = {
-  "01/11/2026": [["00:00", "Registrasi"]],
-  "02/11/2026": [["00:00", "Sesi 1 Pagi"], ["12:00", "Sesi 2 Siang"], ["17:00", "Sesi 3 Malam"]],
-  "03/11/2026": [["00:00", "Sesi 1 Pagi"], ["12:00", "Sesi 2 Siang"]],
-  "04/11/2026": [["00:00", "Sesi 1 Pagi"], ["12:00", "Sesi 2 Siang"]],
-  "05/11/2026": [["00:00", "Sesi 1 Pagi"], ["12:00", "Sesi 2 Siang"]],
-  "06/11/2026": [["00:00", "Sesi 1 Pagi"]],
-};
-const DEFAULT_SESSIONS = [["00:00", "Sesi 1 Pagi"], ["12:00", "Sesi 2 Siang"]];
+// Every day's sessions by WIB start time, earliest first; a check-in belongs to the last one started by
+// then. Sesi 1 until 12:00, Sesi 2 from 12:00 on, the evening included.
+const SESSIONS = [
+  ["00:00", "Sesi 1"],
+  ["12:00", "Sesi 2"],
+];
 
 function doPost(e) {
   const body = JSON.parse(e.postData.contents);
@@ -74,12 +68,11 @@ function visit(row) {
   return { cells: [[ID_HEADER, row.id]].concat(cells), key: [[ID_HEADER, row.id], [VISIT_HEADER, number]] };
 }
 
-// "02-11-2026 Sesi 2 Siang" from the visit's time ("02/11/2026 13:05 WIB").
+// "02-11-2026 Sesi 2" from the visit's time ("02/11/2026 13:05 WIB").
 function sessionTab(cells) {
   const time = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})/.exec(valueOf(cells, "Waktu Check-in (WIB)"));
   if (!time) return "";
-  const sessions = SCHEDULE[`${time[1]}/${time[2]}/${time[3]}`] || DEFAULT_SESSIONS;
-  const session = sessions.filter((start) => start[0] <= time[4]).pop();
+  const session = SESSIONS.filter((start) => start[0] <= time[4]).pop();
   return `${time[1]}-${time[2]}-${time[3]} ${session[1]}`;
 }
 
