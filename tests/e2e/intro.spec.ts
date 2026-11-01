@@ -16,15 +16,10 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
   await expect(intro).toBeInViewport({ ratio: 0.9 });
   // It plays (Chrome takes the AV1 file), looping, without sound.
   await expect.poll(() => intro.evaluate((video: HTMLVideoElement) => video.currentTime), { timeout: 15000 }).toBeGreaterThan(0);
-  expect(await intro.evaluate((video: HTMLVideoElement) => [video.currentSrc.includes("webm"), video.muted, video.loop])).toEqual([true, true, true]);
-  // Its download began only once the page had finished loading, so it never held the page up.
-  const afterLoad = await page.evaluate(() => {
-    const navigation = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
-    const video = performance.getEntriesByType("resource").find((entry) => /intro.*\.(webm|mp4)/.test(entry.name));
-    return video ? video.startTime - navigation.loadEventStart : null;
-  });
-  expect(afterLoad).not.toBeNull();
-  expect(afterLoad!).toBeGreaterThanOrEqual(0);
+  expect(await intro.evaluate((video: HTMLVideoElement) => [video.currentSrc.startsWith("blob:"), video.muted, video.loop])).toEqual([true, true, true]);
+  // Fetched once, whole, and played from memory: the host ignores Range requests, and only one of the two files is downloaded.
+  const fetched = await page.evaluate(() => performance.getEntriesByType("resource").filter((entry) => /intro.*\.(webm|mp4)/.test(entry.name)).map((entry) => entry.name.split(".").pop()));
+  expect(fetched).toEqual(["webm"]);
   await expect(dialog.getByText("1 dari 12", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("img", { name: /halaman/ })).toHaveCount(0);
   // No way out before the last slide: no close button, and Mulai check-in waits there.

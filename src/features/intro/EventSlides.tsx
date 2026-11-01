@@ -176,38 +176,53 @@ export function EventSlides({
   );
 }
 
-// The opening animation. Only its small poster loads with the page; the video starts loading once
-// the page has finished, so it never holds the page up. It loops, like the GIF it was made from, while
-// its slide is showing, and pauses on the others. With reduced motion, or where the video cannot play
-// (autoplay refused, as in iOS Low Power Mode), its last frame (the logos) shows as a picture instead,
-// and the video is not downloaded.
+// The opening animation. Its small poster shows while the video (about 250 KB) downloads with the popup.
+// It loops, like the GIF it was made from, while its slide is showing, and pauses on the others. With
+// reduced motion, or where the video cannot load or play (autoplay refused, as in iOS Low Power Mode), its
+// last frame (the logos) shows as a picture instead, and the video is not downloaded.
+//
+// The file is fetched whole and played from memory: Cloudflare's static assets ignore Range requests,
+// which a video played from its URL relies on (Safari stalls on the poster, Chrome re-downloads at every loop).
 function IntroVideo({ reduceMotion, active }: { reduceMotion: boolean; active: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const [still, setStill] = useState(reduceMotion);
-  const [pageLoaded, setPageLoaded] = useState(() => typeof document !== "undefined" && document.readyState === "complete");
+  const [src, setSrc] = useState<string>();
   useEffect(() => {
-    if (pageLoaded) return;
-    const loaded = () => setPageLoaded(true);
-    window.addEventListener("load", loaded, { once: true });
-    return () => window.removeEventListener("load", loaded);
-  }, [pageLoaded]);
+    if (still) return;
+    // AV1 where supported, H.264 elsewhere (older Safari).
+    const av1 = 'video/webm; codecs="av01.0.04M.08"';
+    const [url, type] = document.createElement("video").canPlayType(av1) ? [INTRO.webm(), av1] : [INTRO.mp4(), "video/mp4"];
+    let objectUrl: string | undefined;
+    let cancelled = false;
+    fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([blob], { type }));
+        setSrc(objectUrl);
+      })
+      .catch(() => !cancelled && setStill(true));
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [still]);
   useEffect(() => {
     const element = video.current;
-    if (still || !pageLoaded || !element) return;
+    if (still || !src || !element) return;
     if (!active) return element.pause();
     // Muted before play(): browsers only start silent video on their own. A pause() before play()
     // settles rejects it with AbortError, which is no reason to give up on the video.
     element.muted = true;
     element.play().catch((error: Error) => error.name !== "AbortError" && setStill(true));
-  }, [active, pageLoaded, still]);
+  }, [active, src, still]);
   const fit: CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" };
   return still ? (
     <img src={INTRO.end()} alt={INTRO.label} style={fit} />
   ) : (
-    <video ref={video} aria-label={INTRO.label} poster={INTRO.poster()} muted loop playsInline preload="none" style={fit}>
-      {/* The browser plays the first it can: AV1 where supported, H.264 elsewhere (Safari). */}
-      <source src={INTRO.webm()} type='video/webm; codecs="av01.0.04M.08"' />
-      <source src={INTRO.mp4()} type="video/mp4" />
-    </video>
+    <video ref={video} src={src} aria-label={INTRO.label} poster={INTRO.poster()} muted loop playsInline style={fit} />
   );
 }
