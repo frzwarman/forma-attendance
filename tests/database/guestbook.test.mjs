@@ -502,3 +502,22 @@ test("every night at 23:59 WIB everyone still checked in is checked out, and the
   assert.ok(next.checkout_token);
   assert.equal((await db.query("select checked_out_at from public.guestbook_checkins where email = 'lupa@example.test'")).rows[0].checked_out_at, null);
 });
+
+test("a repeat check-in keeps its answers: they replace earlier ones question by question, the name stays", async () => {
+  const visit = (name, divisi, answers) =>
+    asRole(null, "anon", async () =>
+      (await db.query(
+        `select public.guestbook_check_in(p_name => $1, p_phone => '0899 4400 5500', p_email => 'jawab@example.test', p_jabatan => null,
+           p_address => null, p_latitude => null, p_longitude => null, p_file_path => null, p_check_in_date => null,
+           p_check_out_date => null, p_divisi => $2, p_answers => $3::jsonb) as r`,
+        [name, divisi, answers && JSON.stringify(answers)],
+      )).rows[0].r,
+    );
+  await visit("Jawab Dulu", "Divisi Hukum", { "Ukuran kaos": "M" });
+  // A question added since, a changed answer and a changed Divisi; another name is not taken.
+  await visit("Orang Lain", "Divisi Teknis", { "Ukuran kaos": "L", "Asal Instansi": "Bawaslu DKI" });
+  // Nothing answered this time: the earlier answers stay.
+  await visit("Jawab Dulu", null, null);
+  const { rows } = await db.query("select name, divisi, answers from public.guestbook_checkins where email = 'jawab@example.test'");
+  assert.deepEqual(rows, [{ name: "Jawab Dulu", divisi: "Divisi Teknis", answers: { "Ukuran kaos": "L", "Asal Instansi": "Bawaslu DKI" } }]);
+});

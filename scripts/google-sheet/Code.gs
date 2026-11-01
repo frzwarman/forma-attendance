@@ -1,14 +1,18 @@
 // Google Apps Script for the spreadsheet that mirrors the check-ins. The database posts to it
 // (supabase/migrations/20261103000000_guestbook_sheet_sync.sql) within seconds of every change:
-//   { secret, rows: [{ id, cells: [[header, value], ...] }] }  add or update a row per check-in
-//   { secret, delete: [id, ...] }                              remove those rows
-// Each row goes to the Check-in tab (everyone, one row per person) and to the tab of the session of
-// its latest check-in, e.g. "02-11-2026 Sesi 2 Siang", created when that session's first check-in
-// arrives. Everyone is checked out at the end of each day (20261104000000_guestbook_auto_checkout.sql).
+//   { secret, rows: [{ id, cells: [[header, value], ...] }] }  a person's current state
+//   { secret, delete: [id, ...] }                              remove that person's rows
+// The sheet is a log: a row per check-in, so someone who checks in three times has three rows,
+// numbered by "Check-in ke-" and each with that visit's time (the database keeps one row per person
+// and counts the visits). A check-out or prize updates the row of the latest visit; earlier rows stay.
+// Each row goes to the Check-in tab (every check-in) and to the tab of its session, e.g.
+// "02-11-2026 Sesi 2 Siang", created when that session's first check-in arrives. Everyone is checked
+// out at the end of each day (20261104000000_guestbook_auto_checkout.sql).
 // Setup steps are in the README ("Google Sheet").
 
 const ALL_TAB = "Check-in";
 const ID_HEADER = "ID";
+const VISIT_HEADER = "Check-in ke-";
 // The sessions of each day of the rundown (Jadwal Kegiatan), by WIB start time, earliest first. A
 // check-in belongs to the last session started by then, so one during a break (Ishoma 12.00-13.00,
 // 17.00-19.00) counts for the session after it. Days not listed use DEFAULT_SESSIONS.
@@ -30,7 +34,7 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    (body.rows || []).forEach((row) => {
+    (body.rows || []).map(visit).forEach((row) => {
       upsert(tab(ALL_TAB), row);
       const session = sessionTab(row.cells);
       if (session) upsert(tab(session), row);
@@ -39,8 +43,7 @@ function doPost(e) {
       SpreadsheetApp.getActive()
         .getSheets()
         .forEach((sheet) => {
-          const at = findRow(sheet, id);
-          if (at) sheet.deleteRow(at);
+          for (let at = findRow(sheet, id); at; at = findRow(sheet, id)) sheet.deleteRow(at);
         }),
     );
   } finally {
@@ -49,10 +52,23 @@ function doPost(e) {
   return reply({ ok: true });
 }
 
-// "02-11-2026 Sesi 2 Siang" from the latest check-in time ("02/11/2026 13:05 WIB").
+const valueOf = (cells, header) => (cells.find((cell) => cell[0] === header) || [])[1] || "";
+
+// The person's latest visit as a log row: "Check-in ke-" from Jumlah Check-in, and that visit's time
+// as Waktu Check-in (the database sends the first and the latest check-in time).
+function visit(row) {
+  const number = valueOf(row.cells, "Jumlah Check-in") || "1";
+  const at = valueOf(row.cells, "Check-in Terakhir (WIB)") || valueOf(row.cells, "Waktu Check-in (WIB)");
+  const cells = row.cells
+    .filter((cell) => cell[0] !== "Check-in Terakhir (WIB)" && cell[0] !== "Jumlah Check-in")
+    .map((cell) => (cell[0] === "Waktu Check-in (WIB)" ? [cell[0], at] : cell));
+  cells.splice(1, 0, [VISIT_HEADER, number]);
+  return { id: row.id, visit: number, cells };
+}
+
+// "02-11-2026 Sesi 2 Siang" from the visit's time ("02/11/2026 13:05 WIB").
 function sessionTab(cells) {
-  const value = (header) => (cells.find((cell) => cell[0] === header) || [])[1] || "";
-  const time = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})/.exec(value("Check-in Terakhir (WIB)") || value("Waktu Check-in (WIB)"));
+  const time = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2})/.exec(valueOf(cells, "Waktu Check-in (WIB)"));
   if (!time) return "";
   const sessions = SCHEDULE[`${time[1]}/${time[2]}/${time[3]}`] || DEFAULT_SESSIONS;
   const session = sessions.filter((start) => start[0] <= time[4]).pop();
@@ -84,18 +100,23 @@ function columns(sheet, wanted) {
   return existing;
 }
 
-// The row holding this check-in, or 0; also 0 on a tab without an ID column (one of your own).
-function findRow(sheet, id) {
-  const column = headers(sheet).indexOf(ID_HEADER) + 1;
-  if (!column) return 0;
-  const found = sheet.getRange(1, column, sheet.getLastRow(), 1).createTextFinder(id).matchEntireCell(true).findNext();
-  return found ? found.getRow() : 0;
+// The row of this person's visit (any visit when none is given), or 0; also 0 on a tab without an
+// ID column (one of your own).
+function findRow(sheet, id, number) {
+  const header = headers(sheet);
+  const idColumn = header.indexOf(ID_HEADER);
+  const visitColumn = header.indexOf(VISIT_HEADER);
+  if (idColumn === -1 || sheet.getLastRow() < 2) return 0;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, header.length).getValues();
+  const at = rows.findIndex((values) => values[idColumn] === id && (!number || String(values[visitColumn]) === number));
+  return at === -1 ? 0 : at + 2;
 }
 
 function upsert(sheet, row) {
   const cells = [[ID_HEADER, row.id]].concat(row.cells);
   const header = columns(sheet, cells.map((cell) => cell[0]));
-  const at = findRow(sheet, row.id) || sheet.getLastRow() + 1;
+  // A new visit gets a new row; a check-out or prize updates its visit's row.
+  const at = findRow(sheet, row.id, row.visit) || sheet.getLastRow() + 1;
   const range = sheet.getRange(at, 1, 1, header.length);
   // Columns the request does not mention (answers to a removed question) keep their values.
   const values = range.getValues()[0];

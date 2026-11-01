@@ -18,7 +18,7 @@ const speaker = (name: string, prefix: string, count: number, height: number, pr
 // Shown until an admin saves Info acara, and what "Pakai data contoh" restores. The files are in public/.
 export const BUILT_IN_CONTENT: EventContent = {
   mentimeter_url: "https://www.menti.com/",
-  rundown: pages("/rundown/rundown", 2, 1948),
+  rundown: pages("/rundown/rundown", 2, 1755),
   speakers: [
     speaker("Dr. Agus Canny", "/narasumber/agus-canny", 9, 1605, [820, 310]),
     speaker("Muhammad Juan Al Qausar", "/narasumber/muhammad-juan-al-qausar", 7, 1605, [960, 590]),
