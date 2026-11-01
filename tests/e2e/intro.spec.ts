@@ -11,15 +11,17 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
   // The opening animation first, then the banner, then the speakers, each with only the
   // name-and-photo part of their CV, then the list of materials.
   const loadedWidth = (image: ReturnType<typeof dialog.getByRole>) => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth);
-  const intro = dialog.locator("video");
-  await expect(intro).toHaveAttribute("aria-label", "Animasi pembuka: lambang Garuda Pancasila, lalu logo Bawaslu");
+  const intro = dialog.getByLabel("Animasi pembuka: lambang Garuda Pancasila, lalu logo Bawaslu");
+  const banner = dialog.getByLabel(/^Animasi spanduk acara: .*Jakarta, 1 - 6 November 2026\. Bersama rakyat awasi pemilu/);
+  await expect(intro).toHaveJSProperty("tagName", "VIDEO");
   await expect(intro).toBeInViewport({ ratio: 0.9 });
   // It plays (Chrome takes the AV1 file), looping, without sound.
   await expect.poll(() => intro.evaluate((video: HTMLVideoElement) => video.currentTime), { timeout: 15000 }).toBeGreaterThan(0);
   expect(await intro.evaluate((video: HTMLVideoElement) => [video.currentSrc.startsWith("blob:"), video.muted, video.loop])).toEqual([true, true, true]);
-  // Fetched once, whole, and played from memory: the host ignores Range requests, and only one of the two files is downloaded.
-  const fetched = await page.evaluate(() => performance.getEntriesByType("resource").filter((entry) => /intro.*\.(webm|mp4)/.test(entry.name)).map((entry) => entry.name.split(".").pop()));
-  expect(fetched).toEqual(["webm"]);
+  // Each animation is fetched once, whole, and played from memory: the host ignores Range requests, and
+  // only one of its two files is downloaded. The banner's comes with the popup, ready for slide 2.
+  const fetched = () => page.evaluate(() => performance.getEntriesByType("resource").map((entry) => entry.name.match(/(intro|kv-bawaslu)\.[0-9a-f]+\.(webm|mp4)$/)?.slice(1).join(".")).filter(Boolean));
+  await expect.poll(fetched).toEqual(["intro.webm", "kv-bawaslu.webm"]);
   await expect(dialog.getByText("1 dari 12", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("img", { name: /halaman/ })).toHaveCount(0);
   // No way out before the last slide: no close button, and Mulai check-in waits there.
@@ -37,14 +39,15 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
     if (await next.count()) expect((await next.boundingBox())!.y).toBe(arrowsAt[1].y);
   };
   await next.click();
-  const opening = dialog.getByRole("img", { name: /Jakarta, 1 - 6 November 2026\. Bersama rakyat awasi pemilu/ });
-  await expect(opening).toBeInViewport({ ratio: 0.9 });
-  await expect.poll(() => loadedWidth(opening)).toBe(960);
+  await expect(banner).toBeInViewport({ ratio: 0.9 });
+  await expect.poll(() => banner.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThan(0);
+  expect(await banner.evaluate((video: HTMLVideoElement) => [video.currentSrc.startsWith("blob:"), video.muted, video.loop, video.videoWidth])).toEqual([true, true, true, 1280]);
   await expect(dialog.getByText("2 dari 12", { exact: true })).toBeVisible();
   // Paused while another slide shows; playing again on the way back.
   await expect.poll(() => intro.evaluate((video: HTMLVideoElement) => video.paused)).toBe(true);
   await previous.click();
   await expect.poll(() => intro.evaluate((video: HTMLVideoElement) => video.paused)).toBe(false);
+  await expect.poll(() => banner.evaluate((video: HTMLVideoElement) => video.paused)).toBe(true);
   await next.click();
   await expect(dialog.getByText("2 dari 12", { exact: true })).toBeVisible();
   await stayed();
@@ -127,7 +130,7 @@ test("on a laptop screen the slides share one height, so the arrows stay put", a
   await expect(dialog.getByRole("button", { name: "Mulai check-in", exact: true })).toBeVisible();
 });
 
-test("with reduced motion the opening animation does not play: its last frame, the logos, shows as a picture", async ({ page }) => {
+test("with reduced motion the animations do not play: a still of each shows as a picture", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installSupabaseStub(page, { intro: true });
   await page.goto("/");
@@ -135,8 +138,11 @@ test("with reduced motion the opening animation does not play: its last frame, t
   const still = dialog.getByRole("img", { name: "Animasi pembuka: lambang Garuda Pancasila, lalu logo Bawaslu" });
   await expect(still).toBeInViewport({ ratio: 0.9 });
   await expect.poll(() => still.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(960);
+  // The banner's still is its full banner, not the video's last frame (the bare background).
+  const banner = dialog.getByRole("img", { name: /^Animasi spanduk acara: / });
+  await expect.poll(() => banner.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(1280);
   await expect(dialog.locator("video")).toHaveCount(0);
-  // Nor is the video downloaded.
+  // Nor are the videos downloaded.
   await page.waitForLoadState("networkidle");
-  expect(await page.evaluate(() => performance.getEntriesByType("resource").some((entry) => /intro.*\.(webm|mp4)/.test(entry.name)))).toBe(false);
+  expect(await page.evaluate(() => performance.getEntriesByType("resource").some((entry) => /(intro|kv-bawaslu)\.[0-9a-f]+\.(webm|mp4)$/.test(entry.name)))).toBe(false);
 });

@@ -2,12 +2,12 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, ty
 import { ChevronLeft, ChevronRight } from "../../components/icons";
 import type { Speaker } from "../../domain/eventContent";
 import { FONT_STACK, useTheme } from "../../theme";
-import { CLOSING, INTRO, OPENING, type SlidePicture } from "./slides";
+import { BANNER, CLOSING, INTRO, type SlidePicture, type SlideVideo } from "./slides";
 
 type Picture = { src: string; width: number; height: number; alt: string };
 
-// The opening popup's carousel: swipe, arrows, dots, and arrow keys once focused. The
-// opening animation and pictures in ./slides.ts, then the speakers, one per slide with the name-and-photo
+// The opening popup's carousel: swipe, arrows, dots, and arrow keys once focused. The two
+// animations in ./slides.ts, then the speakers, one per slide with the name-and-photo
 // part of their CV, then the closing picture, which comes with the action (Mulai check-in).
 //
 // Every slide gets the same height, so the centred popup keeps its size and the arrows stay
@@ -30,9 +30,9 @@ export function EventSlides({
   // The slide an arrow tap is heading to. A second quick tap counts on from there, not from the slide
   // still on screen while the first one scrolls (which would turn two taps into one step).
   const aim = useRef<number | null>(null);
-  const pictures = OPENING;
-  // The animation is slide 0, the pictures follow, then the speakers from here.
-  const first = 1 + pictures.length;
+  const videos = [INTRO, BANNER];
+  // The animations come first, then the speakers from here.
+  const first = videos.length;
   const count = first + speakers.length + 1;
   const last = index === count - 1;
   const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -114,11 +114,17 @@ export function EventSlides({
           height: wide ? "min(480px, calc(100dvh - 220px))" : "min(380px, calc(100dvh - 200px))",
         }}
       >
-        <section aria-roledescription="slide" aria-label={`Slide 1 dari ${count}`} style={{ ...slide, position: "relative", overflow: "hidden", backgroundColor: c.background }}>
-          <img src={INTRO.poster()} alt="" aria-hidden style={blurred} />
-          <IntroVideo reduceMotion={reduceMotion} active={index === 0} />
-        </section>
-        {pictures.map((picture, i) => pictureSlide(picture, 1 + i))}
+        {videos.map((clip, i) => (
+          <section
+            key={clip.label}
+            aria-roledescription="slide"
+            aria-label={`Slide ${i + 1} dari ${count}`}
+            style={{ ...slide, position: "relative", overflow: "hidden", backgroundColor: c.background }}
+          >
+            <img src={clip.poster()} alt="" aria-hidden style={blurred} />
+            {loaded.has(i) && <LoopingVideo clip={clip} reduceMotion={reduceMotion} active={index === i} />}
+          </section>
+        ))}
         {speakers.map((speaker, i) => (
           <section key={speaker.title} aria-roledescription="slide" aria-label={`Slide ${first + i + 1} dari ${count}`} style={slide}>
             <div style={{ padding: `${wide ? 24 : 20}px ${pad}px 12px`, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -176,14 +182,15 @@ export function EventSlides({
   );
 }
 
-// The opening animation. Its small poster shows while the video (about 250 KB) downloads with the popup.
+// An animation slide. Its small poster shows while the video (about 250 KB) downloads, with the popup for
+// the first two slides.
 // It loops, like the GIF it was made from, while its slide is showing, and pauses on the others. With
 // reduced motion, or where the video cannot load or play (autoplay refused, as in iOS Low Power Mode), its
 // last frame (the logos) shows as a picture instead, and the video is not downloaded.
 //
 // The file is fetched whole and played from memory: Cloudflare's static assets ignore Range requests,
 // which a video played from its URL relies on (Safari stalls on the poster, Chrome re-downloads at every loop).
-function IntroVideo({ reduceMotion, active }: { reduceMotion: boolean; active: boolean }) {
+function LoopingVideo({ clip, reduceMotion, active }: { clip: SlideVideo; reduceMotion: boolean; active: boolean }) {
   const video = useRef<HTMLVideoElement>(null);
   const [still, setStill] = useState(reduceMotion);
   const [src, setSrc] = useState<string>();
@@ -191,7 +198,7 @@ function IntroVideo({ reduceMotion, active }: { reduceMotion: boolean; active: b
     if (still) return;
     // AV1 where supported, H.264 elsewhere (older Safari).
     const av1 = 'video/webm; codecs="av01.0.04M.08"';
-    const [url, type] = document.createElement("video").canPlayType(av1) ? [INTRO.webm(), av1] : [INTRO.mp4(), "video/mp4"];
+    const [url, type] = document.createElement("video").canPlayType(av1) ? [clip.webm(), av1] : [clip.mp4(), "video/mp4"];
     let objectUrl: string | undefined;
     let cancelled = false;
     fetch(url)
@@ -209,7 +216,7 @@ function IntroVideo({ reduceMotion, active }: { reduceMotion: boolean; active: b
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [still]);
+  }, [clip, still]);
   useEffect(() => {
     const element = video.current;
     if (still || !src || !element) return;
@@ -221,8 +228,8 @@ function IntroVideo({ reduceMotion, active }: { reduceMotion: boolean; active: b
   }, [active, src, still]);
   const fit: CSSProperties = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain" };
   return still ? (
-    <img src={INTRO.end()} alt={INTRO.label} style={fit} />
+    <img src={clip.end()} alt={clip.label} style={fit} />
   ) : (
-    <video ref={video} src={src} aria-label={INTRO.label} poster={INTRO.poster()} muted loop playsInline style={fit} />
+    <video ref={video} src={src} aria-label={clip.label} poster={clip.poster()} muted loop playsInline style={fit} />
   );
 }
