@@ -23,17 +23,26 @@ function doPost(e) {
   const body = JSON.parse(e.postData.contents);
   const secret = PropertiesService.getScriptProperties().getProperty("SECRET");
   if (!secret || body.secret !== secret) return reply({ ok: false, error: "forbidden" });
-  // One request at a time, so two check-ins arriving together never take the same new row.
+  // One request at a time, so two check-ins arriving together never take the same new row. Check out
+  // semua and a resend send 100 rows a request, all at once: the others wait their turn, a few seconds
+  // each (up to 5 minutes, leaving a minute of Apps Script's 6 for the work).
   const lock = LockService.getScriptLock();
-  lock.waitLock(30000);
+  lock.waitLock(300000);
   try {
-    (body.rows || []).map(visit).forEach((row) => {
-      upsert(tab(ALL_TAB), row.cells, row.key);
+    const visits = (body.rows || []).map(visit);
+    upsert(ALL_TAB, visits);
+    const sessions = {};
+    visits.forEach((row) => {
       const session = valueOf(row.cells, "Sesi");
-      if (session) upsert(tab(session), row.cells, row.key);
+      if (session) (sessions[session] = sessions[session] || []).push(row);
     });
-    (body.feedback || []).forEach((message) =>
-      upsert(tab(FEEDBACK_TAB), message.cells.concat([[FEEDBACK_ID_HEADER, message.id]]), [[FEEDBACK_ID_HEADER, message.id]]),
+    Object.keys(sessions).forEach((session) => upsert(session, sessions[session]));
+    upsert(
+      FEEDBACK_TAB,
+      (body.feedback || []).map((message) => ({
+        cells: message.cells.concat([[FEEDBACK_ID_HEADER, message.id]]),
+        key: [[FEEDBACK_ID_HEADER, message.id]],
+      })),
     );
     // On every tab with an ID column, the Kesan & Pesan tab included.
     (body.delete || []).forEach((id) =>
@@ -98,16 +107,32 @@ function findRow(sheet, key) {
   return found === -1 ? 0 : found + 2;
 }
 
-function upsert(sheet, cells, key) {
-  const header = columns(sheet, cells.map((cell) => cell[0]));
-  // A new visit or message gets a new row; a check-out or prize updates its visit's row.
-  const at = findRow(sheet, key) || sheet.getLastRow() + 1;
-  const range = sheet.getRange(at, 1, 1, header.length);
-  // Columns the request does not mention (answers to a removed question) keep their values.
-  const values = range.getValues()[0];
-  cells.forEach((cell) => (values[header.indexOf(cell[0])] = asText(cell[1])));
-  // Plain text, so phone numbers keep their leading 0 and times stay as written.
-  range.setNumberFormat("@").setValues([values]);
+// rows: [{ cells: [[header, value], ...], key: [[header, value], ...] }], all keyed by the same headers.
+// A new visit or message gets a new row; a check-out or prize updates the first row with its key. The
+// tab is read once, then the rows are written with no read in between: Sheets is slow when reads and
+// writes alternate, which made a request of 100 rows take minutes.
+function upsert(name, rows) {
+  if (!rows.length) return;
+  const sheet = tab(name);
+  const header = columns(sheet, [].concat(...rows.map((row) => row.cells.map((cell) => cell[0]))));
+  const last = sheet.getLastRow();
+  const values = last > 1 ? sheet.getRange(2, 1, last - 1, header.length).getValues() : [];
+  const keyAt = rows[0].key.map((pair) => header.indexOf(pair[0]));
+  const id = (list) => JSON.stringify(list.map(String));
+  const found = new Map();
+  values.forEach((row, i) => {
+    const key = id(keyAt.map((at) => row[at]));
+    if (!found.has(key)) found.set(key, i);
+  });
+  rows.forEach((row) => {
+    const key = id(row.key.map((pair) => pair[1]));
+    if (!found.has(key)) found.set(key, values.push(header.map(() => "")) - 1);
+    const at = found.get(key);
+    // Columns the request does not mention (answers to a removed question) keep their values.
+    row.cells.forEach((cell) => (values[at][header.indexOf(cell[0])] = cell[1]));
+    // Plain text, so phone numbers keep their leading 0 and times stay as written.
+    sheet.getRange(at + 2, 1, 1, header.length).setNumberFormat("@").setValues([values[at].map(asText)]);
+  });
 }
 
 // Attendee text starting like a formula (=IMPORTXML(...)) would run in the sheet; the leading

@@ -10,7 +10,7 @@
     "build:web": "expo export --platform web",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.mjs\"",
     "test:e2e": "playwright test",
     "db:login": "supabase login",
     "db:link": "node --env-file=supabase/.env.cli.local scripts/supabase-link.cjs",
