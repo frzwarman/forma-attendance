@@ -113,8 +113,11 @@ function Editor({ initial }: { initial: EventContent }) {
     setError("");
     setDraft(next);
   };
-  const setSpeaker = (index: number, patch: Partial<EventContent["speakers"][number]>) =>
-    change((d) => ({ ...d, speakers: d.speakers.map((s, i) => (i === index ? { ...s, ...patch } : s)) }));
+  type Speaker = EventContent["speakers"][number];
+  // From the latest draft, as an upload finishes after other edits.
+  const updateSpeaker = (index: number, next: (speaker: Speaker) => Partial<Speaker>) =>
+    change((d) => ({ ...d, speakers: d.speakers.map((s, i) => (i === index ? { ...s, ...next(s) } : s)) }));
+  const setSpeaker = (index: number, patch: Partial<Speaker>) => updateSpeaker(index, () => patch);
 
   async function upload(file: File | null, run: (file: File) => Promise<void>) {
     if (!file || busy) return;
@@ -140,7 +143,11 @@ function Editor({ initial }: { initial: EventContent }) {
     const next: EventContent = {
       ...draft,
       mentimeter_url: url || null,
-      speakers: draft.speakers.map((s) => ({ ...s, name: s.name.trim() || "Narasumber" })),
+      speakers: draft.speakers.map((s) => ({
+        ...s,
+        name: s.name.trim() || "Narasumber",
+        materials: s.materials.map((m) => ({ ...m, title: m.title.trim() || m.file_name })),
+      })),
       materials: draft.materials.map((m) => ({ ...m, title: m.title.trim() || m.file_name })),
     };
     setSaving(true);
@@ -237,7 +244,7 @@ function Editor({ initial }: { initial: EventContent }) {
         icon={Users}
         tone="red"
         title={`Narasumber (${draft.speakers.length})`}
-        description="Unggah CV dalam PDF. Foto profil (opsional) tampil di popup pembuka; tanpa foto, popup memakai halaman pertama CV."
+        description="Unggah CV dalam PDF. Foto profil (opsional) tampil di popup pembuka; tanpa foto, popup memakai halaman pertama CV. Materi narasumber (PDF, hingga 20 MB) diunduh peserta dari nama narasumber."
       />
       {draft.speakers.map((speaker, i) => (
         <View
@@ -266,6 +273,7 @@ function Editor({ initial }: { initial: EventContent }) {
                 ) : (
                   <Badge tone="gold" icon={ImagePlus} label="Tanpa foto profil" />
                 )}
+                <Badge icon={FilePlus} label={speaker.materials.length ? `${speaker.materials.length} materi` : "Tanpa materi"} />
               </Row>
             </View>
           </Row>
@@ -302,6 +310,48 @@ function Editor({ initial }: { initial: EventContent }) {
               <Button small variant="ghost" icon={X} label="Hapus foto" accessibilityLabel={`Hapus foto profil narasumber ${i + 1}`} disabled={locked} onPress={() => setSpeaker(i, { profile: null })} />
             )}
           </Row>
+          {/* The speaker's own PDFs: attendees download them from the speaker's entry under Narasumber. */}
+          <View style={{ gap: 8 }}>
+            {speaker.materials.map((material, j) => (
+              <Row key={j} style={{ gap: 10, flexWrap: "wrap", alignItems: "center", padding: 10, borderRadius: 12, backgroundColor: c.ground }}>
+                <FileText size={20} color={c.background} />
+                <View style={{ flex: 1, gap: 4, minWidth: 180 }}>
+                  <Field
+                    labelHidden
+                    label={`Judul materi ${j + 1} narasumber ${i + 1}`}
+                    value={material.title}
+                    onChangeText={(title) => updateSpeaker(i, (s) => ({ materials: s.materials.map((m, k) => (k === j ? { ...m, title } : m)) }))}
+                  />
+                  <T size={12} color={c.muted}>
+                    {material.file_name}, {formatFileSize(material.size)}
+                  </T>
+                </View>
+                <Button
+                  small
+                  variant="danger"
+                  icon={Trash}
+                  label="Hapus"
+                  accessibilityLabel={`Hapus materi ${material.title || j + 1} narasumber ${i + 1}`}
+                  disabled={locked}
+                  onPress={() => updateSpeaker(i, (s) => ({ materials: s.materials.filter((_, k) => k !== j) }))}
+                />
+              </Row>
+            ))}
+            <FileInput
+              key={`speaker-material-${i}-${picks}`}
+              compact
+              label={`Tambah materi narasumber ${i + 1} (PDF)`}
+              buttonLabel="Tambah materi"
+              icon={FilePlus}
+              accept="application/pdf"
+              onChange={(file) =>
+                void upload(file, async (pdf) => {
+                  const material = await api.uploadMaterial(pdf);
+                  updateSpeaker(i, (s) => ({ materials: [...s.materials, material] }));
+                })
+              }
+            />
+          </View>
           <Row style={{ gap: 4, alignItems: "center", flexWrap: "wrap", paddingTop: 10, borderTopWidth: 1, borderColor: c.border }}>
             <T size={12} color={c.muted} style={{ marginRight: 4 }}>
               Urutan
@@ -340,7 +390,7 @@ function Editor({ initial }: { initial: EventContent }) {
           onChange={(file) =>
             void upload(file, async (pdf) => {
               const pages = await api.uploadPdfPages(pdf, setBusy);
-              change((d) => ({ ...d, speakers: [...d.speakers, { name: withoutPdf(pdf.name), pages, profile: null }] }));
+              change((d) => ({ ...d, speakers: [...d.speakers, { name: withoutPdf(pdf.name), pages, profile: null, materials: [] }] }));
             })
           }
         />

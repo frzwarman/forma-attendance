@@ -1,8 +1,9 @@
 // What attendees see after check-in, as the admin saves it in guestbook_settings.event_content.
 // Files are paths: "/..." is a file built into the site, anything else is in the guestbook-event bucket.
 export type StoredImage = { path: string; width: number; height: number };
-export type StoredSpeaker = { name: string; pages: StoredImage[]; profile: StoredImage | null };
 export type StoredMaterial = { title: string; file_name: string; path: string; size: number };
+// materials: the speaker's own PDFs, downloaded from their entry under Narasumber.
+export type StoredSpeaker = { name: string; pages: StoredImage[]; profile: StoredImage | null; materials: StoredMaterial[] };
 export type EventContent = {
   mentimeter_url: string | null;
   // Rundown page images; empty hides the section.
@@ -15,7 +16,7 @@ export type EventContent = {
 export type Page = { src: string; width: number; height: number };
 export type PagedDoc = { title: string; pages: Page[] };
 // profile: the name-and-photo part of the CV for the opening popup; the first CV page when none is given.
-export type Speaker = PagedDoc & { profile: Page };
+export type Speaker = PagedDoc & { profile: Page; materials: Material[] };
 export type Material = { title: string; file_name: string; url: string; size: number };
 export type EventView = { mentimeter_url: string | null; rundown: PagedDoc | null; speakers: Speaker[]; materials: Material[] };
 
@@ -35,6 +36,13 @@ function image(value: unknown): StoredImage | null {
   return v && isSafePath(v.path) && width && height ? { path: v.path, width, height } : null;
 }
 const images = (value: unknown) => list(value).map(image).filter((page): page is StoredImage => !!page);
+const materials = (value: unknown): StoredMaterial[] =>
+  list(value).flatMap((item) => {
+    const m = item as Record<string, unknown> | null;
+    const bytes = typeof m?.size === "number" && Number.isFinite(m.size) && m.size >= 0 ? m.size : 0;
+    const file_name = text(m?.file_name, 200) || "materi.pdf";
+    return isSafePath(m?.path) ? [{ title: text(m?.title, 200) || file_name, file_name, path: m.path, size: bytes }] : [];
+  });
 
 // Reads what the database holds; entries that are not well formed are left out. Null when nothing is saved.
 export function parseEventContent(raw: unknown): EventContent | null {
@@ -47,14 +55,9 @@ export function parseEventContent(raw: unknown): EventContent | null {
     speakers: list(v.speakers).flatMap((item) => {
       const s = item as Record<string, unknown> | null;
       const pages = images(s?.pages);
-      return pages.length ? [{ name: text(s?.name, 120) || "Narasumber", pages, profile: image(s?.profile) }] : [];
+      return pages.length ? [{ name: text(s?.name, 120) || "Narasumber", pages, profile: image(s?.profile), materials: materials(s?.materials) }] : [];
     }),
-    materials: list(v.materials).flatMap((item) => {
-      const m = item as Record<string, unknown> | null;
-      const bytes = typeof m?.size === "number" && Number.isFinite(m.size) && m.size >= 0 ? m.size : 0;
-      const file_name = text(m?.file_name, 200) || "materi.pdf";
-      return isSafePath(m?.path) ? [{ title: text(m?.title, 200) || file_name, file_name, path: m.path, size: bytes }] : [];
-    }),
+    materials: materials(v.materials),
   };
 }
 
@@ -62,16 +65,22 @@ export function parseEventContent(raw: unknown): EventContent | null {
 export function resolveEventContent(content: EventContent, objectUrl: (path: string) => string): EventView {
   const url = (path: string) => (path.startsWith("/") ? path : objectUrl(path));
   const page = (img: StoredImage): Page => ({ src: url(img.path), width: img.width, height: img.height });
+  const material = (m: StoredMaterial): Material => ({
+    title: m.title,
+    file_name: m.file_name,
+    // The download attribute is ignored across origins; Storage's ?download= names the file instead.
+    url: m.path.startsWith("/") ? m.path : `${objectUrl(m.path)}?download=${encodeURIComponent(m.file_name)}`,
+    size: m.size,
+  });
   return {
     mentimeter_url: content.mentimeter_url,
     rundown: content.rundown.length ? { title: "Rundown acara", pages: content.rundown.map(page) } : null,
-    speakers: content.speakers.map((s) => ({ title: s.name, pages: s.pages.map(page), profile: page(s.profile ?? s.pages[0]) })),
-    materials: content.materials.map((m) => ({
-      title: m.title,
-      file_name: m.file_name,
-      // The download attribute is ignored across origins; Storage's ?download= names the file instead.
-      url: m.path.startsWith("/") ? m.path : `${objectUrl(m.path)}?download=${encodeURIComponent(m.file_name)}`,
-      size: m.size,
+    speakers: content.speakers.map((s) => ({
+      title: s.name,
+      pages: s.pages.map(page),
+      profile: page(s.profile ?? s.pages[0]),
+      materials: s.materials.map(material),
     })),
+    materials: content.materials.map(material),
   };
 }

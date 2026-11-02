@@ -13,6 +13,8 @@ const speaker = (name: string, prefix: string, count: number, height: number, pr
   name,
   pages: pages(prefix, count, height),
   profile: profile ? { path: `${prefix}-profil.jpg`, width: profile[0], height: profile[1] } : null,
+  // Uploaded per speaker in Info acara; the built-in speakers have none.
+  materials: [],
 });
 
 // Shown until an admin saves Info acara, and what "Pakai data contoh" restores. The files are in public/.

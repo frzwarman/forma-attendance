@@ -7,7 +7,12 @@ const saved = {
   mentimeter_url: " https://www.menti.com/al1b2c ",
   rundown: [page("docs/r/1.jpg"), page("docs/r/2.jpg")],
   speakers: [
-    { name: " Dr. Agus Canny ", pages: [page("docs/a/1.jpg")], profile: { path: "profiles/a.jpg", width: 800, height: 300 } },
+    {
+      name: " Dr. Agus Canny ",
+      pages: [page("docs/a/1.jpg")],
+      profile: { path: "profiles/a.jpg", width: 800, height: 300 },
+      materials: [{ title: "Paparan", file_name: "paparan agus.pdf", path: "materials/a.pdf", size: 1200 }],
+    },
     { name: "", pages: [page("/narasumber/nicholas-khoo-1.jpg")], profile: null },
   ],
   materials: [{ title: "Panduan", file_name: "panduan peserta.pdf", path: "materials/p.pdf", size: 46730 }],
@@ -19,6 +24,8 @@ it("reads saved content and trims it", () => {
   assert.equal(content.rundown.length, 2);
   assert.deepEqual(content.speakers.map((s) => s.name), ["Dr. Agus Canny", "Narasumber"]);
   assert.equal(content.materials[0].path, "materials/p.pdf");
+  // A speaker's own materials; content saved before they existed has none.
+  assert.deepEqual(content.speakers.map((s) => s.materials.map((m) => m.path)), [["materials/a.pdf"], []]);
 });
 
 it("treats anything but an object as nothing saved", () => {
@@ -32,11 +39,19 @@ it("drops entries whose files could point elsewhere or are malformed", () => {
   for (const path of ["/rundown/rundown-1.jpg", "docs/0b1c-uuid/1.jpg", "materials/a_b.pdf"]) assert.equal(isSafePath(path), true, path);
   const content = parseEventContent({
     rundown: [page("//evil.example/1.jpg"), { path: "docs/r/1.jpg", width: -1, height: 10 }, page("docs/r/2.jpg")],
-    speakers: [{ name: "Tanpa CV", pages: [] }, { name: "Profil luar", pages: [page("docs/b/1.jpg")], profile: page("https://evil.example/p.jpg") }],
+    speakers: [
+      { name: "Tanpa CV", pages: [] },
+      {
+        name: "Profil luar",
+        pages: [page("docs/b/1.jpg")],
+        profile: page("https://evil.example/p.jpg"),
+        materials: [{ title: "Luar", file_name: "x.pdf", path: "//evil.example/x.pdf", size: 1 }],
+      },
+    ],
     materials: [{ title: "Luar", file_name: "x.pdf", path: "https://evil.example/x.pdf", size: 1 }],
   })!;
   assert.deepEqual(content.rundown.map((p) => p.path), ["docs/r/2.jpg"]);
-  assert.deepEqual(content.speakers.map((s) => [s.name, s.profile]), [["Profil luar", null]]);
+  assert.deepEqual(content.speakers.map((s) => [s.name, s.profile, s.materials]), [["Profil luar", null, []]]);
   assert.deepEqual(content.materials, []);
 });
 
@@ -47,5 +62,6 @@ it("resolves bucket paths to public URLs and keeps files built into the site", (
   // Without a profile picture the popup shows the first CV page.
   assert.deepEqual(view.speakers[1].profile, { src: "/narasumber/nicholas-khoo-1.jpg", width: 1240, height: 1754 });
   assert.equal(view.materials[0].url, "https://x.supabase.co/storage/v1/object/public/guestbook-event/materials/p.pdf?download=panduan%20peserta.pdf");
+  assert.equal(view.speakers[0].materials[0].url, "https://x.supabase.co/storage/v1/object/public/guestbook-event/materials/a.pdf?download=paparan%20agus.pdf");
   assert.equal(resolveEventContent({ ...parseEventContent(saved)!, rundown: [] }, String).rundown, null);
 });

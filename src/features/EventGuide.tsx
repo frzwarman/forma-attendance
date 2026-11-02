@@ -9,10 +9,6 @@ import type { Material, PagedDoc } from "../domain/eventContent";
 import { useEventContent } from "../services/eventInfo";
 import { FONT_STACK, useTheme } from "../theme";
 
-// ponytail: mock. Every speaker offers the same sample PDF; when the real files arrive, give each
-// speaker their own materials (a list on StoredSpeaker, uploaded in Info acara) and link those here.
-const SPEAKER_MATERIAL = "/materi/materi-kecerdasan-buatan.pdf";
-
 // What a checked-in attendee needs during the event: polling, the rundown, materials and speaker CVs.
 export function EventGuide() {
   const c = useTheme();
@@ -24,7 +20,7 @@ export function EventGuide() {
   const { mentimeter_url, rundown, speakers, materials } = content;
   const menti = mentimeter_url && isMentimeterUrl(mentimeter_url) ? mentimeter_url : null;
   const sections: ReactNode[] = [];
-  // Lihat CV and Unduh materi under an opened speaker.
+  // Lihat CV and the speaker's materials under an opened speaker.
   const choice: CSSProperties = {
     flex: "1 1 140px",
     display: "flex",
@@ -110,7 +106,7 @@ export function EventGuide() {
                       {speaker.title}
                     </T>
                     <T size={12} color={c.muted}>
-                      CV dan materi
+                      {speaker.materials.length ? "CV dan materi" : "CV"}
                     </T>
                   </View>
                   <View style={{ transform: [{ rotate: open ? "90deg" : "0deg" }] }}>
@@ -123,10 +119,19 @@ export function EventGuide() {
                       <FileText size={18} color={c.text} />
                       Lihat CV
                     </button>
-                    <a href={SPEAKER_MATERIAL} download={`Materi ${speaker.title}.pdf`} aria-label={`Unduh materi ${speaker.title}`} style={choice}>
-                      <Download size={18} color={c.text} />
-                      Unduh materi
-                    </a>
+                    {/* One material shows as Unduh materi; several by their titles. */}
+                    {speaker.materials.map((material) => (
+                      <a
+                        key={material.url}
+                        href={material.url}
+                        download={material.file_name}
+                        aria-label={speaker.materials.length > 1 ? `Unduh materi ${speaker.title}: ${material.title}` : `Unduh materi ${speaker.title}`}
+                        style={{ ...choice, textAlign: "center" }}
+                      >
+                        <Download size={18} color={c.text} />
+                        {speaker.materials.length > 1 ? material.title : "Unduh materi"}
+                      </a>
+                    ))}
                   </div>
                 )}
               </View>

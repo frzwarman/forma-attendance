@@ -62,17 +62,19 @@ test("the rundown shows one page at a time with next and back, and each speaker'
 
   const speakers = guide.getByRole("list", { name: "Narasumber" });
   await expect(speakers.getByRole("listitem")).toHaveCount(9);
-  // Each speaker opens like an accordion, one at a time, with Lihat CV and Unduh materi.
+  // Each speaker opens like an accordion, one at a time, with Lihat CV (and their materials, once uploaded:
+  // the built-in speakers have none).
   await expect(speakers.getByRole("link")).toHaveCount(0);
+  await expect(speakers.getByRole("button", { name: /^Dr\. Agus Canny/ })).toContainText(/CV$/);
   const agus = speakers.getByRole("button", { name: /^Dr\. Agus Canny/ });
   await expect(agus).toHaveAttribute("aria-expanded", "false");
   await agus.click();
   await expect(agus).toHaveAttribute("aria-expanded", "true");
-  // ponytail: the materials are one sample PDF for everyone for now.
-  expect(await download(page, "Unduh materi Dr. Agus Canny")).toEqual({ name: "Materi Dr. Agus Canny.pdf", head: "%PDF-" });
+  await expect(speakers.getByRole("button", { name: "Lihat CV Dr. Agus Canny", exact: true })).toBeVisible();
+  await expect(speakers.getByRole("link")).toHaveCount(0);
   await speakers.getByRole("button", { name: /^Nicholas Khoo/ }).click();
   await expect(agus).toHaveAttribute("aria-expanded", "false");
-  await expect(speakers.getByRole("link", { name: "Unduh materi Dr. Agus Canny" })).toHaveCount(0);
+  await expect(speakers.getByRole("button", { name: "Lihat CV Dr. Agus Canny", exact: true })).toHaveCount(0);
   await agus.click();
   await speakers.getByRole("button", { name: "Lihat CV Dr. Agus Canny", exact: true }).click();
   const viewer = page.getByRole("dialog", { name: "CV Dr. Agus Canny" });
@@ -85,7 +87,7 @@ test("the rundown shows one page at a time with next and back, and each speaker'
 
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
 
-test("an admin uploads the rundown, a speaker's CV and profile picture, and a material; attendees see them", async ({ page }) => {
+test("an admin uploads the rundown, a speaker's CV, profile picture and materials, and a material; attendees see them", async ({ page }) => {
   const state = await installSupabaseStub(page);
   await page.goto("/admin");
   await signInAsAdmin(page);
@@ -117,6 +119,21 @@ test("an admin uploads the rundown, a speaker's CV and profile picture, and a ma
   // The eight built-in speakers kept have their cropped profile pictures, and the new one now has one too.
   await expect(page.getByText("Foto profil diunggah", { exact: true })).toHaveCount(9);
   await expect(page.getByText("Tanpa foto profil", { exact: true })).toHaveCount(0);
+  // The speaker's own materials, downloaded from their entry under Narasumber.
+  await expect(page.getByText("Tanpa materi", { exact: true })).toHaveCount(9);
+  const speakerMaterial = (name: string) =>
+    page.getByLabel("Tambah materi narasumber 8 (PDF)", { exact: true }).setInputFiles({ name, mimeType: "application/pdf", buffer: pdfWithPages(1) });
+  await speakerMaterial("Paparan Budi.pdf");
+  await idle();
+  await expect(page.getByLabel("Judul materi 1 narasumber 8", { exact: true })).toHaveValue("Paparan Budi");
+  await expect(page.getByText("1 materi", { exact: true })).toBeVisible();
+  await speakerMaterial("salah.pdf");
+  await idle();
+  await page.getByRole("button", { name: "Hapus materi salah narasumber 8", exact: true }).click();
+  await speakerMaterial("Studi kasus.pdf");
+  await idle();
+  await page.getByLabel("Judul materi 2 narasumber 8", { exact: true }).fill("Studi kasus Budi");
+  await expect(page.getByText("2 materi", { exact: true })).toBeVisible();
 
   const material = page.getByLabel("Tambah materi (PDF)", { exact: true });
   await material.setInputFiles({ name: "besar.pdf", mimeType: "application/pdf", buffer: Buffer.concat([Buffer.from("%PDF-"), Buffer.alloc(21 * 1024 * 1024)]) });
@@ -133,8 +150,9 @@ test("an admin uploads the rundown, a speaker's CV and profile picture, and a ma
     expect.arrayContaining([["docs", "image/jpeg"], ["profiles", "image/jpeg"], ["materials", "application/pdf"]]),
   );
   expect(uploads.filter((u) => u.path.startsWith("docs/"))).toHaveLength(5);
-  const saved = state.settings.event_content as { rundown: { path: string }[]; speakers: { name: string; profile: unknown }[] };
+  const saved = state.settings.event_content as { rundown: { path: string }[]; speakers: { name: string; profile: unknown; materials: { title: string }[] }[] };
   expect(saved.rundown).toHaveLength(2);
+  expect(saved.speakers.map((s) => s.materials.map((m) => m.title))).toEqual([[], [], [], [], [], [], [], ["Paparan Budi", "Studi kasus Budi"], []]);
   expect(saved.speakers.map((s) => s.name).slice(-2)).toEqual(["Budi Narasumber", "Karen Grace Sutoto"]);
 
   await page.evaluate(() =>
@@ -151,6 +169,13 @@ test("an admin uploads the rundown, a speaker's CV and profile picture, and a ma
   await speakers.nth(7).getByRole("button", { name: "Lihat CV Budi Narasumber" }).click();
   await expect(page.getByRole("dialog", { name: "CV Budi Narasumber" }).getByRole("img", { name: /^Budi Narasumber, halaman \d dari 3$/ })).toHaveCount(3);
   await page.keyboard.press("Escape");
+  // With two materials each shows its title.
+  await expect(speakers.nth(7).getByRole("link", { name: "Unduh materi Budi Narasumber: Paparan Budi" })).toHaveText("Paparan Budi");
+  await expect(speakers.nth(7).getByRole("link", { name: "Unduh materi Budi Narasumber: Studi kasus Budi" })).toHaveAttribute(
+    "href",
+    /guestbook-event\/materials\/.+\.pdf\?download=Studi%20kasus\.pdf$/,
+  );
+  expect(await download(page, "Unduh materi Budi Narasumber: Paparan Budi")).toEqual({ name: "Paparan Budi.pdf", head: "%PDF-" });
   await expect(guide.getByRole("link", { name: "Unduh Paparan narasumber" })).toHaveAttribute("href", /guestbook-event\/materials\/.+\.pdf\?download=paparan\.pdf$/);
   expect(await download(page, "Unduh Paparan narasumber")).toEqual({ name: "paparan.pdf", head: "%PDF-" });
 
