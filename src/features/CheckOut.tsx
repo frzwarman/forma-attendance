@@ -81,7 +81,7 @@ export function CheckOut({
             Anda sudah check-in
           </T>
           <T size={14} color={c.muted}>
-            Tekan check-out saat meninggalkan lokasi acara. Jika lupa, check-out tercatat otomatis pukul 12.00 dan 23.59 WIB; check-in lagi untuk sesi berikutnya.
+            Tekan check-out saat meninggalkan lokasi acara. Saat sesi berikutnya dimulai, check-in lagi untuk sesi itu.
           </T>
           {pending.map((entry) => (
             <View key={entry.token} style={{ gap: 10, padding: 14, borderRadius: 12, backgroundColor: c.ground }}>

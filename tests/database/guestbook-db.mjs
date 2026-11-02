@@ -40,6 +40,9 @@ export async function guestbookDatabase() {
     create function cron.schedule(name text, schedule text, command text) returns bigint language sql as $$
       insert into cron.jobs values (name, schedule, command) on conflict (name) do update set schedule = excluded.schedule, command = excluded.command returning 1::bigint
     $$;
+    create function cron.unschedule(name text) returns boolean language sql as $$
+      with gone as (delete from cron.jobs where jobs.name = unschedule.name returning 1) select count(*) = 1 from gone
+    $$;
   `);
   const files = (await readdir(migrations)).filter((name) => /^\d+_guestbook.*\.sql$/.test(name)).sort();
   for (const name of files) {

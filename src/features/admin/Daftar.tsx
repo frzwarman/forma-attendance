@@ -2,12 +2,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, FileSpreadsheet, FileText, LogOut, Search, Trophy, Users } from "../../components/icons";
 import { useState, type CSSProperties } from "react";
 import { View, useWindowDimensions } from "react-native";
+import { Modal } from "../../components/Modal";
 import { Badge, Button, Card, Empty, Field, Row, Stat, T } from "../../components/ui";
 import { exportFileName, exportRows, toCsv, toXlsx } from "../../domain/export";
 import { formFieldsFrom } from "../../domain/formFields";
 import { formatWib } from "../../domain/time";
 import { useAdminApi, useCheckIns, useWinners } from "../../services/adminContext";
 import { downloadFile } from "../../services/download";
+import { SESSION_LABELS, sessionTab, useCurrentSession, type EventSession } from "../../services/session";
 import { useSettings } from "../../services/settings";
 import { FONT_STACK, useTheme } from "../../theme";
 import type { CheckIn, Winner } from "../../types/guestbook";
@@ -30,6 +32,11 @@ export function Daftar() {
   const [rowBusy, setRowBusy] = useState("");
   const [confirmAll, setConfirmAll] = useState(false);
   const [allBusy, setAllBusy] = useState(false);
+  // The session under way, also as other admins start them.
+  const session = useCurrentSession(30_000);
+  const [confirmSession, setConfirmSession] = useState<EventSession["label"]>();
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [sessionError, setSessionError] = useState("");
   // The table needs about 820 px; the card is narrower when the sidebar takes its share, so the
   // card's own width (not the window's) picks the table or the stacked list.
   const [listWidth, setListWidth] = useState(0);
@@ -74,6 +81,23 @@ export function Daftar() {
       setError(`Check-out semua gagal: ${(cause as Error).message}`);
     } finally {
       setAllBusy(false);
+    }
+  }
+
+  async function startSession(label: EventSession["label"]) {
+    if (sessionBusy) return;
+    setSessionBusy(true);
+    setSessionError("");
+    try {
+      await api.startSession(label);
+      await client.invalidateQueries({ queryKey: ["session"] });
+      setConfirmSession(undefined);
+      setNotice(`${label} dimulai.`);
+    } catch (cause) {
+      // Shown in the popup, which stays open to try again.
+      setSessionError(`${label} gagal dimulai: ${(cause as Error).message}`);
+    } finally {
+      setSessionBusy(false);
     }
   }
 
@@ -130,6 +154,22 @@ export function Daftar() {
           />
         </Row>
       </Row>
+      <SessionCard
+        session={session.data}
+        loading={session.isLoading}
+        failure={session.isError ? (session.error as Error).message : undefined}
+        today={todayKey}
+        confirming={confirmSession}
+        busy={sessionBusy}
+        startError={sessionError}
+        onAsk={(label) => {
+          setNotice("");
+          setSessionError("");
+          setConfirmSession(label);
+        }}
+        onConfirm={(label) => void startSession(label)}
+        onCancel={() => setConfirmSession(undefined)}
+      />
       {confirmAll && (
         <Card style={{ gap: 12, borderColor: c.danger }}>
           <T weight="semibold">
@@ -389,5 +429,97 @@ function CheckInRow({
         )}
       </Row>
     </View>
+  );
+}
+
+// Which session is under way, and the buttons that start the next. A session runs until an admin starts
+// another, past midnight too, so the first press of the day is Mulai Sesi 1. The session under way has its
+// button disabled; only one carried over from an earlier day leaves Mulai Sesi 1 open, for today's Sesi 1.
+// Each start is confirmed in a popup first: phones of attendees who checked in before it go back to the
+// form, to check in again for the new session.
+function SessionCard({
+  session,
+  loading,
+  failure,
+  today,
+  confirming,
+  busy,
+  startError,
+  onAsk,
+  onConfirm,
+  onCancel,
+}: {
+  session: EventSession | null | undefined;
+  loading: boolean;
+  failure?: string;
+  // Today in WIB, as formatWib writes it: 02/11/2026.
+  today: string;
+  confirming?: EventSession["label"];
+  busy: boolean;
+  startError: string;
+  onAsk: (label: EventSession["label"]) => void;
+  onConfirm: (label: EventSession["label"]) => void;
+  onCancel: () => void;
+}) {
+  const c = useTheme();
+  const startedToday = !!session && formatWib(session.started_at).slice(0, 10) === today;
+  const ongoing = (label: string) => session?.label === label && (startedToday || label === "Sesi 2");
+  const next = startedToday && session?.label === "Sesi 1" ? "Sesi 2" : "Sesi 1";
+  const hint = failure
+    ? `Sesi belum bisa dimuat: ${failure}`
+    : loading
+      ? "Memuat sesi…"
+      : !session
+        ? "Tekan Mulai Sesi 1 saat sesi pertama benar-benar dimulai."
+        : startedToday
+          ? `Check-in sejak itu masuk tab ${sessionTab(session.label, session.started_at)} di spreadsheet.`
+          : `Sesi ini dimulai ${formatWib(session.started_at)} dan masih berjalan: check-in baru masuk tab ${sessionTab(session.label, session.started_at)} sampai Anda menekan Mulai Sesi 1.`;
+  return (
+    <Card style={{ gap: 12 }}>
+      <Row style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <View style={{ gap: 2, flexShrink: 1 }}>
+          <T weight="bold" accessibilityRole="header">
+            {session ? `${session.label} sejak ${startedToday ? formatWib(session.started_at).slice(11) : formatWib(session.started_at)}` : loading ? "Sesi" : "Belum ada sesi"}
+          </T>
+          <T size={13} color={failure || (session && !startedToday) ? c.danger : c.muted}>
+            {hint}
+          </T>
+        </View>
+        <Row style={{ gap: 10, flexWrap: "wrap" }}>
+          {SESSION_LABELS.map((label) => (
+            <Button
+              key={label}
+              small
+              variant={label === next ? "primary" : "secondary"}
+              label={`Mulai ${label}`}
+              disabled={loading || ongoing(label)}
+              onPress={() => onAsk(label)}
+            />
+          ))}
+        </Row>
+      </Row>
+      {confirming && (
+        <Modal label={`Mulai ${confirming}`} maxWidth={460} onClose={() => !busy && onCancel()}>
+          <View style={{ padding: 24, paddingTop: 28, gap: 16 }}>
+            <T size={22} weight="extra" accessibilityRole="header" style={{ paddingRight: 48 }}>
+              Mulai {confirming} sekarang?
+            </T>
+            <T color={c.muted}>
+              Check-in sesudah ini masuk tab {sessionTab(confirming, new Date().toISOString())} di spreadsheet. Peserta yang check-in sebelumnya diminta check-in
+              lagi di ponselnya; tidak ada yang di-check-out.
+            </T>
+            {!!startError && (
+              <T accessibilityRole="alert" color={c.danger}>
+                {startError}
+              </T>
+            )}
+            <Row style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <Button variant="ghost" label="Batal" disabled={busy} onPress={onCancel} />
+              <Button label={`Ya, mulai ${confirming}`} loading={busy} loadingLabel="Menyimpan…" onPress={() => onConfirm(confirming)} />
+            </Row>
+          </View>
+        </Modal>
+      )}
+    </Card>
   );
 }

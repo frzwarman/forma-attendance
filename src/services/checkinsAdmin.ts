@@ -1,4 +1,5 @@
 import type { CheckIn, Winner } from "../types/guestbook";
+import type { EventSession } from "./session";
 import { getSupabase } from "./supabase";
 
 export const PAGE = 1000;
@@ -52,4 +53,11 @@ export async function checkOutAll(): Promise<number> {
   const { data, error } = await getSupabase().rpc("guestbook_check_out_all");
   if (error) throw new Error(error.message);
   return Number(data ?? 0);
+}
+
+// Mulai Sesi 1 / Mulai Sesi 2: the session runs from now until the next one. Returns its start.
+export async function startSession(label: EventSession["label"]): Promise<string> {
+  const { data, error } = await getSupabase().rpc("guestbook_start_session", { p_label: label });
+  if (error) throw new Error(error.message);
+  return data as string;
 }

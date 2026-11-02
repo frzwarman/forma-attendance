@@ -1,9 +1,12 @@
 import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "../theme";
 import { X } from "./icons";
 
 // Accessible popup: focus moves into it and Tab stays inside. With onClose, the close button,
 // Escape or the backdrop closes it; without, only the popup's own buttons do.
+// Rendered into <body>: inside a ScrollView (translateZ(0) in React Native Web) position: fixed is
+// relative to the ScrollView, so on the admin pages the popup left the header uncovered.
 export function Modal({
   label,
   maxWidth,
@@ -60,7 +63,7 @@ export function Modal({
     justifyContent: "center",
     cursor: "pointer",
   };
-  return (
+  return createPortal(
     <div
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose?.();
@@ -107,6 +110,7 @@ export function Modal({
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

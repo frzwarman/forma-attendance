@@ -11,6 +11,8 @@ export type StubState = {
   uploads: { bucket: string; path: string; contentType: string; bytes: number }[];
   signedPaths: string[];
   rangeHeaders: string[];
+  // Sessions an admin started (guestbook_sessions), oldest first.
+  sessions: { label: "Sesi 1" | "Sesi 2"; started_at: string }[];
 };
 type Seed = {
   settings?: Partial<Settings>;
@@ -28,6 +30,7 @@ type Seed = {
   // A database without migrations 20261028000000 and 20261029000000: no p_room_number or p_divisi
   // yet, and an address is required.
   legacyCheckIn?: boolean;
+  sessions?: StubState["sessions"];
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -130,6 +133,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     uploads: [],
     signedPaths: [],
     rangeHeaders: [],
+    sessions: [...(seed.sessions || [])],
   };
   if (!seed.intro) await page.addInitScript(() => sessionStorage.setItem("guestbook.intro.seen", "1"));
   const admin = seed.admin || { email: "admin@bawaslu.test", password: "rahasia123" };
@@ -232,6 +236,21 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     return json(route, open.length);
   });
 
+  // The current session: the latest started, as one object (406 before the first).
+  await page.route("**/rest/v1/guestbook_sessions*", (route, request) => {
+    const latest = [...state.sessions].sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+    if (!wantsObject(request)) return json(route, latest ? [latest] : []);
+    return latest ? json(route, latest) : json(route, { code: "PGRST116", message: "Cannot coerce the result to a single JSON object" }, 406);
+  });
+  await page.route("**/rest/v1/rpc/guestbook_start_session", (route, request) => {
+    const label = parseBody(request).p_label as "Sesi 1" | "Sesi 2";
+    const latest = [...state.sessions].sort((a, b) => b.started_at.localeCompare(a.started_at))[0];
+    const wibDay = (iso: string) => new Date(Date.parse(iso) + 7 * 3600 * 1000).toISOString().slice(0, 10);
+    if (latest?.label === label && wibDay(latest.started_at) === wibDay(new Date().toISOString())) return json(route, latest.started_at);
+    const started_at = new Date().toISOString();
+    state.sessions.push({ label, started_at });
+    return json(route, started_at);
+  });
   await page.route("**/rest/v1/rpc/guestbook_draw_winner", async (route, request) => {
     const body = parseBody(request);
     state.rpcCalls.push({ name: "guestbook_draw_winner", body });

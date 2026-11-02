@@ -117,3 +117,82 @@ test("at every screen width the check-out and file buttons are fully visible, ne
     expect(clipped, `${width}px`).toEqual([]);
   }
 });
+
+// Today in WIB as the sheet's tab names write it: 02-11-2026.
+const tabDay = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10).split("-").reverse().join("-");
+
+test("the admin starts Sesi 1 and Sesi 2 when they really begin, confirmed in a popup; nobody is checked out", async ({ page }) => {
+  const state = await installSupabaseStub(page, { checkins: [checkInRow({ name: "Budi Santoso" })] });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await expect(page.getByText("Belum ada sesi", { exact: true })).toBeVisible();
+
+  // Asked first in a popup; Batal, the close button and Escape start nothing.
+  await page.getByRole("button", { name: "Mulai Sesi 1", exact: true }).click();
+  const ask = page.getByRole("dialog", { name: "Mulai Sesi 1" });
+  await expect(ask.getByRole("heading", { name: "Mulai Sesi 1 sekarang?" })).toBeVisible();
+  await expect(ask.getByText(`Check-in sesudah ini masuk tab ${tabDay()} Sesi 1 di spreadsheet.`, { exact: false })).toBeVisible();
+  // It covers the whole screen, the admin header too: rendered into <body>, outside the scroll view.
+  expect(await ask.evaluate((dialog) => (dialog.parentElement as HTMLElement).getBoundingClientRect().toJSON())).toMatchObject({ top: 0, left: 0, height: await page.evaluate(() => innerHeight) });
+  await ask.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(ask).toHaveCount(0);
+  await page.getByRole("button", { name: "Mulai Sesi 1", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(ask).toHaveCount(0);
+  await page.getByRole("button", { name: "Mulai Sesi 1", exact: true }).click();
+  await ask.getByRole("button", { name: "Tutup", exact: true }).click();
+  await expect(ask).toHaveCount(0);
+  expect(state.sessions).toEqual([]);
+
+  await page.getByRole("button", { name: "Mulai Sesi 1", exact: true }).click();
+  await ask.getByRole("button", { name: "Ya, mulai Sesi 1", exact: true }).click();
+  await expect(ask).toHaveCount(0);
+  await expect(page.getByText(/^Sesi 1 sejak \d{2}:\d{2} WIB$/)).toBeVisible();
+  await expect(page.getByText(`Check-in sejak itu masuk tab ${tabDay()} Sesi 1 di spreadsheet.`, { exact: true })).toBeVisible();
+  // Sesi 1 is under way: its button is disabled, Sesi 2 is next.
+  await expect(page.getByRole("button", { name: "Mulai Sesi 1", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Mulai Sesi 2", exact: true })).toBeEnabled();
+
+  await page.getByRole("button", { name: "Mulai Sesi 2", exact: true }).click();
+  await page.getByRole("dialog", { name: "Mulai Sesi 2" }).getByRole("button", { name: "Ya, mulai Sesi 2", exact: true }).click();
+  await expect(page.getByText(/^Sesi 2 sejak \d{2}:\d{2} WIB$/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mulai Sesi 2", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Mulai Sesi 1", exact: true })).toBeEnabled();
+  expect(state.sessions.map((session) => session.label)).toEqual(["Sesi 1", "Sesi 2"]);
+  expect(state.checkins[0].checked_out_at).toBeNull();
+});
+
+test("a start that fails is explained in the popup, which stays open to try again", async ({ page }) => {
+  const state = await installSupabaseStub(page);
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.route("**/rest/v1/rpc/guestbook_start_session", (route) =>
+    route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ message: "Hanya admin yang dapat memulai sesi" }) }),
+  );
+  await page.getByRole("button", { name: "Mulai Sesi 1", exact: true }).click();
+  const ask = page.getByRole("dialog", { name: "Mulai Sesi 1" });
+  await ask.getByRole("button", { name: "Ya, mulai Sesi 1", exact: true }).click();
+  await expect(ask.getByRole("alert")).toHaveText("Sesi 1 gagal dimulai: Hanya admin yang dapat memulai sesi");
+  await expect(ask.getByRole("button", { name: "Ya, mulai Sesi 1", exact: true })).toBeEnabled();
+  expect(state.sessions).toEqual([]);
+});
+
+test("past midnight the session keeps running until the admin starts Sesi 1, and the card says so", async ({ page }) => {
+  await installSupabaseStub(page, { sessions: [{ label: "Sesi 2", started_at: new Date(Date.now() - 20 * 3600 * 1000).toISOString() }] });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await expect(page.getByText(/^Sesi 2 sejak \d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/)).toBeVisible();
+  await expect(page.getByText(/masih berjalan: check-in baru masuk tab .* Sesi 2 sampai Anda menekan Mulai Sesi 1\./)).toBeVisible();
+  // Sesi 2 is still under way; Sesi 1 starts today's first session.
+  await expect(page.getByRole("button", { name: "Mulai Sesi 2", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Mulai Sesi 1", exact: true })).toBeEnabled();
+});
+
+test("a Sesi 1 carried over from an earlier day leaves Mulai Sesi 1 open for today's", async ({ page }) => {
+  await installSupabaseStub(page, { sessions: [{ label: "Sesi 1", started_at: new Date(Date.now() - 26 * 3600 * 1000).toISOString() }] });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await expect(page.getByText(/^Sesi 1 sejak \d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mulai Sesi 1", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Mulai Sesi 2", exact: true })).toBeEnabled();
+});

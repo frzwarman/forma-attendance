@@ -62,13 +62,13 @@ test("guestbook tables have RLS and no direct client writes", async () => {
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'guestbook_%' order by 1
   `);
-  assert.deepEqual(rows.map((r) => r.relname), ["guestbook_admins", "guestbook_checkins", "guestbook_draw_winners", "guestbook_feedback", "guestbook_settings"]);
+  assert.deepEqual(rows.map((r) => r.relname), ["guestbook_admins", "guestbook_checkins", "guestbook_draw_winners", "guestbook_feedback", "guestbook_sessions", "guestbook_settings"]);
   for (const row of rows) {
     assert.equal(row.relrowsecurity, true, row.relname);
     for (const flag of ["anon_insert", "anon_update", "anon_delete"]) assert.equal(row[flag], false, `${row.relname}: ${flag}`);
   }
   const byName = Object.fromEntries(rows.map((r) => [r.relname, r]));
-  for (const table of ["guestbook_checkins", "guestbook_admins", "guestbook_feedback"]) {
+  for (const table of ["guestbook_checkins", "guestbook_admins", "guestbook_feedback", "guestbook_sessions"]) {
     assert.equal(byName[table].auth_insert, false, table);
     assert.equal(byName[table].auth_update, false, table);
   }
@@ -433,7 +433,7 @@ test("check-ins are copied to the Google Sheet: added, updated, deleted, and not
   assert.equal(request.rows.length, 1);
   const tono = request.rows[0];
   assert.deepEqual(tono.cells.map(([header]) => header), [
-    "Waktu Check-in (WIB)", "Check-in Terakhir (WIB)", "Jumlah Check-in", "Waktu Check-out (WIB)", "Nama", "Nomor Telepon", "E-mail",
+    "Waktu Check-in (WIB)", "Sesi", "Check-in Terakhir (WIB)", "Jumlah Check-in", "Waktu Check-out (WIB)", "Nama", "Nomor Telepon", "E-mail",
     "Divisi", "Nomor Kamar Hotel", "Berkas", "Hadiah", "Waktu Undian (WIB)",
   ]);
   assert.match(cells(tono)["Waktu Check-in (WIB)"], /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/);
@@ -486,16 +486,10 @@ test("check-ins are copied to the Google Sheet: added, updated, deleted, and not
   }
 });
 
-test("every night at 23:59 WIB everyone still checked in is checked out, and the next check-in starts a new visit", async () => {
-  const job = (await db.query("select schedule, command from cron.jobs where name = 'guestbook-auto-check-out'")).rows[0];
-  assert.deepEqual(job, { schedule: "59 16 * * *", command: "select private.guestbook_auto_check_out()" });
-  await assert.rejects(() => asUser(id(1), () => db.query("select private.guestbook_auto_check_out()")), /permission denied/);
+test("nobody is checked out automatically: no cron jobs, a forgotten check-out stays open until the next check-in", async () => {
+  assert.equal((await db.query("select count(*)::int as n from cron.jobs")).rows[0].n, 0);
   const lupa = { name: "Lupa Checkout", phone: "0899 1100 2200", email: "lupa@example.test", in: null, out: null };
   await asRole(null, "anon", () => checkIn(lupa));
-  const open = (await db.query("select count(*)::int as n from public.guestbook_checkins where checked_out_at is null")).rows[0].n;
-  assert.ok(open >= 1);
-  assert.equal((await db.query("select private.guestbook_auto_check_out() as n")).rows[0].n, open);
-  assert.equal((await db.query("select count(*)::int as n from public.guestbook_checkins where checked_out_at is null")).rows[0].n, 0);
   // Next morning: welcomed, present again, with a code to check out.
   const next = await asRole(null, "anon", () => checkIn(lupa));
   assert.equal(next.status, "returning");
@@ -576,22 +570,56 @@ test("Kesan & Pesan: sent with the phone's check-out code, stored under the send
   }
 });
 
-test("at 12:00 WIB everyone still checked in from before 12:00 is checked out; a check-in from 12:00 on stays", async () => {
-  const job = (await db.query("select schedule, command from cron.jobs where name = 'guestbook-midday-check-out'")).rows[0];
-  assert.deepEqual(job, { schedule: "0 5 * * *", command: "select private.guestbook_midday_check_out()" });
-  await assert.rejects(() => asUser(id(1), () => db.query("select private.guestbook_midday_check_out()")), /permission denied/);
-  await asRole(null, "anon", () => checkIn({ name: "Tamu Pagi", phone: "0899 8800 1100", email: "pagi@example.test", in: null, out: null }));
-  await asRole(null, "anon", () => checkIn({ name: "Tamu Siang", phone: "0899 8800 2200", email: "siang@example.test", in: null, out: null }));
-  // Today's 12:00 in Jakarta. Pagi last checked in before it (last night); Siang checked in again at 12:00 exactly.
-  const noon = "(date_trunc('day', now() at time zone 'Asia/Jakarta') + interval '12 hours') at time zone 'Asia/Jakarta'";
-  await db.query(`update public.guestbook_checkins set created_at = ${noon} - interval '16 hours' where email in ('pagi@example.test', 'siang@example.test')`);
-  await db.query(`update public.guestbook_checkins set last_checked_in_at = ${noon}, checkin_count = 2 where email = 'siang@example.test'`);
-  await db.query("select private.guestbook_midday_check_out()");
-  const { rows } = await db.query(
-    "select email, checked_out_at is not null as out from public.guestbook_checkins where email in ('pagi@example.test', 'siang@example.test') order by email",
-  );
-  assert.deepEqual(rows, [
-    { email: "pagi@example.test", out: true },
-    { email: "siang@example.test", out: false },
-  ]);
+test("sessions start when an admin starts them and last until the next, midnight included; the sheet files each visit under its session", async () => {
+  // The migration recorded the old rule for today: Sesi 1 from 00:00 WIB, and Sesi 2 from 12:00 if that has passed.
+  const seeded = (await db.query(`select to_char(started_at at time zone 'Asia/Jakarta', 'HH24:MI') as at, label from public.guestbook_sessions
+    where (started_at at time zone 'Asia/Jakarta')::date = (now() at time zone 'Asia/Jakarta')::date order by started_at`)).rows;
+  const afterNoon = (await db.query("select (now() at time zone 'Asia/Jakarta')::time >= '12:00' as v")).rows[0].v;
+  assert.deepEqual(seeded, [{ at: "00:00", label: "Sesi 1" }, ...(afterNoon ? [{ at: "12:00", label: "Sesi 2" }] : [])]);
+
+  const start = (label, user = id(1)) => asUser(user, async () => (await db.query("select public.guestbook_start_session($1) as at", [label])).rows[0].at);
+  await assert.rejects(() => start("Sesi 2", id(2)), /Hanya admin/);
+  await assert.rejects(() => asUser(null, () => db.query("select public.guestbook_start_session('Sesi 2')"), "anon"), /permission denied/);
+  await assert.rejects(() => start("Sesi 3"), /Sesi tidak dikenal/);
+  await assert.rejects(() => start(null), /Sesi tidak dikenal/);
+  await assert.rejects(() => asUser(id(1), () => db.query("insert into public.guestbook_sessions (label) values ('Sesi 2')")), /permission denied/);
+  // Anyone may read which session is under way.
+  await asUser(null, async () => assert.ok((await db.query("select label from public.guestbook_sessions")).rows.length > 0), "anon");
+
+  const tab = async (t) => (await db.query("select private.guestbook_session_tab($1::timestamptz) as tab", [t])).rows[0].tab;
+  const wib = (local) => `${local}+07:00`;
+  await db.exec("create temp table saved_sessions as select * from public.guestbook_sessions; delete from public.guestbook_sessions;");
+  try {
+    assert.equal(await tab(wib("2026-10-05 09:00")), "");
+    await db.query(`insert into public.guestbook_sessions (started_at, label) values
+      ('${wib("2026-10-05 08:15")}', 'Sesi 1'), ('${wib("2026-10-05 13:40")}', 'Sesi 2'), ('${wib("2026-10-06 07:50")}', 'Sesi 1')`);
+    assert.equal(await tab(wib("2026-10-05 08:14")), "");
+    assert.equal(await tab(wib("2026-10-05 08:15")), "05-10-2026 Sesi 1");
+    assert.equal(await tab(wib("2026-10-05 13:39")), "05-10-2026 Sesi 1");
+    assert.equal(await tab(wib("2026-10-05 13:40")), "05-10-2026 Sesi 2");
+    // Past midnight Sesi 2 carries on until the admin starts Sesi 1 in the morning.
+    assert.equal(await tab(wib("2026-10-06 00:30")), "05-10-2026 Sesi 2");
+    assert.equal(await tab(wib("2026-10-06 07:50")), "06-10-2026 Sesi 1");
+
+    // Pressed now: a new session; pressed again the same day while it is current, the first start stays.
+    await asUser(id(1), async () => {
+      const first = (await db.query("select public.guestbook_start_session('Sesi 2') as at")).rows[0].at;
+      assert.deepEqual((await db.query("select public.guestbook_start_session('Sesi 2') as at")).rows[0].at, first);
+      assert.equal((await db.query("select count(*)::int as n from public.guestbook_sessions where started_at >= $1", [first])).rows[0].n, 1);
+      const latest = (await db.query("select label from public.guestbook_sessions order by started_at desc limit 1")).rows[0].label;
+      assert.equal(latest, "Sesi 2");
+    });
+
+    // The sheet row carries the session of the latest check-in.
+    const url = "https://script.google.com/macros/s/AKfycbx-sesi/exec";
+    await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", [url, "s".repeat(32)]);
+    await db.exec("delete from net.sent");
+    await asRole(null, "anon", () => checkIn({ name: "Tamu Sesi", phone: "0899 3300 4400", email: "sesi@example.test", in: null, out: null }));
+    await db.query(`update public.guestbook_checkins set created_at = '${wib("2026-10-05 14:05")}' where email = 'sesi@example.test'`);
+    const [body] = (await db.query("select body from net.sent order by id desc limit 1")).rows.map((row) => row.body);
+    assert.equal(Object.fromEntries(body.rows[0].cells)["Sesi"], "05-10-2026 Sesi 2");
+  } finally {
+    await db.exec(`delete from private.guestbook_sheet; delete from public.guestbook_checkins where email = 'sesi@example.test';
+      delete from public.guestbook_sessions; insert into public.guestbook_sessions select * from saved_sessions; drop table saved_sessions;`);
+  }
 });

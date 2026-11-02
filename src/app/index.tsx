@@ -11,6 +11,7 @@ import { KesanPesan } from "../features/KesanPesan";
 import { OPENING } from "../features/intro/slides";
 import { ThankYou, type CheckInDetails } from "../features/ThankYou";
 import { refreshCheckIn, rememberCheckIn, storedCheckIns } from "../services/checkout";
+import { inSession, useCurrentSession } from "../services/session";
 import { useFormFields } from "../services/settings";
 import { useTheme } from "../theme";
 
@@ -26,19 +27,18 @@ export default function Index() {
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const toTop = () => scroll.current?.scrollTo({ y: 0, animated: false });
   const fields = useFormFields();
-  // A page left open since before 12:00 or midnight moves on to the form when looked at again: the
-  // database has checked that session's attendees out, and they check in again for the next one.
+  // Only check-ins of the session under way count. Once an admin starts the next one (Mulai Sesi 1 or 2),
+  // the page moves on to the form, so the attendee checks in again for it; nobody is checked out. A page
+  // left open does so when looked at again: the session is asked for again on visibilitychange.
+  const session = useCurrentSession();
+  // After one failed attempt the page goes on without it, keeping every check-in on this phone.
+  const sessionKnown = session.isSuccess || session.failureCount > 0;
+  const live = entries.filter((entry) => inSession(entry.at, session.data));
+  const mode = view === "checkedIn" && (!sessionKnown || live.length) ? "checkedIn" : "form";
+  // Moved on to the form while scrolled down the event information: start it at the top.
   useEffect(() => {
-    if (view !== "checkedIn") return;
-    const refresh = () => {
-      if (document.visibilityState !== "visible" || storedCheckIns().length) return;
-      setEntries([]);
-      setView("form");
-      toTop();
-    };
-    document.addEventListener("visibilitychange", refresh);
-    return () => document.removeEventListener("visibilitychange", refresh);
-  }, [view]);
+    if (mode === "form") toTop();
+  }, [mode]);
 
   function checkedIn(details: CheckInDetails) {
     if (details.token) rememberCheckIn({ token: details.token, name: details.name, at: details.at });
@@ -55,8 +55,8 @@ export default function Index() {
       <Backdrop scrollRef={scroll}>
         <View style={{ paddingHorizontal: 20, paddingTop: 36, paddingBottom: 104 }}>
           <View style={{ width: "100%", maxWidth: 560, alignSelf: "center", gap: 28 }}>
-            <EventHeader title={view === "checkedIn" ? "Informasi acara" : undefined} />
-            {view === "form" ? (
+            <EventHeader title={mode === "checkedIn" ? "Informasi acara" : undefined} />
+            {mode === "form" ? (
               fields ? (
                 // A new form when the admin's questions change, so its rules always match what it shows.
                 <CheckIn key={JSON.stringify(fields)} fields={fields} onCheckedIn={checkedIn} />
@@ -65,6 +65,10 @@ export default function Index() {
                   <T color={c.muted}>Memuat formulir…</T>
                 </Card>
               )
+            ) : !sessionKnown ? (
+              <Card elevated>
+                <T color={c.muted}>Memuat…</T>
+              </Card>
             ) : (
               <>
                 <section
@@ -83,11 +87,11 @@ export default function Index() {
                 <EventGuide />
                 {/* Last: Kesan & Pesan, then check-out at the very bottom. The newest check-in on this phone sends it.
                     No key: CheckOut's key is the same code, and siblings must not share one. */}
-                {entries.length > 0 && <KesanPesan entry={entries[entries.length - 1]} />}
-                {entries.length > 0 && (
+                {live.length > 0 && <KesanPesan entry={live[live.length - 1]} />}
+                {live.length > 0 && (
                   <CheckOut
-                    key={entries.map((entry) => entry.token).join()}
-                    entries={entries}
+                    key={live.map((entry) => entry.token).join()}
+                    entries={live}
                     onCheckedOut={setGoodbye}
                     onEmpty={() => {
                       setEntries([]);

@@ -78,50 +78,36 @@ test("an unknown check-out code is explained and can be removed from the phone",
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
 });
 
-test("a check-in from an earlier day is forgotten: the next day starts on the form", async ({ page }) => {
-  await installSupabaseStub(page);
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "guestbook.checkouts",
-      JSON.stringify([{ token: "kemarin", name: "Budi Santoso", at: new Date(Date.now() - 36 * 3600 * 1000).toISOString() }]),
-    ),
-  );
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3600 * 1000).toISOString();
+
+test("a check-in from before the current session is forgotten: the attendee checks in again for this one", async ({ page }) => {
+  await installSupabaseStub(page, { sessions: [{ label: "Sesi 2", started_at: hoursAgo(1) }] });
+  await page.addInitScript((at) => localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "sesi-1", name: "Budi Santoso", at }])), hoursAgo(3));
   await page.goto("/");
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
 });
 
-// Today in the other session (Sesi 1 before 12:00 WIB, Sesi 2 from 12:00): 09:00 or 13:00 WIB.
-function otherSessionToday() {
-  const wib = new Date(Date.now() + 7 * 3600 * 1000);
-  const day = wib.toISOString().slice(0, 10);
-  return new Date(`${day}T${wib.getUTCHours() < 12 ? "13:00" : "09:00"}:00+07:00`).toISOString();
-}
-
-test("a check-in from the other session today is not current: after 12:00 the page starts on the form again", async ({ page }) => {
-  await installSupabaseStub(page);
-  const at = otherSessionToday();
-  await page.addInitScript((at) => localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "sesi-lain", name: "Budi Santoso", at }])), at);
-  await page.goto("/");
-  await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
-});
-
-test("a page left open since the last session moves on to the form when looked at again", async ({ page }) => {
-  await installSupabaseStub(page);
-  await page.addInitScript(() => {
-    if (!localStorage.getItem("guestbook.checkouts"))
-      localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at: new Date().toISOString() }]));
-  });
+test("midnight changes nothing: a check-in stays until the admin starts the next session", async ({ page }) => {
+  await installSupabaseStub(page, { sessions: [{ label: "Sesi 2", started_at: hoursAgo(40) }] });
+  await page.addInitScript((at) => localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kemarin", name: "Budi Santoso", at }])), hoursAgo(36));
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toBeVisible();
-  await expect(page.getByText(/otomatis pukul 12\.00 dan 23\.59 WIB/)).toBeVisible();
-  // 12:00 (or midnight) passes while the phone is locked: the stored check-in now belongs to an earlier session.
-  const at = otherSessionToday();
-  await page.evaluate((at) => {
-    localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at }]));
-    document.dispatchEvent(new Event("visibilitychange"));
-  }, at);
+  await expect(page.getByText(/check-in lagi untuk sesi itu/)).toBeVisible();
+});
+
+test("a page left open moves on to the form when looked at again after the admin starts the next session", async ({ page }) => {
+  const state = await installSupabaseStub(page, { sessions: [{ label: "Sesi 1", started_at: hoursAgo(2) }] });
+  await page.addInitScript((at) => {
+    if (!localStorage.getItem("guestbook.checkouts")) localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at }]));
+  }, hoursAgo(1));
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toBeVisible();
+  // Mulai Sesi 2 while the phone is locked; unlocked, the page asks again.
+  state.sessions.push({ label: "Sesi 2", started_at: new Date().toISOString() });
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange", { bubbles: true })));
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
+  // Not checked out: the code stays on the phone, and checking in again brings a new one.
+  expect(state.rpcCalls.filter((call) => call.name === "guestbook_check_out")).toEqual([]);
 });
