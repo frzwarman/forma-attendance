@@ -571,11 +571,10 @@ test("Kesan & Pesan: sent with the phone's check-out code, stored under the send
 });
 
 test("sessions start when an admin starts them and last until the next, midnight included; the sheet files each visit under its session", async () => {
-  // The migration recorded the old rule for today: Sesi 1 from 00:00 WIB, and Sesi 2 from 12:00 if that has passed.
+  // Recorded for today by the migrations: Sesi 1 from 00:00 WIB; Sesi 2 waits for an admin (20261110000000).
   const seeded = (await db.query(`select to_char(started_at at time zone 'Asia/Jakarta', 'HH24:MI') as at, label from public.guestbook_sessions
     where (started_at at time zone 'Asia/Jakarta')::date = (now() at time zone 'Asia/Jakarta')::date order by started_at`)).rows;
-  const afterNoon = (await db.query("select (now() at time zone 'Asia/Jakarta')::time >= '12:00' as v")).rows[0].v;
-  assert.deepEqual(seeded, [{ at: "00:00", label: "Sesi 1" }, ...(afterNoon ? [{ at: "12:00", label: "Sesi 2" }] : [])]);
+  assert.deepEqual(seeded, [{ at: "00:00", label: "Sesi 1" }]);
 
   const start = (label, user = id(1)) => asUser(user, async () => (await db.query("select public.guestbook_start_session($1) as at", [label])).rows[0].at);
   await assert.rejects(() => start("Sesi 2", id(2)), /Hanya admin/);
@@ -621,5 +620,52 @@ test("sessions start when an admin starts them and last until the next, midnight
   } finally {
     await db.exec(`delete from private.guestbook_sheet; delete from public.guestbook_checkins where email = 'sesi@example.test';
       delete from public.guestbook_sessions; insert into public.guestbook_sessions select * from saved_sessions; drop table saved_sessions;`);
+  }
+});
+
+test("02-11-2026: Sesi 1 runs past 12:00, and the 12:00 automatic check-out is undone for those still there", async () => {
+  const fix = await readFile(new URL("../../supabase/migrations/20261110000000_guestbook_sesi1_continues.sql", import.meta.url), "utf8");
+  const wib = (local) => `${local}+07`;
+  const emails = ["fix.pagi", "fix.siang", "fix.sendiri", "fix.lagi", "fix.kemarin"].map((name) => `${name}@example.test`);
+  for (const [i, email] of emails.entries()) {
+    await asRole(null, "anon", () => checkIn({ name: `Tamu Perbaikan ${i + 1}`, phone: `0899 7711 000${i}`, email, in: null, out: null }));
+  }
+  const set = (email, sql) => db.query(`update public.guestbook_checkins set ${sql} where email = $1`, [email]);
+  const job = wib("2026-11-02 12:00:00.48");
+  // Checked out by the job at 12:00: present again.
+  await set(emails[0], `created_at = '${wib("2026-11-02 08:10")}', checked_out_at = '${job}'`);
+  await set(emails[1], `created_at = '${wib("2026-11-02 10:40")}', checked_out_at = '${job}'`);
+  // Checked out on their own in the same minute: stays.
+  await set(emails[2], `created_at = '${wib("2026-11-02 09:00")}', checked_out_at = '${wib("2026-11-02 12:00:31")}'`);
+  // Checked in again after 12:00, so already present.
+  await set(emails[3], `created_at = '${wib("2026-11-02 09:30")}', last_checked_in_at = '${wib("2026-11-02 12:20")}', checkin_count = 2, checked_out_at = null`);
+  // The day before is left alone.
+  await set(emails[4], `created_at = '${wib("2026-11-01 09:00")}', checked_out_at = '${wib("2026-11-01 12:00:00.21")}'`);
+  await db.exec(`create temp table saved_sessions_fix as select * from public.guestbook_sessions;
+    delete from public.guestbook_sessions;
+    insert into public.guestbook_sessions (started_at, label) values
+      ('${wib("2026-11-01 00:00")}', 'Sesi 1'), ('${wib("2026-11-01 12:00")}', 'Sesi 2'),
+      ('${wib("2026-11-02 00:00")}', 'Sesi 1'), ('${wib("2026-11-02 12:00")}', 'Sesi 2'),
+      ('${wib("2026-11-03 00:00")}', 'Sesi 1'), ('${wib("2026-11-03 12:00")}', 'Sesi 2'), ('${wib("2026-11-03 15:03:12.345")}', 'Sesi 2');
+    drop table private.guestbook_midday_check_out_undone;`);
+  try {
+    await db.exec(fix);
+    const sessions = (await db.query(`select to_char(started_at at time zone 'Asia/Jakarta', 'DD-MM HH24:MI:SS') as at, label
+      from public.guestbook_sessions order by started_at`)).rows.map((row) => `${row.at} ${row.label}`);
+    // The 12:00 starts from 02-11 on are gone; 01-11 keeps its split and an admin's press stays.
+    assert.deepEqual(sessions, ["01-11 00:00:00 Sesi 1", "01-11 12:00:00 Sesi 2", "02-11 00:00:00 Sesi 1", "03-11 00:00:00 Sesi 1", "03-11 15:03:12 Sesi 2"]);
+    const tab = async (t) => (await db.query("select private.guestbook_session_tab($1::timestamptz) as tab", [t])).rows[0].tab;
+    assert.equal(await tab(wib("2026-11-02 16:30")), "02-11-2026 Sesi 1");
+
+    const out = (await db.query("select email, checked_out_at is not null as out from public.guestbook_checkins where email like 'fix.%' order by email")).rows;
+    assert.deepEqual(Object.fromEntries(out.map((row) => [row.email, row.out])), {
+      [emails[4]]: true, [emails[3]]: false, [emails[0]]: false, [emails[2]]: true, [emails[1]]: false,
+    });
+    // The undone times are kept for a rollback.
+    const kept = (await db.query("select count(*)::int as n from private.guestbook_midday_check_out_undone")).rows[0].n;
+    assert.equal(kept, 2);
+  } finally {
+    await db.exec(`delete from public.guestbook_checkins where email like 'fix.%';
+      delete from public.guestbook_sessions; insert into public.guestbook_sessions select * from saved_sessions_fix; drop table saved_sessions_fix;`);
   }
 });

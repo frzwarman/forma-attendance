@@ -119,3 +119,62 @@ function asText(value) {
 function reply(value) {
   return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);
 }
+
+// One-off repair for 02-11-2026 (supabase/migrations/20261110000000_guestbook_sesi1_continues.sql): the old
+// rule started Sesi 2 at 12:00 that day while Sesi 1 was still running, and checked everyone out at 12:00.
+// Every visit of the day goes to the "02-11-2026 Sesi 1" tab with that Sesi, also on the Check-in tab; a
+// morning visit's 12:00 check-out is cleared; the "02-11-2026 Sesi 2" tab is deleted. Run it once from the
+// editor (pick it in the list of functions, then Run) after deploying this version and applying the
+// migration, before anyone presses Mulai Sesi 2 that day. Running it again changes nothing.
+function repairSesi1On02Nov() {
+  const day = "02/11/2026";
+  const to = "02-11-2026 Sesi 1";
+  const book = SpreadsheetApp.getActive();
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const all = tab(ALL_TAB);
+    const wrong = book.getSheetByName("02-11-2026 Sesi 2");
+    const target = tab(to);
+    const key = (row) => row[ID_HEADER] + "|" + row[VISIT_HEADER];
+    // The day's visits from the Check-in tab, then any only the Sesi 2 tab has.
+    const visits = new Map();
+    [all, wrong].filter(Boolean).forEach((sheet) =>
+      records(sheet).forEach((row) => {
+        const time = String(row["Waktu Check-in (WIB)"] || "");
+        if (!row[ID_HEADER] || time.indexOf(day + " ") !== 0 || visits.has(key(row))) return;
+        row.Sesi = to;
+        if (time.slice(11, 16) < "12:00" && row["Waktu Check-out (WIB)"] === day + " 12:00 WIB") row["Waktu Check-out (WIB)"] = "";
+        visits.set(key(row), row);
+      }),
+    );
+    const fix = (row) => Object.assign(row, visits.get(key(row)));
+    write(all, records(all).map(fix));
+    // The Sesi 1 tab keeps its rows, corrected, and gets the day's other visits after them.
+    const there = records(target);
+    const have = new Set(there.map(key));
+    write(target, there.map(fix).concat([...visits.values()].filter((row) => !have.has(key(row)))));
+    if (wrong) book.deleteSheet(wrong);
+    Logger.log(visits.size + " check-in " + day + " sekarang di tab " + to + ".");
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// A tab's rows as { header: value }.
+function records(sheet) {
+  const header = headers(sheet);
+  if (sheet.getLastRow() < 2) return [];
+  return sheet
+    .getRange(2, 1, sheet.getLastRow() - 1, header.length)
+    .getValues()
+    .map((values) => header.reduce((row, name, i) => (name ? Object.assign(row, { [name]: values[i] }) : row), {}));
+}
+
+// Writes rows ({ header: value }) from the tab's second row on, in one go, adding missing columns.
+function write(sheet, rows) {
+  if (!rows.length) return;
+  const header = columns(sheet, [...new Set([].concat(...rows.map(Object.keys)))]);
+  const values = rows.map((row) => header.map((name) => asText(Object.prototype.hasOwnProperty.call(row, name) ? row[name] : "")));
+  sheet.getRange(2, 1, rows.length, header.length).setNumberFormat("@").setValues(values);
+}
