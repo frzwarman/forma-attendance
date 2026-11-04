@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { fillForm } from "./form";
 import { finishIntro } from "./intro";
-import { installSupabaseStub } from "./supabase-stub";
+import { checkInRow, installSupabaseStub } from "./supabase-stub";
 
 test("a returning attendee checks out with one tap on the same phone", async ({ page }) => {
   const state = await installSupabaseStub(page);
@@ -23,15 +23,47 @@ test("a returning attendee checks out with one tap on the same phone", async ({ 
   await expect(popup.getByRole("heading", { name: "Sampai jumpa, Budi Santoso!" })).toBeVisible();
   await expect(popup.getByText(/Check-out tercatat pada \d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB/)).toBeVisible();
   expect(state.checkins[0].checked_out_at).toBeTruthy();
-  await popup.getByRole("button", { name: "Selesai", exact: true }).click();
-  await expect(popup).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: /Sampai jumpa/ })).toHaveCount(0);
   await expect(page.getByLabel("Nama", { exact: true })).toBeInViewport();
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
+  // Done: Selesai leads back to the link page.
+  await popup.getByRole("button", { name: "Selesai", exact: true }).click();
+  await expect(popup).toHaveCount(0);
+  await expect(page).toHaveURL(/:4173\/$/);
+  await expect(page.getByRole("heading", { name: /Sampai jumpa/ })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Buku Tamu" })).toBeVisible();
+  // Registrasi has the form again, for the next session; a reload keeps it.
+  await page.getByRole("link", { name: /^Registrasi/ }).click();
+  await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Sampai jumpa/ })).toHaveCount(0);
+});
+
+test("with two people checked in on one phone, the page stays for the second check-out, then leads back to the link page", async ({ page }) => {
+  const budi = checkInRow({ name: "Budi Santoso" });
+  const siti = checkInRow({ name: "Siti Rahma" });
+  const state = await installSupabaseStub(page, { checkins: [budi, siti], tokens: { "code-budi": budi.id, "code-siti": siti.id } });
+  const at = new Date().toISOString();
+  await page.addInitScript(
+    (entries) => localStorage.setItem("guestbook.checkouts", JSON.stringify(entries)),
+    [
+      { token: "code-budi", name: "Budi Santoso", at },
+      { token: "code-siti", name: "Siti Rahma", at },
+    ],
+  );
+  await page.goto("/registrasi");
+  const popup = page.getByRole("dialog", { name: "Check-out berhasil" });
+  await page.getByRole("button", { name: "Check out Budi Santoso", exact: true }).click();
+  await popup.getByRole("button", { name: "Selesai", exact: true }).click();
+  await expect(popup).toHaveCount(0);
+  // Siti is still checked in on this phone: the page stays for her check-out.
+  await expect(page).toHaveURL(/\/registrasi$/);
+  await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
+  await expect(popup.getByRole("heading", { name: "Sampai jumpa, Siti Rahma!" })).toBeVisible();
+  await popup.getByRole("button", { name: "Selesai", exact: true }).click();
+  await expect(page).toHaveURL(/:4173\/$/);
+  await expect(page.getByRole("link", { name: /^Registrasi/ })).toBeVisible();
+  expect(state.checkins.map((row) => !!row.checked_out_at)).toEqual([true, true]);
 });
 
 test("checked out after the morning session, the attendee checks in again and can check out again", async ({ page }) => {
@@ -42,6 +74,7 @@ test("checked out after the morning session, the attendee checks in again and ca
   await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
   await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
   await page.getByRole("dialog", { name: "Check-out berhasil" }).getByRole("button", { name: "Selesai", exact: true }).click();
+  await page.getByRole("link", { name: /^Registrasi/ }).click();
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByText(/Saat pulang, buka tautan ini lagi/)).toBeVisible();

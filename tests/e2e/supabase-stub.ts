@@ -40,6 +40,8 @@ type Seed = {
   ballots?: Ballot[];
   // A database without migration 20261111000000_guestbook_evote.sql: no E-Vote table or functions.
   legacyEvote?: boolean;
+  // Check-out codes held by phones from check-ins made before the test: code -> check-in ID.
+  tokens?: Record<string, string>;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -163,7 +165,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
   if (!seed.intro) await page.addInitScript(() => sessionStorage.setItem("guestbook.intro.seen", "1"));
   const admin = seed.admin || { email: "admin@bawaslu.test", password: "rahasia123" };
   const adminUser = { id: "00000000-0000-4000-8000-00000000adm1", email: admin.email };
-  const tokens = new Map<string, string>();
+  const tokens = new Map<string, string>(Object.entries(seed.tokens ?? {}));
 
   await page.route("**/rest/v1/guestbook_settings*", async (route, request) => {
     if (request.method() === "PATCH" && seed.settingsWriteDenied) {

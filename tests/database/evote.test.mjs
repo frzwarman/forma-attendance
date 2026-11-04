@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { after, before, beforeEach, test } from "node:test";
 import { guestbookDatabase } from "./guestbook-db.mjs";
 
@@ -184,4 +185,37 @@ test("saving different options, order or number of picks starts a new vote: coun
   assert.deepEqual(await vote(id(99), device(2), [0]), { status: "changed" });
   // The earlier votes' ballots stay in the database.
   assert.equal(await ballotCount(), 2);
+});
+
+test("TYPE LAYOUT answers from the registration form join the vote under way: one ballot per attendee, once", async () => {
+  // As in production on 04-11-2026: the vote's options, and a phone that already voted on /vote.
+  const poll = await savePoll(["Round table", "Classroom table"], 1);
+  await vote(poll.id, device(1), [0]);
+  const checkIn = (n, answers) =>
+    as("anon", "", () =>
+      db.query(
+        `select public.guestbook_check_in(p_name => $1, p_phone => $2, p_email => $3, p_jabatan => null, p_address => null,
+           p_latitude => null, p_longitude => null, p_file_path => null, p_check_in_date => null, p_check_out_date => null,
+           p_answers => $4::jsonb)`,
+        [`Tamu Layout ${n}`, `0822 5000 ${String(n).padStart(4, "0")}`, `layout${n}@example.test`, answers ? JSON.stringify(answers) : null],
+      ),
+    );
+  await checkIn(1, { "TYPE LAYOUT": "CLASS ROOM" });
+  await checkIn(2, { "TYPE LAYOUT": "ROUNDTABLE" });
+  await checkIn(3, { "TYPE LAYOUT": " class room ", "MATERI SENTINEL": "MATERI SESI KESATU" });
+  await checkIn(4, { "MATERI SENTINEL": "MATERI SESI KEDUA" });
+  await checkIn(5, null);
+  const migration = await readFile(new URL("../../supabase/migrations/20261112000000_guestbook_evote_type_layout.sql", import.meta.url), "utf8");
+
+  await db.exec(migration);
+  // Round table: the phone and ROUNDTABLE; Classroom table: both CLASS ROOM answers. 1 phone + 3 attendees voted.
+  assert.deepEqual(await results().then(({ voters, counts }) => ({ voters, counts })), { voters: 4, counts: [2, 2] });
+  // Applied again, nobody is added twice.
+  await db.exec(migration);
+  assert.deepEqual(await results().then(({ voters, counts }) => ({ voters, counts })), { voters: 4, counts: [2, 2] });
+
+  // A vote under way without those options (another question) gets nothing.
+  const other = await savePoll(["Nasi goreng", "Soto"], 1);
+  await db.exec(migration);
+  assert.deepEqual(await results().then(({ poll: shown, voters }) => ({ id: shown.id, voters })), { id: other.id, voters: 0 });
 });

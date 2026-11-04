@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { ScrollView, View } from "react-native";
 import { Backdrop, EventHeader } from "../components/Brand";
@@ -112,7 +113,17 @@ export default function Registrasi() {
       <WhatsAppHelp />
       <EventIntro />
       {thanks && <ThankYou details={thanks} onClose={() => setThanks(undefined)} />}
-      {goodbye && <Goodbye done={goodbye} onClose={() => setGoodbye(undefined)} />}
+      {goodbye && (
+        <Goodbye
+          done={goodbye}
+          onClose={() => {
+            setGoodbye(undefined);
+            // Nobody on this phone is checked in any more: back to the link page. With someone
+            // left, the page stays for their check-out.
+            if (!live.length) router.push("/");
+          }}
+        />
+      )}
     </>
   );
 }
