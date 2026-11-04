@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { after, before, beforeEach, test } from "node:test";
 import { guestbookDatabase } from "./guestbook-db.mjs";
@@ -218,4 +219,117 @@ test("TYPE LAYOUT answers from the registration form join the vote under way: on
   const other = await savePoll(["Nasi goreng", "Soto"], 1);
   await db.exec(migration);
   assert.deepEqual(await results().then(({ poll: shown, voters }) => ({ id: shown.id, voters })), { id: other.id, voters: 0 });
+});
+
+test("each vote is copied to the sheet's E-Vote tab with its time and picks only; a resend sends every vote again", async () => {
+  const bodies = async () => (await db.query("select body from net.sent order by id")).rows.map((row) => row.body);
+  const code = (pollId, deviceId) => createHash("md5").update(`${pollId}:${deviceId}`).digest("hex");
+  const poll = await savePoll(["Round table", "Classroom table", "U-shape"], 2);
+  await db.exec("delete from net.sent");
+  // No sheet set up: nothing is sent, and the vote counts.
+  assert.deepEqual(await vote(poll.id, device(1), [0]), { status: "recorded", picks: [0] });
+  assert.deepEqual(await bodies(), []);
+
+  await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", ["https://script.google.com/macros/s/AKfycbx-evote/exec", "s".repeat(32)]);
+  try {
+    await vote(poll.id, device(2), [2, 0]);
+    const [request] = await bodies();
+    assert.equal(request.secret, "s".repeat(32));
+    assert.equal(request.rows, undefined);
+    assert.equal(request.votes.length, 1);
+    const [sent] = request.votes;
+    assert.equal(sent.id, code(poll.id, device(2)));
+    assert.deepEqual(sent.cells.map(([header]) => header), ["Waktu (WIB)", "Pilihan"]);
+    assert.match(sent.cells[0][1], /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/);
+    assert.equal(sent.cells[1][1], "Round table, U-shape");
+    // Nothing that ties the vote to a phone.
+    assert.ok(!JSON.stringify(request).includes(device(2)));
+    // A phone voting again sends nothing.
+    await db.exec("delete from net.sent");
+    assert.equal((await vote(poll.id, device(2), [1])).status, "already");
+    assert.deepEqual(await bodies(), []);
+
+    // A TYPE LAYOUT answer moved from the form shows when its attendee checked in, not when it was moved.
+    const { rows: [attendee] } = await as("anon", "", () =>
+      db.query(
+        `select (public.guestbook_check_in(p_name => 'Tamu Sheet', p_phone => '0822 6000 0001', p_email => 'sheet@example.test',
+           p_jabatan => null, p_address => null, p_latitude => null, p_longitude => null, p_file_path => null,
+           p_check_in_date => null, p_check_out_date => null)) as r`,
+      ),
+    );
+    assert.equal(attendee.r.status, "created");
+    await db.exec(`update public.guestbook_checkins set created_at = '2026-11-04 01:23:00+00', last_checked_in_at = '2026-11-04 02:34:00+00'
+                    where email = 'sheet@example.test'`);
+    await db.query(
+      `insert into public.guestbook_ballots (poll_id, device_id, picks)
+       select $1, md5('form:' || id::text), '{1}' from public.guestbook_checkins where email = 'sheet@example.test'`,
+      [poll.id],
+    );
+    const [moved] = (await bodies()).flatMap((body) => body.votes ?? []);
+    assert.deepEqual(moved.cells, [["Waktu (WIB)", "04/11/2026 09:34 WIB"], ["Pilihan", "Classroom table"]]);
+
+    // A resend sends every vote again (the sheet updates their rows by ID).
+    await db.exec("delete from net.sent");
+    await db.query("select private.guestbook_sheet_resend()");
+    const resent = (await bodies()).flatMap((body) => body.votes ?? []);
+    assert.deepEqual(resent.map((row) => row.cells[1][1]).sort(), ["Classroom table", "Round table", "Round table, U-shape"]);
+  } finally {
+    await db.exec("delete from private.guestbook_sheet; delete from net.sent");
+  }
+});
+
+test("a vote counts even when copying it to the sheet fails", async () => {
+  const poll = await savePoll(["Round table", "Classroom table"], 1);
+  await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", ["https://script.google.com/macros/s/AKfycbx-down/exec", "s".repeat(32)]);
+  const httpPost = (body) => `create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
+    headers jsonb default '{}', timeout_milliseconds int default 5000) returns bigint ${body}`;
+  await db.exec(httpPost(`language plpgsql as $$ begin raise exception 'Google is down'; end $$`));
+  try {
+    assert.deepEqual(await vote(poll.id, device(1), [1]), { status: "recorded", picks: [1] });
+    assert.deepEqual((await results()).counts, [0, 1]);
+  } finally {
+    await db.exec(httpPost(`language sql as $$ insert into net.sent (url, body) values (url, body) returning id $$`));
+    await db.exec("delete from private.guestbook_sheet");
+  }
+});
+
+const resetPoll = (userId = ADMIN) => as("authenticated", userId, () => one("select public.guestbook_reset_poll() as result"));
+
+test("Reset hitungan starts the same vote again from zero: every phone votes again, earlier votes stay stored", async () => {
+  await assert.rejects(resetPoll(), /Belum ada voting/);
+  const poll = await savePoll(["Round table", "Classroom table"], 1);
+  await vote(poll.id, device(1), [0]);
+  await vote(poll.id, device(2), [1]);
+  await assert.rejects(resetPoll(OTHER), /Hanya admin/);
+  await assert.rejects(as("anon", "", () => one("select public.guestbook_reset_poll() as result")));
+  const fresh = await resetPoll();
+  assert.notEqual(fresh.id, poll.id);
+  assert.deepEqual([fresh.options, fresh.max_picks, fresh.is_open], [["Round table", "Classroom table"], 1, true]);
+  assert.deepEqual(await results().then(({ poll: shown, voters, counts }) => ({ id: shown.id, voters, counts })), { id: fresh.id, voters: 0, counts: [0, 0] });
+  // A phone that voted votes again; a ballot for the earlier count is not counted.
+  assert.deepEqual(await vote(fresh.id, device(1), [1]), { status: "recorded", picks: [1] });
+  assert.deepEqual(await vote(poll.id, device(3), [0]), { status: "changed" });
+  // The earlier votes stay in the database.
+  assert.equal(await ballotCount(), 3);
+  // A closed vote stays closed after a reset.
+  await closePoll();
+  assert.equal((await resetPoll()).is_open, false);
+});
+
+test("Reset hitungan empties the sheet's E-Vote tab, and a resend sends only the votes of the count under way", async () => {
+  const bodies = async () => (await db.query("select body from net.sent order by id")).rows.map((row) => row.body);
+  const poll = await savePoll(["Round table", "Classroom table"], 1);
+  await vote(poll.id, device(1), [0]);
+  await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", ["https://script.google.com/macros/s/AKfycbx-reset/exec", "s".repeat(32)]);
+  await db.exec("delete from net.sent");
+  try {
+    const fresh = await resetPoll();
+    assert.deepEqual(await bodies(), [{ secret: "s".repeat(32), votes_reset: true }]);
+    await vote(fresh.id, device(2), [1]);
+    await db.exec("delete from net.sent");
+    await db.query("select private.guestbook_sheet_resend()");
+    assert.deepEqual((await bodies()).flatMap((body) => body.votes ?? []).map((row) => row.cells[1][1]), ["Classroom table"]);
+  } finally {
+    await db.exec("delete from private.guestbook_sheet; delete from net.sent");
+  }
 });

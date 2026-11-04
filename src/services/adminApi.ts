@@ -4,7 +4,7 @@ import { isAdmin, signIn, signOut, useSession } from "./auth";
 import { adminCheckOut, checkOutAll, fetchAllCheckIns, fetchWinners, signedFileUrl, startSession } from "./checkinsAdmin";
 import { drawWinner, removeWinner } from "./draw";
 import { saveEventContent, uploadMaterial, uploadPdfPages, uploadProfileImage } from "./eventAdmin";
-import { closePoll, fetchPollResults, savePoll } from "./evoteAdmin";
+import { closePoll, fetchPollResults, resetPoll, savePoll } from "./evoteAdmin";
 import { saveFormFields, updateSettings, uploadBrandImage } from "./settingsAdmin";
 
 export const adminApi = {
@@ -27,6 +27,7 @@ export const adminApi = {
   fetchPollResults,
   savePoll,
   closePoll,
+  resetPoll,
 };
 export type AdminApi = typeof adminApi;
 export { signIn, signOut, useSession };

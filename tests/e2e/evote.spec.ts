@@ -111,7 +111,7 @@ test("a ballot sent after the admin changed the options or closed voting is not 
   await page.getByRole("radio", { name: "Round table" }).click();
   state.polls.push(pollRow({ options: ["Nasi goreng", "Soto"], created_at: "2026-11-04T02:00:00.000Z" }));
   await page.getByRole("button", { name: "Kirim suara", exact: true }).click();
-  await expect(page.getByText("Pilihan voting berubah. Silakan pilih lagi.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Voting dimulai ulang. Silakan pilih lagi.", { exact: true })).toBeVisible();
   await expect(page.getByRole("radio", { name: "Round table" })).toHaveCount(0);
   await page.getByRole("radio", { name: "Soto" }).click();
   state.polls[1].is_open = false;
@@ -248,4 +248,60 @@ test("before the E-Vote migration, the vote page says it cannot load and the adm
   await expect(page.getByRole("alert")).toContainText("npm run db:push");
   await page.getByRole("link", { name: "Hasil E-Vote", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("npm run db:push");
+});
+
+test("Reset hitungan asks first, then starts the same vote again from zero", async ({ page }) => {
+  const poll = pollRow({ options: ["Round table", "Classroom table"], max_picks: 1 });
+  const state = await installSupabaseStub(page, {
+    polls: [poll],
+    ballots: [1, 2, 3].map((n) => ({ poll_id: poll.id, device_id: deviceId(n), picks: [n % 2] })),
+  });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "E-Vote", exact: true }).click();
+  const reset = page.getByRole("button", { name: "Reset hitungan", exact: true });
+  const dialog = page.getByRole("dialog", { name: "Reset hitungan" });
+  await reset.click();
+  await expect(dialog).toContainText("3 orang");
+  await dialog.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.polls).toHaveLength(1);
+
+  await reset.click();
+  await dialog.getByRole("button", { name: "Ya, reset", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("Hitungan direset: voting dimulai dari nol.", { exact: true })).toBeVisible();
+  expect(state.polls).toHaveLength(2);
+  expect(state.polls[1]).toMatchObject({ options: ["Round table", "Classroom table"], max_picks: 1, is_open: true });
+  expect(state.polls[1].id).not.toBe(poll.id);
+  await expect(page.getByLabel("Pilihan 1", { exact: true })).toHaveValue("Round table");
+  await page.getByRole("link", { name: "Hasil E-Vote", exact: true }).click();
+  await expect(page.getByTestId("evote-stage")).toContainText("0 orang sudah memilih");
+});
+
+test("Reset hitungan waits for a vote to exist", async ({ page }) => {
+  await installSupabaseStub(page);
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "E-Vote", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Reset hitungan", exact: true })).toBeDisabled();
+});
+
+test("after a reset, a phone that already voted can vote again", async ({ page }) => {
+  const poll = pollRow({ options: ["Round table", "Classroom table"], max_picks: 1, created_at: "2026-11-04T06:00:00.000Z" });
+  const state = await installSupabaseStub(page, { polls: [poll] });
+  await page.goto("/vote");
+  await page.getByRole("radio", { name: "Round table" }).click();
+  await page.getByRole("button", { name: "Kirim suara", exact: true }).click();
+  await expect(page.getByText("Terima kasih!", { exact: true })).toBeVisible();
+  // The admin presses Reset hitungan: the same options, a new count.
+  state.polls.push({ ...poll, id: "00000000-0000-4000-8000-0000000reset", created_at: "2026-11-04T07:00:00.000Z" });
+  await page.reload();
+  await page.getByRole("radio", { name: "Classroom table" }).click();
+  await page.getByRole("button", { name: "Kirim suara", exact: true }).click();
+  await expect(page.getByTestId("my-picks")).toHaveText("Classroom table");
+  expect(state.ballots.map((ballot) => [ballot.poll_id, ballot.picks])).toEqual([
+    [poll.id, [0]],
+    ["00000000-0000-4000-8000-0000000reset", [1]],
+  ]);
 });

@@ -33,6 +33,10 @@ function load() {
     setNumberFormat() {
       return this;
     }
+    clearContent() {
+      for (let i = 0; i < this.nr; i++) for (let j = 0; j < this.nc; j++) if (this.sheet.data[this.r - 1 + i]) this.sheet.data[this.r - 1 + i][this.c - 1 + j] = "";
+      return this;
+    }
     setFontWeight() {
       return this;
     }
@@ -54,6 +58,9 @@ function load() {
     setFrozenRows() {}
     deleteRow(r) {
       this.data.splice(r - 1, 1);
+    }
+    hideColumns(column) {
+      (this.hidden ??= new Set()).add(column);
     }
   }
   const book = {
@@ -144,4 +151,48 @@ test("a message is written once however often it comes; deleting a person remove
     "02-11-2026 Sesi 1: n",
     "Kesan & Pesan: ",
   ]);
+});
+
+test("votes go to the E-Vote tab with only the time and the picks, once however often they come", () => {
+  const { book, post, rows } = load();
+  const vote = (id, at, picks) => ({ id, cells: [["Waktu (WIB)", at], ["Pilihan", picks]] });
+  post({ rows: [person("m")] });
+  assert.equal(book.getSheetByName("E-Vote"), null, "no tab until a vote comes");
+  post({ votes: [vote("v1", "04/11/2026 13:10 WIB", "Round table"), vote("v2", "04/11/2026 13:11 WIB", "Classroom table, U-shape")] });
+  // A resend: the same vote again.
+  post({ votes: [vote("v1", "04/11/2026 13:10 WIB", "Round table")] });
+  assert.deepEqual(rows("E-Vote").map((row) => `${row["Waktu (WIB)"]} | ${row.Pilihan}`), [
+    "04/11/2026 13:10 WIB | Round table",
+    "04/11/2026 13:11 WIB | Classroom table, U-shape",
+  ]);
+  // The vote's code keeps a resend from repeating it; the tab shows the time and the picks.
+  const sheet = book.getSheetByName("E-Vote");
+  assert.deepEqual(sheet.data[0], ["Waktu (WIB)", "Pilihan", "ID Suara"]);
+  assert.deepEqual([...sheet.hidden], [3]);
+  // Votes carry no person's ID: deleting a person leaves them.
+  post({ delete: ["m", "v1"] });
+  assert.equal(rows("E-Vote").length, 2);
+});
+
+test("a reset empties the E-Vote tab, keeping its header and hidden code column, and new votes start at the top", () => {
+  const { book, post, rows } = load();
+  const vote = (id, at, picks) => ({ id, cells: [["Waktu (WIB)", at], ["Pilihan", picks]] });
+  post({ rows: [person("m")] });
+  post({ votes: [vote("v1", "04/11/2026 13:10 WIB", "Round table"), vote("v2", "04/11/2026 13:11 WIB", "Classroom table")] });
+  post({ votes_reset: true });
+  // Cleared rows stay as blank rows, as in Sheets.
+  const filled = () => rows("E-Vote").filter((row) => Object.values(row).some((value) => value !== ""));
+  assert.deepEqual(filled(), []);
+  post({ votes: [vote("v3", "04/11/2026 14:00 WIB", "Classroom table")] });
+  assert.deepEqual(filled().map((row) => `${row["Waktu (WIB)"]} | ${row.Pilihan} | ${row["ID Suara"]}`), ["04/11/2026 14:00 WIB | Classroom table | v3"]);
+  const sheet = book.getSheetByName("E-Vote");
+  // Right under the header.
+  assert.deepEqual(sheet.data[1], ["04/11/2026 14:00 WIB", "Classroom table", "v3"]);
+  assert.deepEqual(sheet.data[0], ["Waktu (WIB)", "Pilihan", "ID Suara"]);
+  assert.deepEqual([...sheet.hidden], [3]);
+  // Other tabs keep their rows; a reset before any vote does nothing.
+  assert.deepEqual(rows("Check-in").map((row) => row.ID), ["m"]);
+  const fresh = load();
+  fresh.post({ votes_reset: true });
+  assert.equal(fresh.book.getSheetByName("E-Vote"), null);
 });

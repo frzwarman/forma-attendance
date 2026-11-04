@@ -2,6 +2,8 @@
 // (supabase/migrations/20261103000000_guestbook_sheet_sync.sql) within seconds of every change:
 //   { secret, rows: [{ id, cells: [[header, value], ...] }] }      a person's current state
 //   { secret, feedback: [{ id, cells: [[header, value], ...] }] }  Kesan & Pesan messages
+//   { secret, votes: [{ id, cells: [[header, value], ...] }] }     E-Vote votes: time and picks, no name
+//   { secret, votes_reset: true }                                  Reset hitungan: empty the E-Vote tab
 //   { secret, delete: [id, ...] }                                  remove that person's rows
 // The sheet is a log: a row per check-in, so someone who checks in three times has three rows,
 // numbered by "Check-in ke-" and each with that visit's time (the database keeps one row per person
@@ -11,6 +13,9 @@
 // arrives. Sessions start when an admin presses Mulai Sesi 1 or Mulai Sesi 2 and run until the next,
 // past midnight too (20261109000000_guestbook_sessions.sql). Kesan & Pesan messages
 // (20261106000000_guestbook_feedback.sql) go to their own tab, a row per message with its sender.
+// E-Vote votes (20261113000000_guestbook_evote_sheet.sql) go to the E-Vote tab, a row per vote with its
+// time and picks only; the vote's code, which ties to no person, sits in a hidden column so a resend
+// updates the row instead of adding it again.
 // Setup steps are in the README ("Google Sheet").
 
 const ALL_TAB = "Check-in";
@@ -18,6 +23,8 @@ const ID_HEADER = "ID";
 const VISIT_HEADER = "Check-in ke-";
 const FEEDBACK_TAB = "Kesan & Pesan";
 const FEEDBACK_ID_HEADER = "ID Pesan";
+const VOTE_TAB = "E-Vote";
+const VOTE_ID_HEADER = "ID Suara";
 
 function doPost(e) {
   const body = JSON.parse(e.postData.contents);
@@ -44,6 +51,18 @@ function doPost(e) {
         key: [[FEEDBACK_ID_HEADER, message.id]],
       })),
     );
+    // Reset hitungan (20261114000000_guestbook_evote_reset.sql): the tab starts again under its header.
+    const voteTab = SpreadsheetApp.getActive().getSheetByName(VOTE_TAB);
+    if (body.votes_reset && voteTab && voteTab.getLastRow() > 1) voteTab.getRange(2, 1, voteTab.getLastRow() - 1, voteTab.getLastColumn()).clearContent();
+    const votes = (body.votes || []).map((vote) => ({
+      cells: vote.cells.concat([[VOTE_ID_HEADER, vote.id]]),
+      key: [[VOTE_ID_HEADER, vote.id]],
+    }));
+    upsert(VOTE_TAB, votes);
+    if (votes.length) {
+      const sheet = tab(VOTE_TAB);
+      sheet.hideColumns(headers(sheet).indexOf(VOTE_ID_HEADER) + 1);
+    }
     // On every tab with an ID column, the Kesan & Pesan tab included.
     (body.delete || []).forEach((id) =>
       SpreadsheetApp.getActive()

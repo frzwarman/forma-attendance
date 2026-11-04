@@ -333,6 +333,15 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     if (latest) latest.is_open = false;
     return json(route, latest ?? null);
   });
+  await page.route("**/rest/v1/rpc/guestbook_reset_poll", (route, request) => {
+    if (seed.legacyEvote) return noFunction(route, "guestbook_reset_poll");
+    state.rpcCalls.push({ name: "guestbook_reset_poll", body: parseBody(request) });
+    const latest = latestPoll();
+    if (!latest) return refused(route, "Belum ada voting");
+    const poll: Poll = { ...latest, id: uuid(), created_at: new Date(Math.max(Date.now(), Date.parse(latest.created_at) + 1)).toISOString() };
+    state.polls.push(poll);
+    return json(route, poll);
+  });
   await page.route("**/rest/v1/rpc/guestbook_cast_ballot", (route, request) => {
     if (seed.legacyEvote) return noFunction(route, "guestbook_cast_ballot");
     const body = parseBody(request);

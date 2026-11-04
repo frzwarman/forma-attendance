@@ -1,7 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { View } from "react-native";
-import { Lock, Plus, Save, Trash, Vote } from "../../components/icons";
+import { Lock, Plus, RotateCcw, Save, Trash, Vote } from "../../components/icons";
 import { Modal } from "../../components/Modal";
 import { Badge, Button, Card, Divider, Field, IconHeading, Row, T } from "../../components/ui";
 import { normalizeOptions, OPTION_LENGTH_MAX, OPTIONS_MAX, OPTIONS_MIN, pollProblem, sameVote, type Poll } from "../../domain/evote";
@@ -49,10 +49,11 @@ function Editor({ poll, voters, notice, onNotice }: { poll: Poll | null; voters:
   const client = useQueryClient();
   const [options, setOptions] = useState<string[]>(poll?.options ?? ["", ""]);
   const [maxPicks, setMaxPicks] = useState(poll?.max_picks ?? 1);
-  const [busy, setBusy] = useState<"" | "save" | "close">("");
+  const [busy, setBusy] = useState<"" | "save" | "close" | "reset">("");
   const [error, setError] = useState("");
   // The options waiting for Ya, mulai voting baru.
   const [confirming, setConfirming] = useState<string[]>();
+  const [confirmReset, setConfirmReset] = useState(false);
 
   function edit(next: string[]) {
     setError("");
@@ -94,6 +95,23 @@ function Editor({ poll, voters, notice, onNotice }: { poll: Poll | null; voters:
     try {
       await api.closePoll();
       onNotice("Voting ditutup. Peserta tidak bisa memilih lagi.");
+      await client.invalidateQueries({ queryKey: ["poll-results"] });
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // The same vote again from zero; the sheet's E-Vote tab is emptied (20261114000000_guestbook_evote_reset.sql).
+  async function reset() {
+    setBusy("reset");
+    setError("");
+    onNotice("");
+    try {
+      await api.resetPoll();
+      setConfirmReset(false);
+      onNotice("Hitungan direset: voting dimulai dari nol.");
       await client.invalidateQueries({ queryKey: ["poll-results"] });
     } catch (cause) {
       setError((cause as Error).message);
@@ -161,18 +179,19 @@ function Editor({ poll, voters, notice, onNotice }: { poll: Poll | null; voters:
       </Row>
       <Divider />
       <Row style={{ gap: 10, flexWrap: "wrap" }}>
-        <Button icon={Save} label="Simpan & buka voting" loading={busy === "save"} loadingLabel="Menyimpan…" disabled={busy === "close"} onPress={ask} />
+        <Button icon={Save} label="Simpan & buka voting" loading={busy === "save"} loadingLabel="Menyimpan…" disabled={!!busy && busy !== "save"} onPress={ask} />
         <Button
           variant="secondary"
           icon={Lock}
           label="Tutup voting"
           loading={busy === "close"}
           loadingLabel="Menutup…"
-          disabled={busy === "save" || !poll?.is_open}
+          disabled={(!!busy && busy !== "close") || !poll?.is_open}
           onPress={() => void close()}
         />
+        <Button variant="danger" icon={RotateCcw} label="Reset hitungan" disabled={!!busy || !poll} onPress={() => setConfirmReset(true)} />
       </Row>
-      {!!error && !confirming && (
+      {!!error && !confirming && !confirmReset && (
         <T accessibilityRole="alert" color={c.danger}>
           {error}
         </T>
@@ -200,6 +219,28 @@ function Editor({ poll, voters, notice, onNotice }: { poll: Poll | null; voters:
             <Row style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
               <Button variant="ghost" label="Batal" disabled={!!busy} onPress={() => setConfirming(undefined)} />
               <Button label="Ya, mulai voting baru" loading={busy === "save"} loadingLabel="Menyimpan…" onPress={() => void save(confirming)} />
+            </Row>
+          </View>
+        </Modal>
+      )}
+      {confirmReset && (
+        <Modal label="Reset hitungan" maxWidth={460} onClose={() => !busy && setConfirmReset(false)}>
+          <View style={{ padding: 24, paddingTop: 28, gap: 16 }}>
+            <T size={22} weight="extra" accessibilityRole="header" style={{ paddingRight: 48 }}>
+              Reset hitungan?
+            </T>
+            <T color={c.muted}>
+              Hitungan kembali ke nol dan tab E-Vote di spreadsheet dikosongkan. Setiap HP bisa memilih lagi, juga yang sudah memilih (
+              {voters.toLocaleString("id-ID")} orang). Pilihannya tetap sama; suara sebelumnya tetap tersimpan di database.
+            </T>
+            {!!error && (
+              <T accessibilityRole="alert" color={c.danger}>
+                {error}
+              </T>
+            )}
+            <Row style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <Button variant="ghost" label="Batal" disabled={!!busy} onPress={() => setConfirmReset(false)} />
+              <Button variant="danger" icon={RotateCcw} label="Ya, reset" loading={busy === "reset"} loadingLabel="Mereset…" onPress={() => void reset()} />
             </Row>
           </View>
         </Modal>

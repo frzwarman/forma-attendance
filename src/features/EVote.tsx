@@ -39,7 +39,7 @@ export function EVote() {
         poll={current}
         notice={notice}
         onVoted={(picks) => setSent({ pollId: current.id, picks })}
-        onChanged={() => setNotice("Pilihan voting berubah. Silakan pilih lagi.")}
+        onChanged={() => setNotice("Voting dimulai ulang. Silakan pilih lagi.")}
       />
     );
   return (
