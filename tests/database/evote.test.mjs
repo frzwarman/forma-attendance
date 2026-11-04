@@ -41,6 +41,8 @@ const vote = (pollId, deviceId, picks) =>
   as("anon", "", () => one("select public.guestbook_cast_ballot($1::uuid, $2::text, $3::int[]) as result", [pollId, deviceId, picks]));
 // What the vote page reads: the latest poll, through the public select.
 const currentPoll = () => as("anon", "", async () => (await db.query("select * from public.guestbook_polls order by created_at desc limit 1")).rows[0]);
+// The job pg_cron runs every 10 seconds: sends the votes cast since its last run.
+const sendQueued = async () => (await db.query("select private.guestbook_sheet_send_queued_votes() as n")).rows[0].n;
 const ballotCount = async () => Number((await db.query("select count(*) as n from public.guestbook_ballots")).rows[0].n);
 
 test("E-Vote tables: anyone reads the vote's options, nobody reads ballots or writes either table directly", async () => {
@@ -228,11 +230,15 @@ test("each vote is copied to the sheet's E-Vote tab with its time and picks only
   await db.exec("delete from net.sent");
   // No sheet set up: nothing is sent, and the vote counts.
   assert.deepEqual(await vote(poll.id, device(1), [0]), { status: "recorded", picks: [0] });
+  await sendQueued();
   assert.deepEqual(await bodies(), []);
 
   await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", ["https://script.google.com/macros/s/AKfycbx-evote/exec", "s".repeat(32)]);
   try {
     await vote(poll.id, device(2), [2, 0]);
+    // Nothing goes out while the attendee votes: the next batch takes it.
+    assert.deepEqual(await bodies(), []);
+    await sendQueued();
     const [request] = await bodies();
     assert.equal(request.secret, "s".repeat(32));
     assert.equal(request.rows, undefined);
@@ -247,6 +253,7 @@ test("each vote is copied to the sheet's E-Vote tab with its time and picks only
     // A phone voting again sends nothing.
     await db.exec("delete from net.sent");
     assert.equal((await vote(poll.id, device(2), [1])).status, "already");
+    await sendQueued();
     assert.deepEqual(await bodies(), []);
 
     // A TYPE LAYOUT answer moved from the form shows when its attendee checked in, not when it was moved.
@@ -265,6 +272,7 @@ test("each vote is copied to the sheet's E-Vote tab with its time and picks only
        select $1, md5('form:' || id::text), '{1}' from public.guestbook_checkins where email = 'sheet@example.test'`,
       [poll.id],
     );
+    await sendQueued();
     const [moved] = (await bodies()).flatMap((body) => body.votes ?? []);
     assert.deepEqual(moved.cells, [["Waktu (WIB)", "04/11/2026 09:34 WIB"], ["Pilihan", "Classroom table"]]);
 
@@ -278,7 +286,7 @@ test("each vote is copied to the sheet's E-Vote tab with its time and picks only
   }
 });
 
-test("a vote counts even when copying it to the sheet fails", async () => {
+test("a vote counts, and the batch job carries on, when copying to the sheet fails", async () => {
   const poll = await savePoll(["Round table", "Classroom table"], 1);
   await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", ["https://script.google.com/macros/s/AKfycbx-down/exec", "s".repeat(32)]);
   const httpPost = (body) => `create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
@@ -286,6 +294,7 @@ test("a vote counts even when copying it to the sheet fails", async () => {
   await db.exec(httpPost(`language plpgsql as $$ begin raise exception 'Google is down'; end $$`));
   try {
     assert.deepEqual(await vote(poll.id, device(1), [1]), { status: "recorded", picks: [1] });
+    await sendQueued();
     assert.deepEqual((await results()).counts, [0, 1]);
   } finally {
     await db.exec(httpPost(`language sql as $$ insert into net.sent (url, body) values (url, body) returning id $$`));
@@ -329,6 +338,53 @@ test("Reset hitungan empties the sheet's E-Vote tab, and a resend sends only the
     await db.exec("delete from net.sent");
     await db.query("select private.guestbook_sheet_resend()");
     assert.deepEqual((await bodies()).flatMap((body) => body.votes ?? []).map((row) => row.cells[1][1]), ["Classroom table"]);
+  } finally {
+    await db.exec("delete from private.guestbook_sheet; delete from net.sent");
+  }
+});
+
+test("votes reach the sheet in batches every 10 seconds: a burst of 150 votes is 2 requests, each vote once", async () => {
+  const { rows: jobs } = await db.query("select schedule, command from cron.jobs where name = 'guestbook-sheet-votes'");
+  assert.deepEqual(jobs, [{ schedule: "10 seconds", command: "select private.guestbook_sheet_send_queued_votes()" }]);
+  const bodies = async () => (await db.query("select body from net.sent order by id")).rows.map((row) => row.body);
+  const poll = await savePoll(["Round table", "Classroom table"], 1);
+  await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", ["https://script.google.com/macros/s/AKfycbx-burst/exec", "s".repeat(32)]);
+  await db.exec("delete from net.sent");
+  try {
+    for (let n = 1; n <= 150; n++) await vote(poll.id, device(n), [n % 2]);
+    assert.deepEqual(await bodies(), []);
+    assert.equal(await sendQueued(), 150);
+    const requests = await bodies();
+    assert.deepEqual(requests.map((body) => body.votes.length), [100, 50]);
+    assert.equal(new Set(requests.flatMap((body) => body.votes.map((row) => row.id))).size, 150);
+    // The next run finds nothing new.
+    assert.equal(await sendQueued(), 0);
+    assert.equal((await bodies()).length, 2);
+  } finally {
+    await db.exec("delete from private.guestbook_sheet; delete from net.sent");
+  }
+});
+
+test("votes still waiting for the batch when Reset hitungan is pressed are not sent; without a sheet the list is emptied all the same", async () => {
+  const bodies = async () => (await db.query("select body from net.sent order by id")).rows.map((row) => row.body);
+  const waiting = async () => Number((await db.query("select count(*) as n from private.guestbook_sheet_vote_queue")).rows[0].n);
+  const poll = await savePoll(["Round table", "Classroom table"], 1);
+  await vote(poll.id, device(1), [0]);
+  assert.equal(await waiting(), 1);
+  assert.equal(await sendQueued(), 0);
+  assert.equal(await waiting(), 0);
+
+  await db.query("insert into private.guestbook_sheet (url, secret) values ($1, $2)", ["https://script.google.com/macros/s/AKfycbx-queue/exec", "s".repeat(32)]);
+  await db.exec("delete from net.sent");
+  try {
+    await vote(poll.id, device(2), [1]);
+    const fresh = await resetPoll();
+    await vote(fresh.id, device(3), [1]);
+    assert.equal(await sendQueued(), 1);
+    const requests = await bodies();
+    assert.deepEqual(requests[0], { secret: "s".repeat(32), votes_reset: true });
+    assert.deepEqual(requests.slice(1).flatMap((body) => body.votes.map((row) => row.cells[1][1])), ["Classroom table"]);
+    assert.equal(await waiting(), 0);
   } finally {
     await db.exec("delete from private.guestbook_sheet; delete from net.sent");
   }

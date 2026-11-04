@@ -489,8 +489,9 @@ test("check-ins are copied to the Google Sheet: added, updated, deleted, and not
   }
 });
 
-test("nobody is checked out automatically: no cron jobs, a forgotten check-out stays open until the next check-in", async () => {
-  assert.equal((await db.query("select count(*)::int as n from cron.jobs")).rows[0].n, 0);
+test("nobody is checked out automatically: no check-out job, a forgotten check-out stays open until the next check-in", async () => {
+  // The only scheduled job copies E-Vote votes to the sheet (20261115000000_guestbook_evote_sheet_batches.sql).
+  assert.deepEqual((await db.query("select name from cron.jobs order by name")).rows.map((row) => row.name), ["guestbook-sheet-votes"]);
   const lupa = { name: "Lupa Checkout", phone: "0899 1100 2200", email: "lupa@example.test", in: null, out: null };
   await asRole(null, "anon", () => checkIn(lupa));
   // Next morning: welcomed, present again, with a code to check out.
