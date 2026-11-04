@@ -12,7 +12,7 @@ test("captures reference screenshots of the public form and the admin list", asy
     ],
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible();
   // A tall viewport instead of fullPage: the fixed background layer is captured only once per viewport.
   await page.setViewportSize({ width: 390, height: 1500 });

@@ -1,3 +1,4 @@
+import { Link } from "expo-router";
 import React from "react";
 import type { IconComponent } from "./icons";
 import {
@@ -81,9 +82,11 @@ export function Card({
   );
 }
 
+// With href it is a link to that page of the site, styled the same.
 export function Button({
   label,
   onPress,
+  href,
   icon: Icon,
   variant = "primary",
   disabled = false,
@@ -97,7 +100,8 @@ export function Button({
   label: string;
   // When several buttons share a visible label, e.g. "Hapus" on every row.
   accessibilityLabel?: string;
-  onPress: () => void;
+  onPress?: () => void;
+  href?: string;
   icon?: IconComponent;
   variant?: "primary" | "secondary" | "ghost" | "danger" | "inverse";
   disabled?: boolean;
@@ -117,39 +121,52 @@ export function Button({
   }[variant];
   const color = palette.color;
   const height = small ? 38 : large ? 54 : 46;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: disabled || loading, busy: loading }}
-      aria-busy={loading}
-      disabled={disabled || loading}
-      onPress={onPress}
-      style={({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) => [
-        {
-          minHeight: height,
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: palette.border,
-          paddingHorizontal: small ? 14 : large ? 26 : 20,
-          backgroundColor: hovered && !pressed ? palette.hover : palette.background,
-          opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
-          alignItems: "center",
-          justifyContent: "center",
-          flexDirection: "row",
-          gap: 9,
-          transform: [{ scale: pressed ? 0.98 : 1 }],
-          transitionProperty: "background-color, transform, opacity",
-          transitionDuration: "150ms",
-          boxShadow: variant === "primary" && !disabled ? `0 8px 18px ${c.accentSoft}` : undefined,
-        } as ViewStyle,
-        style,
-      ]}
-    >
+  const look = ({ pressed, hovered }: { pressed: boolean; hovered?: boolean }) =>
+    ({
+      minHeight: height,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: palette.border,
+      paddingHorizontal: small ? 14 : large ? 26 : 20,
+      backgroundColor: hovered && !pressed ? palette.hover : palette.background,
+      opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+      alignItems: "center",
+      justifyContent: "center",
+      flexDirection: "row",
+      gap: 9,
+      transform: [{ scale: pressed ? 0.98 : 1 }],
+      transitionProperty: "background-color, transform, opacity",
+      transitionDuration: "150ms",
+      boxShadow: variant === "primary" && !disabled ? `0 8px 18px ${c.accentSoft}` : undefined,
+    }) as ViewStyle;
+  const content = (
+    <>
       {loading ? <ActivityIndicator color={color} /> : Icon ? <Icon size={18} color={color} strokeWidth={2.2} /> : null}
       <T weight="semibold" color={color} size={small ? 13 : large ? 16 : 15}>
         {loading ? loadingLabel : label}
       </T>
+    </>
+  );
+  const shared = {
+    accessibilityLabel: accessibilityLabel ?? label,
+    accessibilityState: { disabled: disabled || loading, busy: loading },
+    "aria-busy": loading,
+    disabled: disabled || loading,
+    onPress,
+  };
+  // Link's asChild flattens its child's style, which drops a style function, so a link keeps the
+  // look on an inner view (as the admin sidebar's links do).
+  if (href)
+    return (
+      <Link href={href} asChild>
+        <Pressable accessibilityRole="link" {...shared} style={style}>
+          {(state: { pressed: boolean; hovered?: boolean }) => <View style={look(state)}>{content}</View>}
+        </Pressable>
+      </Link>
+    );
+  return (
+    <Pressable accessibilityRole="button" {...shared} style={(state: { pressed: boolean; hovered?: boolean }) => [look(state), style]}>
+      {content}
     </Pressable>
   );
 }

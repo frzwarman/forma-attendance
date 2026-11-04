@@ -135,6 +135,13 @@ export function ColorInput({
   );
 }
 
+// The browser's own dropdown arrow sits against the right border (and long text runs under it), so
+// the select draws lucide's chevron-down 14 px in and keeps text clear of it.
+const chevron = (color: string) =>
+  `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
+  )}")`;
+
 // A dropdown for a question with fixed answers; "" is "nothing chosen yet".
 export function SelectInput({
   label,
@@ -163,7 +170,24 @@ export function SelectInput({
       <T size={14} weight="semibold">
         {label}
       </T>
-      <select aria-label={label} aria-invalid={!!error} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} style={{ ...style, color: value ? c.text : c.muted }}>
+      <select
+        aria-label={label}
+        aria-invalid={!!error}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        style={{
+          ...style,
+          color: value ? c.text : c.muted,
+          padding: "11px 44px 11px 14px",
+          appearance: "none",
+          WebkitAppearance: "none",
+          backgroundImage: chevron(c.muted),
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "right 14px center",
+          backgroundSize: "18px",
+        }}
+      >
         <option value="">{placeholder}</option>
         {options.map((option) => (
           <option key={option} value={option} style={{ color: c.text }}>

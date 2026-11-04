@@ -10,7 +10,7 @@ test("unsupported files are refused and block Kirim; an image is compressed to J
   if (!fs.existsSync(fixture)) execSync("node scripts/make-test-fixtures.cjs", { stdio: "ignore" });
   const fixtureBytes = fs.statSync(fixture).size;
   const state = await installSupabaseStub(page);
-  await page.goto("/");
+  await page.goto("/registrasi");
   const picker = page.getByLabel("Pilih berkas", { exact: true });
   await picker.setInputFiles({
     name: "surat.docx",

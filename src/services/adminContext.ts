@@ -15,6 +15,12 @@ export function useCheckIns() {
   return useQuery({ queryKey: ["checkins"], queryFn: api.fetchAllCheckIns, refetchInterval: 10_000 });
 }
 
+// E-Vote's current poll and count; Hasil E-Vote asks every 2 s so the monitor follows the votes.
+export function usePollResults(refetchInterval: number) {
+  const api = useAdminApi();
+  return useQuery({ queryKey: ["poll-results"], queryFn: api.fetchPollResults, refetchInterval });
+}
+
 export function useWinners() {
   const api = useAdminApi();
   return useQuery({ queryKey: ["winners"], queryFn: api.fetchWinners, refetchInterval: 10_000 });

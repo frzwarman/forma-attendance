@@ -17,7 +17,7 @@ test("theme changes are saved and reflected on the public page", async ({ page }
   await expect(page.getByText("Tampilan disimpan.", { exact: true })).toBeVisible();
   expect(state.settings.event_name).toBe("Rakernas Bawaslu 2026");
   expect(state.settings.accent_color).toBe("#005bbb");
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByRole("heading", { name: "Rakernas Bawaslu 2026" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Kirim", exact: true })).toHaveCSS("background-color", "rgb(0, 91, 187)");
 });

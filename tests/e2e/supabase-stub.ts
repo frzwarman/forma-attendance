@@ -1,6 +1,8 @@
 import type { Page, Request, Route } from "@playwright/test";
+import type { Poll } from "../../src/domain/evote";
 import type { CheckIn, Settings, Winner } from "../../src/types/guestbook";
 
+export type Ballot = { poll_id: string; device_id: string; picks: number[] };
 export type StubState = {
   settings: Settings;
   checkins: CheckIn[];
@@ -13,6 +15,9 @@ export type StubState = {
   rangeHeaders: string[];
   // Sessions an admin started (guestbook_sessions), oldest first.
   sessions: { label: "Sesi 1" | "Sesi 2"; started_at: string }[];
+  // E-Vote (guestbook_polls, the latest is the vote under way) and every phone's ballot.
+  polls: Poll[];
+  ballots: Ballot[];
 };
 type Seed = {
   settings?: Partial<Settings>;
@@ -31,6 +36,10 @@ type Seed = {
   // yet, and an address is required.
   legacyCheckIn?: boolean;
   sessions?: StubState["sessions"];
+  polls?: Poll[];
+  ballots?: Ballot[];
+  // A database without migration 20261111000000_guestbook_evote.sql: no E-Vote table or functions.
+  legacyEvote?: boolean;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -75,6 +84,20 @@ export function checkInRow(overrides: Partial<CheckIn> = {}): CheckIn {
     ...overrides,
   };
 }
+
+export function pollRow(overrides: Partial<Poll> = {}): Poll {
+  const n = ++counter;
+  return {
+    id: uuid(),
+    created_at: new Date(Date.UTC(2026, 10, 4, 1, 0, n % 60)).toISOString(),
+    options: ["Round table", "Classroom"],
+    max_picks: 1,
+    is_open: true,
+    ...overrides,
+  };
+}
+// A phone's E-Vote ID, as the page makes them: 16 random bytes as hex.
+export const deviceId = (n: number) => n.toString(16).padStart(32, "0");
 
 const PNG_1x1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -134,6 +157,8 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     signedPaths: [],
     rangeHeaders: [],
     sessions: [...(seed.sessions || [])],
+    polls: [...(seed.polls || [])],
+    ballots: [...(seed.ballots || [])],
   };
   if (!seed.intro) await page.addInitScript(() => sessionStorage.setItem("guestbook.intro.seen", "1"));
   const admin = seed.admin || { email: "admin@bawaslu.test", password: "rahasia123" };
@@ -265,6 +290,77 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       winner: { id: winner.id, checkin_id: winner.checkin_id, prize: winner.prize, drawn_at: winner.drawn_at },
       checkin: { id: checkin.id, name: checkin.name, jabatan: checkin.jabatan, phone: checkin.phone, email: checkin.email },
     });
+  });
+
+  // E-Vote, mirroring supabase/migrations/20261111000000_guestbook_evote.sql.
+  const latestPoll = () => [...state.polls].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  const noFunction = (route: Route, name: string) =>
+    json(route, { code: "PGRST202", message: `Could not find the function public.${name} without parameters in the schema cache` }, 404);
+  const refused = (route: Route, message: string) => json(route, { code: "P0001", message }, 400);
+  await page.route("**/rest/v1/guestbook_polls*", (route, request) => {
+    if (seed.legacyEvote) return json(route, { code: "PGRST205", message: "Could not find the table 'public.guestbook_polls' in the schema cache" }, 404);
+    const latest = latestPoll();
+    if (!wantsObject(request)) return json(route, latest ? [latest] : []);
+    return latest ? json(route, latest) : json(route, { code: "PGRST116", message: "Cannot coerce the result to a single JSON object" }, 406);
+  });
+  await page.route("**/rest/v1/rpc/guestbook_save_poll", (route, request) => {
+    if (seed.legacyEvote) return noFunction(route, "guestbook_save_poll");
+    const body = parseBody(request);
+    state.rpcCalls.push({ name: "guestbook_save_poll", body });
+    const options = ((body.p_options as unknown[] | null) ?? []).map((option) => String(option ?? "").trim());
+    const max = body.p_max_picks as number;
+    if (options.length < 2 || options.length > 20) return refused(route, "Isi 2 sampai 20 pilihan");
+    if (options.some((option) => !option)) return refused(route, "Pilihan tidak boleh kosong");
+    if (options.some((option) => option.length > 120)) return refused(route, "Setiap pilihan maksimal 120 karakter");
+    if (new Set(options.map((option) => option.toLowerCase())).size !== options.length) return refused(route, "Pilihan tidak boleh sama");
+    if (!Number.isInteger(max) || max < 1 || max > options.length) return refused(route, `Jumlah pilihan per orang harus 1 sampai ${options.length}`);
+    const latest = latestPoll();
+    if (latest && latest.max_picks === max && latest.options.length === options.length && latest.options.every((option, i) => option === options[i])) {
+      latest.is_open = true;
+      return json(route, latest);
+    }
+    const created = Math.max(Date.now(), latest ? Date.parse(latest.created_at) + 1 : 0);
+    const poll: Poll = { id: uuid(), created_at: new Date(created).toISOString(), options, max_picks: max, is_open: true };
+    state.polls.push(poll);
+    return json(route, poll);
+  });
+  await page.route("**/rest/v1/rpc/guestbook_close_poll", (route, request) => {
+    if (seed.legacyEvote) return noFunction(route, "guestbook_close_poll");
+    state.rpcCalls.push({ name: "guestbook_close_poll", body: parseBody(request) });
+    const latest = latestPoll();
+    if (latest) latest.is_open = false;
+    return json(route, latest ?? null);
+  });
+  await page.route("**/rest/v1/rpc/guestbook_cast_ballot", (route, request) => {
+    if (seed.legacyEvote) return noFunction(route, "guestbook_cast_ballot");
+    const body = parseBody(request);
+    state.rpcCalls.push({ name: "guestbook_cast_ballot", body });
+    const device = String(body.p_device_id ?? "");
+    if (!/^[0-9a-f]{32}$/.test(device)) return refused(route, "Perangkat tidak dikenal");
+    const poll = latestPoll();
+    if (!poll || poll.id !== body.p_poll_id) return json(route, { status: "changed" });
+    const stored = state.ballots.find((ballot) => ballot.poll_id === poll.id && ballot.device_id === device);
+    if (stored) return json(route, { status: "already", picks: stored.picks });
+    if (!poll.is_open) return json(route, { status: "closed" });
+    const picks = body.p_picks as number[] | null;
+    if (
+      !Array.isArray(picks) ||
+      picks.length < 1 ||
+      picks.length > poll.max_picks ||
+      picks.some((pick) => !Number.isInteger(pick) || pick < 0 || pick >= poll.options.length) ||
+      new Set(picks).size !== picks.length
+    )
+      return refused(route, "Pilihan tidak valid");
+    const sorted = [...picks].sort((a, b) => a - b);
+    state.ballots.push({ poll_id: poll.id, device_id: device, picks: sorted });
+    return json(route, { status: "recorded", picks: sorted });
+  });
+  await page.route("**/rest/v1/rpc/guestbook_poll_results", (route) => {
+    if (seed.legacyEvote) return noFunction(route, "guestbook_poll_results");
+    const poll = latestPoll();
+    if (!poll) return json(route, { poll: null, voters: 0, counts: [] });
+    const ballots = state.ballots.filter((ballot) => ballot.poll_id === poll.id);
+    return json(route, { poll, voters: ballots.length, counts: poll.options.map((_, i) => ballots.filter((ballot) => ballot.picks.includes(i)).length) });
   });
 
   await page.route("**/rest/v1/guestbook_checkins*", async (route, request) => {

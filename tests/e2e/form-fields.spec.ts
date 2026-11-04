@@ -40,7 +40,7 @@ test("an admin adds and removes questions; attendees answer them and admins see 
     expect.objectContaining({ label: "Ukuran kaos", type: "select", required: true, options: ["S", "M", "L"] }),
   ]);
 
-  await page.goto("/");
+  await page.goto("/registrasi");
   // The questions in the admin's order, after E-mail; no room question.
   await expect(page.getByLabel("Ukuran kaos", { exact: true })).toBeVisible();
   const order = await page.getByLabel(/^(E-mail|Asal instansi|Divisi|Ukuran kaos)$/).evaluateAll((inputs) => inputs.map((input) => input.getAttribute("aria-label")));
@@ -88,7 +88,7 @@ test("before migration 20261031000000 is applied, saving the form explains what 
   await page.getByRole("link", { name: "Formulir" }).click();
   await page.getByRole("button", { name: "Simpan", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("kolom form_fields belum ada");
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Check-in berhasil" })).toBeVisible();
@@ -119,7 +119,7 @@ test("an admin sets placeholders; attendees see them in the empty boxes, and bui
   expect(saved[1]).toEqual(expect.objectContaining({ label: "Asal instansi", placeholder: "Contoh: Bawaslu Provinsi Jawa Barat" }));
   expect(saved[2]).toEqual(expect.objectContaining({ label: "Ukuran kaos", placeholder: "Pilih ukuran kaos" }));
 
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByLabel("Divisi", { exact: true })).toHaveAttribute("placeholder", "Contoh: Divisi Hukum");
   await expect(page.getByLabel("Asal instansi", { exact: true })).toHaveAttribute("placeholder", "Contoh: Bawaslu Provinsi Jawa Barat");
   await expect(page.getByLabel("Ukuran kaos", { exact: true }).locator("option").first()).toHaveText("Pilih ukuran kaos");

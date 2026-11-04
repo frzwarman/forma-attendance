@@ -62,13 +62,16 @@ test("guestbook tables have RLS and no direct client writes", async () => {
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'guestbook_%' order by 1
   `);
-  assert.deepEqual(rows.map((r) => r.relname), ["guestbook_admins", "guestbook_checkins", "guestbook_draw_winners", "guestbook_feedback", "guestbook_sessions", "guestbook_settings"]);
+  assert.deepEqual(rows.map((r) => r.relname), [
+    "guestbook_admins", "guestbook_ballots", "guestbook_checkins", "guestbook_draw_winners",
+    "guestbook_feedback", "guestbook_polls", "guestbook_sessions", "guestbook_settings",
+  ]);
   for (const row of rows) {
     assert.equal(row.relrowsecurity, true, row.relname);
     for (const flag of ["anon_insert", "anon_update", "anon_delete"]) assert.equal(row[flag], false, `${row.relname}: ${flag}`);
   }
   const byName = Object.fromEntries(rows.map((r) => [r.relname, r]));
-  for (const table of ["guestbook_checkins", "guestbook_admins", "guestbook_feedback", "guestbook_sessions"]) {
+  for (const table of ["guestbook_checkins", "guestbook_admins", "guestbook_feedback", "guestbook_sessions", "guestbook_polls", "guestbook_ballots"]) {
     assert.equal(byName[table].auth_insert, false, table);
     assert.equal(byName[table].auth_update, false, table);
   }

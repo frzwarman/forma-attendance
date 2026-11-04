@@ -6,7 +6,7 @@ import { installSupabaseStub } from "./supabase-stub";
 test("a returning attendee checks out with one tap on the same phone", async ({ page }) => {
   const state = await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByText(/Saat pulang, buka tautan ini lagi/)).toBeVisible();
@@ -36,7 +36,7 @@ test("a returning attendee checks out with one tap on the same phone", async ({ 
 
 test("checked out after the morning session, the attendee checks in again and can check out again", async ({ page }) => {
   const state = await installSupabaseStub(page);
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
@@ -55,7 +55,7 @@ test("checked out after the morning session, the attendee checks in again and ca
 
 test("the slideshow does not open again for an attendee returning to check out", async ({ page }) => {
   await installSupabaseStub(page, { intro: true });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await finishIntro(page);
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
@@ -71,7 +71,7 @@ test("an unknown check-out code is explained and can be removed from the phone",
   await page.addInitScript(() =>
     localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "unknown-code", name: "Budi Santoso", at: new Date().toISOString() }])),
   );
-  await page.goto("/");
+  await page.goto("/registrasi");
   await page.getByRole("button", { name: "Check out sekarang", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Kode check-out tidak dikenal");
   await page.getByRole("button", { name: "Hapus dari HP ini", exact: true }).click();
@@ -83,7 +83,7 @@ const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3600 * 1000).t
 test("a check-in from before the current session is forgotten: the attendee checks in again for this one", async ({ page }) => {
   await installSupabaseStub(page, { sessions: [{ label: "Sesi 2", started_at: hoursAgo(1) }] });
   await page.addInitScript((at) => localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "sesi-1", name: "Budi Santoso", at }])), hoursAgo(3));
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByLabel("Nama", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toHaveCount(0);
 });
@@ -91,7 +91,7 @@ test("a check-in from before the current session is forgotten: the attendee chec
 test("midnight changes nothing: a check-in stays until the admin starts the next session", async ({ page }) => {
   await installSupabaseStub(page, { sessions: [{ label: "Sesi 2", started_at: hoursAgo(40) }] });
   await page.addInitScript((at) => localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kemarin", name: "Budi Santoso", at }])), hoursAgo(36));
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toBeVisible();
   await expect(page.getByText(/check-in lagi untuk sesi itu/)).toBeVisible();
 });
@@ -101,7 +101,7 @@ test("a page left open moves on to the form when looked at again after the admin
   await page.addInitScript((at) => {
     if (!localStorage.getItem("guestbook.checkouts")) localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at }]));
   }, hoursAgo(1));
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByRole("heading", { name: "Anda sudah check-in" })).toBeVisible();
   // Mulai Sesi 2 while the phone is locked; unlocked, the page asks again.
   state.sessions.push({ label: "Sesi 2", started_at: new Date().toISOString() });

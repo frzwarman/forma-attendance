@@ -7,7 +7,7 @@ test("the development server bundles and serves the public page", async ({ page 
   page.on("response", (response) => {
     if (response.status() >= 500) failures.push(`${response.status()} ${response.url()}`);
   });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible({ timeout: 120000 });
   expect(failures).toEqual([]);
 });

@@ -10,7 +10,7 @@ const withRoom = { form_fields: [BUILTIN_FIELDS.divisi, BUILTIN_FIELDS.room_numb
 test("an attendee's hotel room number is saved, confirmed in the popup, and listed and searchable for admins", async ({ page }) => {
   const state = await installSupabaseStub(page, { settings: withRoom, checkins: [checkInRow({ name: "Siti Rahma", room_number: "0811" })] });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByLabel("Nomor Kamar Hotel", { exact: true }).fill(" 1205 ");
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
@@ -37,7 +37,7 @@ test("an attendee's hotel room number is saved, confirmed in the popup, and list
 
 test("without a room number the check-in request is the same as before", async ({ page }) => {
   const state = await installSupabaseStub(page, { settings: withRoom });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   const popup = page.getByRole("dialog", { name: "Check-in berhasil" });
@@ -48,7 +48,7 @@ test("without a room number the check-in request is the same as before", async (
 
 test("before migration 20261028000000 is applied, check-ins with and without a room number still go through", async ({ page }) => {
   const state = await installSupabaseStub(page, { settings: withRoom, legacyCheckIn: true });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByLabel("Nomor Kamar Hotel", { exact: true }).fill("1205");
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
@@ -60,7 +60,7 @@ test("before migration 20261028000000 is applied, check-ins with and without a r
   ]);
 
   await page.evaluate(() => localStorage.clear());
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page, { phone: "0812 3333 4444", email: "sari@example.test", name: "Sari Dewi" });
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Check-in berhasil" })).toBeVisible();

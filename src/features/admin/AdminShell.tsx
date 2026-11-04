@@ -1,5 +1,5 @@
 import { Link, usePathname } from "expo-router";
-import { ClipboardList, Gift, LayoutList, LogOut, Palette, Presentation, type IconComponent } from "../../components/icons";
+import { ChartColumn, ClipboardList, Gift, LayoutList, LogOut, Palette, Presentation, Vote, type IconComponent } from "../../components/icons";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { Logo } from "../../components/Brand";
@@ -11,6 +11,8 @@ import { useTheme } from "../../theme";
 const items: [string, string, IconComponent][] = [
   ["Daftar Check-in", "/admin", LayoutList],
   ["Undian", "/admin/undian", Gift],
+  ["E-Vote", "/admin/evote", Vote],
+  ["Hasil E-Vote", "/admin/hasil-evote", ChartColumn],
   ["Formulir", "/admin/formulir", ClipboardList],
   ["Info acara", "/admin/acara", Presentation],
   ["Tampilan", "/admin/tampilan", Palette],

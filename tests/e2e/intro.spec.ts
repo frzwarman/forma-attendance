@@ -5,7 +5,7 @@ import { installSupabaseStub } from "./supabase-stub";
 test("the event slideshow opens on a first visit, can be browsed, and stays closed on reload", async ({ page }) => {
   await installSupabaseStub(page, { intro: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   const dialog = page.getByRole("dialog", { name: "Informasi acara" });
   await expect(dialog).toBeVisible();
   // The opening animation first, then the banner, then the speakers, each with only the
@@ -89,7 +89,7 @@ test("the event slideshow opens on a first visit, can be browsed, and stays clos
 
 test("Mulai check-in closes the slideshow so the form can be filled", async ({ page }) => {
   await installSupabaseStub(page, { intro: true });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await finishIntro(page);
   await page.getByLabel("Nama", { exact: true }).fill("Budi Santoso");
   await expect(page.getByLabel("Nama", { exact: true })).toHaveValue("Budi Santoso");
@@ -98,7 +98,7 @@ test("Mulai check-in closes the slideshow so the form can be filled", async ({ p
 test("the network illustration sits to the right of the logo on a phone", async ({ page }) => {
   await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   const logo = (await page.getByRole("img", { name: "Buku Tamu" }).first().boundingBox())!;
   const art = page.getByTestId("event-illustration");
   await expect(art).toBeVisible();
@@ -112,7 +112,7 @@ test("the network illustration sits to the right of the logo on a phone", async 
 test("on a laptop screen the slides share one height, so the arrows stay put", async ({ page }) => {
   await installSupabaseStub(page, { intro: true });
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   const dialog = page.getByRole("dialog", { name: "Informasi acara" });
   const previous = dialog.getByRole("button", { name: "Slide sebelumnya" });
   const next = dialog.getByRole("button", { name: "Slide berikutnya" });
@@ -133,7 +133,7 @@ test("on a laptop screen the slides share one height, so the arrows stay put", a
 test("with reduced motion the animations do not play: a still of each shows as a picture", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await installSupabaseStub(page, { intro: true });
-  await page.goto("/");
+  await page.goto("/registrasi");
   const dialog = page.getByRole("dialog", { name: "Informasi acara" });
   const still = dialog.getByRole("img", { name: "Animasi pembuka: lambang Garuda Pancasila, lalu logo Bawaslu" });
   await expect(still).toBeInViewport({ ratio: 0.9 });

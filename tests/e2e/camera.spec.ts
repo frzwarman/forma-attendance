@@ -6,7 +6,7 @@ test("a photo taken with the camera can be retaken, attached and sent with the c
   await context.grantPermissions(["camera"], { origin: new URL(baseURL!).origin });
   const state = await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await page.getByRole("button", { name: "Ambil foto", exact: true }).click();
   const shutter = page.getByRole("button", { name: "Potret", exact: true });
   await expect(shutter).toBeEnabled({ timeout: 15000 });
@@ -32,7 +32,7 @@ test("a photo taken with the camera can be retaken, attached and sent with the c
 test("a denied camera explains how to continue and keeps the file picker", async ({ page, context, baseURL }) => {
   await context.grantPermissions([], { origin: new URL(baseURL!).origin });
   await installSupabaseStub(page);
-  await page.goto("/");
+  await page.goto("/registrasi");
   await page.getByRole("button", { name: "Ambil foto", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Akses kamera ditolak", { timeout: 15000 });
   await expect(page.getByRole("img", { name: "Pratinjau foto" })).toHaveCount(0);

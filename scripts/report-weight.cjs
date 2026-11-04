@@ -1,5 +1,5 @@
 // Gate for the public page weight budget. Measures what a browser actually downloads
-// on a first visit to "/" from the built site: gzipped JavaScript, images and video.
+// on a first visit to the heaviest public page, "/registrasi" (the guest book, with the opening slideshow), from the built site: gzipped JavaScript, images and video.
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
@@ -39,7 +39,7 @@ async function main() {
       else if ((response.headers()['content-type'] || '').startsWith('video/')) videos.set(url.pathname, body.length);
     } catch { /* aborted */ }
   });
-  await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'networkidle' });
+  await page.goto(`http://127.0.0.1:${PORT}/registrasi`, { waitUntil: 'networkidle' });
   await browser.close();
   server.close();
   const report = (title, entries) => {
@@ -51,9 +51,9 @@ async function main() {
     }
     return total;
   };
-  const js = report('JavaScript downloaded for / (gzipped)', scripts);
-  const img = report('Images downloaded for /', images);
-  const video = report('Video downloaded for /', videos);
+  const js = report('JavaScript downloaded for /registrasi (gzipped)', scripts);
+  const img = report('Images downloaded for /registrasi', images);
+  const video = report('Video downloaded for /registrasi', videos);
   console.log(`Public JavaScript: ${kb(js)} (limit ${kb(JS_LIMIT)})`);
   console.log(`Images: ${kb(img)} (limit ${kb(IMAGE_LIMIT)})`);
   console.log(`Video: ${kb(video)} (limit ${kb(VIDEO_LIMIT)})`);

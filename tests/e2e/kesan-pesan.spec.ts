@@ -5,7 +5,7 @@ import { installSupabaseStub } from "./supabase-stub";
 test("after check-in, Kesan & Pesan and then check-out come last; a message is sent under the attendee's check-in", async ({ page }) => {
   const state = await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await expect(page.getByText(/tekan Check out sekarang di bagian bawah halaman/)).toBeVisible();
@@ -45,7 +45,7 @@ test("a check-in code the database does not know is explained", async ({ page })
   await page.addInitScript(() =>
     localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-hilang", name: "Budi Santoso", at: new Date().toISOString() }])),
   );
-  await page.goto("/");
+  await page.goto("/registrasi");
   await page.getByLabel("Kesan & pesan", { exact: true }).fill("Halo panitia");
   await page.getByRole("button", { name: "Kirim kesan & pesan", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("Kode check-in tidak dikenal");

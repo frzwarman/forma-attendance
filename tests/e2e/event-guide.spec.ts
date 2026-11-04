@@ -14,7 +14,7 @@ async function download(page: Page, name: string) {
 test("after check-in the attendee finds the Mentimeter link and the materials", async ({ page }) => {
   await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await expect(page.getByRole("button", { name: "Kirim", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Panduan acara" })).toHaveCount(0);
   await fillForm(page);
@@ -32,7 +32,7 @@ test("after check-in the attendee finds the Mentimeter link and the materials", 
 test("the rundown shows one page at a time with next and back, and each speaker's CV opens as images, with no download", async ({ page }) => {
   await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
@@ -158,7 +158,7 @@ test("an admin uploads the rundown, a speaker's CV, profile picture and material
   await page.evaluate(() =>
     localStorage.setItem("guestbook.checkouts", JSON.stringify([{ token: "kode-1", name: "Budi Santoso", at: new Date().toISOString() }])),
   );
-  await page.goto("/");
+  await page.goto("/registrasi");
   const guide = page.getByRole("region", { name: "Panduan acara" });
   await expect(guide.getByRole("link", { name: "Ikut polling di Mentimeter" })).toHaveAttribute("href", "https://www.menti.com/al1b2c3d4e5f");
   await expect(guide.getByRole("img", { name: "Rundown acara, halaman 1 dari 2" })).toHaveAttribute("src", /\/storage\/v1\/object\/public\/guestbook-event\/docs\/.+\/1\.jpg$/);
@@ -186,7 +186,7 @@ test("an admin uploads the rundown, a speaker's CV, profile picture and material
   await expect(page.getByLabel("Nama narasumber 9", { exact: true })).toHaveValue("Tim Positium");
   await page.getByRole("button", { name: "Simpan", exact: true }).click();
   await expect(page.getByText(/^Info acara disimpan/)).toBeVisible();
-  await page.goto("/");
+  await page.goto("/registrasi");
   const materials = page.getByRole("region", { name: "Panduan acara" }).getByRole("list", { name: "Materi" });
   await expect(materials.getByRole("listitem")).toHaveCount(2);
   await expect(materials).not.toContainText("Paparan narasumber");
@@ -203,7 +203,7 @@ test("the opening popup shows the speakers the admin saved", async ({ page }) =>
   };
   await installSupabaseStub(page, { intro: true, settings: { event_content } });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   const popup = page.getByRole("dialog", { name: "Informasi acara" });
   // After the opening animation and the banner.
   await popup.getByRole("button", { name: "Slide berikutnya" }).click();
@@ -235,7 +235,7 @@ test("before migration 20261030000000 is applied, saving explains what to run an
 
 test("when the settings cannot be loaded the opening popup shows the built-in speakers without waiting for retries", async ({ page }) => {
   await installSupabaseStub(page, { intro: true, failSettings: true });
-  await page.goto("/");
+  await page.goto("/registrasi");
   // TanStack Query retries for several seconds; the popup must not appear later over a half-filled form.
   await expect(page.getByRole("dialog", { name: "Informasi acara" }).getByRole("heading", { name: "Dr. Agus Canny" })).toBeVisible({ timeout: 900 });
 });
@@ -243,7 +243,7 @@ test("when the settings cannot be loaded the opening popup shows the built-in sp
 test("closing a CV leaves the page where the attendee was, with focus back on Lihat CV", async ({ page }) => {
   await installSupabaseStub(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/registrasi");
   await fillForm(page);
   await page.getByRole("button", { name: "Kirim", exact: true }).click();
   await page.getByRole("button", { name: "Lihat informasi acara", exact: true }).click();
