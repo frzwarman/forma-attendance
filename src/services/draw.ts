@@ -36,6 +36,12 @@ export async function returnToWheel(id: string): Promise<void> {
   if (error) throw failure(error);
 }
 
+// Ubah on the participant list: a corrected name and message (the database checks their lengths).
+export async function updateWheelEntry(id: string, name: string, note: string): Promise<void> {
+  const { error } = await getSupabase().from("guestbook_wheel_entries").update({ name, note }).eq("id", id);
+  if (error) throw failure(error);
+}
+
 // Hapus on the participant list: the name leaves the list for good (an upload brings it back).
 export async function removeFromWheel(id: string): Promise<void> {
   const { error } = await getSupabase().from("guestbook_wheel_entries").delete().eq("id", id);

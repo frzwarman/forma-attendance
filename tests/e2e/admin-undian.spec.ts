@@ -173,7 +173,7 @@ test("the wheel turns to the drawn name, and Layar penuh fills the screen with t
   await expect(stage.getByTestId("wheel-status")).toBeVisible();
 });
 
-test("the participant list shows names and notes, Hapus takes one off the wheel after a confirmation, and a file can be dropped onto the uploader", async ({ page }) => {
+test("the participant list shows names and notes, Ubah corrects them, Hapus takes one off the wheel after a confirmation, and a file can be dropped onto the uploader", async ({ page }) => {
   const seeded = [
     wheelEntry({ name: "Budi Santoso", note: "Acaranya seru!" }),
     wheelEntry({ name: "Siti Rahma" }),
@@ -190,6 +190,23 @@ test("the participant list shows names and notes, Hapus takes one off the wheel 
   await expect(rows.nth(0)).toContainText("Acaranya seru!");
   await expect(rows.nth(1)).toContainText("Siti Rahma");
 
+  // Ubah: a corrected name and message, trimmed; an empty name is refused.
+  await page.getByRole("button", { name: "Ubah Budi Santoso", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Ubah peserta" });
+  await expect(edit.getByLabel("Nama", { exact: true })).toHaveValue("Budi Santoso");
+  await expect(edit.getByLabel("Kesan & Pesan", { exact: true })).toHaveValue("Acaranya seru!");
+  await edit.getByLabel("Nama", { exact: true }).fill("   ");
+  await edit.getByRole("button", { name: "Simpan", exact: true }).click();
+  await expect(edit.getByRole("alert")).toHaveText("Nama wajib diisi.");
+  await edit.getByLabel("Nama", { exact: true }).fill(" Budi Santoso, S.H. ");
+  await edit.getByLabel("Kesan & Pesan", { exact: true }).fill("Mantap, lanjutkan! ");
+  await edit.getByRole("button", { name: "Simpan", exact: true }).click();
+  await expect(edit).toHaveCount(0);
+  await expect(rows.nth(0)).toContainText("Budi Santoso, S.H.");
+  await expect(rows.nth(0)).toContainText("Mantap, lanjutkan!");
+  await expect(page.getByTestId("wheel-label").first()).toHaveText("Budi Santoso, S.H.");
+  expect(state.wheel[0]).toMatchObject({ name: "Budi Santoso, S.H.", note: "Mantap, lanjutkan!" });
+
   await page.getByRole("button", { name: "Hapus Siti Rahma", exact: true }).click();
   await expect(dialog).toContainText("Hapus Siti Rahma dari roda?");
   await dialog.getByRole("button", { name: "Batal", exact: true }).click();
@@ -202,7 +219,7 @@ test("the participant list shows names and notes, Hapus takes one off the wheel 
   await expect(rows).toHaveCount(1);
   await expect(page.getByTestId("wheel-segment")).toHaveCount(1);
   await expect(page.getByTestId("wheel-status")).toHaveText("Sisa 1 peserta");
-  expect(state.wheel.map((entry) => entry.name)).toEqual(["Budi Santoso", "Agus Canny"]);
+  expect(state.wheel.map((entry) => entry.name)).toEqual(["Budi Santoso, S.H.", "Agus Canny"]);
   await expect(page.getByTestId("winner-row")).toHaveCount(1);
 
   // Dropped on the box instead of picked: the same import (the list here has a winner, so it asks first).

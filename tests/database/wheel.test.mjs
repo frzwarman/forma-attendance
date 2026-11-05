@@ -38,7 +38,7 @@ const wheel = (userId = ADMIN) =>
   as("authenticated", userId, async () => (await db.query("select * from public.guestbook_wheel_entries order by position")).rows);
 const shown = async (userId) => (await wheel(userId)).map(({ position, name, note, prize, won_at }) => ({ position, name, note, prize, won_at }));
 
-test("wheel entries: admins read them; a client may set won_at and prize only, never add, remove or rename", async () => {
+test("wheel entries: admins read them; a client may set name, note, prize and won_at, never the order, and never add rows", async () => {
   const { rows } = await db.query(`
     select c.relrowsecurity,
       has_table_privilege('anon', c.oid, 'SELECT') or has_table_privilege('anon', c.oid, 'INSERT')
@@ -54,7 +54,7 @@ test("wheel entries: admins read them; a client may set won_at and prize only, n
   `);
   assert.deepEqual(rows, [{
     relrowsecurity: true, anon_any: false, auth_select: true, auth_insert: false, auth_delete: true, auth_update_all: false,
-    auth_update_columns: { position: false, name: false, note: false, prize: true, won_at: true },
+    auth_update_columns: { position: false, name: true, note: true, prize: true, won_at: true },
   }]);
 });
 
@@ -147,14 +147,20 @@ test("a winner put back on the wheel (won_at cleared, prize emptied) is drawn ag
   const again = await spin("Sepeda");
   assert.equal(again.status, "drawn");
   assert.equal(again.entry.id, first.entry.id);
-  // Names, messages and the order come from the uploaded file only; the list is replaced, never edited.
-  for (const change of ["name = 'Curang'", "note = 'x'", "position = 9"])
-    await assert.rejects(as("authenticated", ADMIN, () => db.query(`update public.guestbook_wheel_entries set ${change} where id = $1`, [first.entry.id])), /permission denied/);
+  // Ubah on the list: an admin corrects the name and the message (within the table's checks); the order comes from the file only.
+  const edit = (userId, change, params = []) =>
+    as("authenticated", userId, () => db.query(`update public.guestbook_wheel_entries set ${change} where id = $1`, [first.entry.id, ...params]));
+  assert.equal((await edit(OTHER, "name = 'Curang'")).affectedRows, 0);
+  assert.equal((await edit(ADMIN, "name = $2, note = $3", ["Budi Santoso", "Mantap!"])).affectedRows, 1);
+  assert.deepEqual((await shown()).map(({ name, note }) => [name, note]), [["Budi Santoso", "Mantap!"]]);
+  await assert.rejects(edit(ADMIN, "name = ''"), /check/);
+  await assert.rejects(edit(ADMIN, "name = $2", ["x".repeat(121)]), /check/);
+  await assert.rejects(edit(ADMIN, "position = 9"), /permission denied/);
   // Hapus on the list: only an admin deletes a row, and only by its id (safeupdate refuses a bare delete).
   await assert.rejects(as("anon", "", () => db.query("delete from public.guestbook_wheel_entries where id = $1", [first.entry.id])), /permission denied/);
   assert.equal((await as("authenticated", OTHER, () => db.query("delete from public.guestbook_wheel_entries where id = $1", [first.entry.id]))).affectedRows, 0);
   await assert.rejects(as("authenticated", ADMIN, () => db.query("insert into public.guestbook_wheel_entries (position, name) values (2, 'Tambahan')")), /permission denied/);
-  assert.deepEqual((await shown()).map(({ name, prize }) => [name, prize]), [["Budi", "Sepeda"]]);
+  assert.deepEqual((await shown()).map(({ name, prize }) => [name, prize]), [["Budi Santoso", "Sepeda"]]);
   assert.equal((await as("authenticated", ADMIN, () => db.query("delete from public.guestbook_wheel_entries where id = $1", [first.entry.id]))).affectedRows, 1);
   assert.deepEqual(await shown(), []);
 });

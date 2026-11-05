@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { View, useWindowDimensions } from "react-native";
 import * as XLSX from "xlsx";
 import { useBrandBackground } from "../../components/Brand";
-import { Maximize, Trash, Upload } from "../../components/icons";
+import { Maximize, Pencil, Trash, Upload } from "../../components/icons";
 import { Modal } from "../../components/Modal";
 import { FileInput } from "../../components/NativeInput";
 import { Badge, Button, Card, Field, IconHeading, Row, T } from "../../components/ui";
 import { formatWib } from "../../domain/time";
-import { parseWheelFile, SPIN_MS, spinTo, WHEEL_COLORS, type WheelRow } from "../../domain/wheel";
+import { parseWheelFile, SPIN_MS, spinTo, WHEEL_COLORS, WHEEL_NAME_MAX, WHEEL_NOTE_MAX, type WheelRow } from "../../domain/wheel";
 import { useAdminApi, useWheel } from "../../services/adminContext";
 import { FONT_STACK, useTheme } from "../../theme";
 import type { WheelEntry } from "../../types/guestbook";
@@ -49,6 +49,8 @@ export function Undian() {
   // The participant waiting for Ya, hapus.
   const [removing, setRemoving] = useState<WheelEntry>();
   const [deleting, setDeleting] = useState(false);
+  // The participant open in the Ubah popup.
+  const [editing, setEditing] = useState<WheelEntry>();
 
   useEffect(() => {
     const changed = () => setFull(!!stage.current && document.fullscreenElement === stage.current);
@@ -325,15 +327,26 @@ export function Undian() {
                     </T>
                   )}
                 </View>
-                <Button
-                  small
-                  variant="danger"
-                  icon={Trash}
-                  label="Hapus"
-                  accessibilityLabel={`Hapus ${entry.name}`}
-                  disabled={spinning || !!winner}
-                  onPress={() => setRemoving(entry)}
-                />
+                <Row style={{ gap: 8 }}>
+                  <Button
+                    small
+                    variant="secondary"
+                    icon={Pencil}
+                    label="Ubah"
+                    accessibilityLabel={`Ubah ${entry.name}`}
+                    disabled={spinning || !!winner}
+                    onPress={() => setEditing(entry)}
+                  />
+                  <Button
+                    small
+                    variant="danger"
+                    icon={Trash}
+                    label="Hapus"
+                    accessibilityLabel={`Hapus ${entry.name}`}
+                    disabled={spinning || !!winner}
+                    onPress={() => setRemoving(entry)}
+                  />
+                </Row>
               </Row>
             ))}
           </div>
@@ -377,6 +390,17 @@ export function Undian() {
           ))
         )}
       </Card>
+      {editing && (
+        <EditEntry
+          entry={editing}
+          onClose={() => setEditing(undefined)}
+          onSave={async (name, note) => {
+            await api.updateWheelEntry(editing.id, name, note);
+            setEditing(undefined);
+            await client.invalidateQueries({ queryKey: ["wheel"] });
+          }}
+        />
+      )}
       {removing && (
         <Modal label="Hapus peserta" maxWidth={460} onClose={() => !deleting && setRemoving(undefined)}>
           <View style={{ padding: 24, paddingTop: 28, gap: 16 }}>
@@ -409,6 +433,59 @@ export function Undian() {
         </Modal>
       )}
     </View>
+  );
+}
+
+// Ubah: the name and the Kesan & Pesan of one participant, trimmed; the name may not be empty.
+function EditEntry({ entry, onClose, onSave }: { entry: WheelEntry; onClose: () => void; onSave: (name: string, note: string) => Promise<void> }) {
+  const c = useTheme();
+  const [name, setName] = useState(entry.name);
+  const [note, setNote] = useState(entry.note);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    const cleanName = name.trim();
+    if (!cleanName) return setError("Nama wajib diisi.");
+    setBusy(true);
+    setError("");
+    try {
+      await onSave(cleanName, note.trim());
+    } catch (cause) {
+      setError((cause as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal label="Ubah peserta" maxWidth={520} onClose={() => !busy && onClose()}>
+      <View style={{ padding: 24, paddingTop: 28, gap: 16 }}>
+        <T size={22} weight="extra" accessibilityRole="header" style={{ paddingRight: 48 }}>
+          Ubah peserta
+        </T>
+        <Field label="Nama" value={name} maxLength={WHEEL_NAME_MAX} editable={!busy} onChangeText={setName} />
+        <Field
+          label="Kesan & Pesan"
+          value={note}
+          maxLength={WHEEL_NOTE_MAX}
+          editable={!busy}
+          multiline
+          numberOfLines={4}
+          placeholder="Kosongkan bila tidak ada"
+          style={{ minHeight: 110, textAlignVertical: "top" }}
+          onChangeText={setNote}
+        />
+        {!!error && (
+          <T accessibilityRole="alert" color={c.danger}>
+            {error}
+          </T>
+        )}
+        <Row style={{ gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <Button variant="ghost" label="Batal" disabled={busy} onPress={onClose} />
+          <Button label="Simpan" loading={busy} loadingLabel="Menyimpan…" onPress={() => void save()} />
+        </Row>
+      </View>
+    </Modal>
   );
 }
 

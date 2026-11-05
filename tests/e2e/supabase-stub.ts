@@ -431,6 +431,13 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       const entry = state.wheel.find((e) => e.id === id);
       if (entry && "won_at" in body) entry.won_at = body.won_at as string | null;
       if (entry && "prize" in body) entry.prize = String(body.prize ?? "");
+      // Ubah: the table's checks, as the database applies them.
+      if (entry && "name" in body) {
+        const name = String(body.name ?? "");
+        if (name.length < 1 || name.length > 120) return json(route, { code: "23514", message: 'new row for relation "guestbook_wheel_entries" violates check constraint' }, 400);
+        entry.name = name;
+      }
+      if (entry && "note" in body) entry.note = String(body.note ?? "");
       return json(route, wantsObject(request) && entry ? entry : []);
     }
     return json(route, [...state.wheel].sort((a, b) => a.position - b.position));
