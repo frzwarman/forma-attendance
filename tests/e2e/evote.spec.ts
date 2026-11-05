@@ -230,6 +230,27 @@ test("Hasil E-Vote shows the live count on a page of its own, in the admin's ord
   await expect.poll(() => page.evaluate(() => document.fullscreenElement?.getAttribute("data-testid") ?? null)).toBe("evote-stage");
 });
 
+test("Hasil E-Vote fits all 20 options in the stage, with nothing to scroll", async ({ page }) => {
+  const options = Array.from({ length: 20 }, (_, i) => `Pilihan ${i + 1}`);
+  const poll = pollRow({ options, max_picks: 1 });
+  await installSupabaseStub(page, { polls: [poll], ballots: [1, 2, 3].map((n) => ({ poll_id: poll.id, device_id: deviceId(n), picks: [n] })) });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "Hasil E-Vote", exact: true }).click();
+  const stage = page.getByTestId("evote-stage");
+  const rows = stage.getByTestId("result-row");
+  await expect(rows).toHaveCount(20);
+  await expect(rows.nth(19)).toContainText("Pilihan 20");
+  await expect(stage).toContainText("3 orang sudah memilih");
+  // Nothing hidden below the edge: the stage has no scroll room, and the last row's bottom is inside it.
+  expect(await stage.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
+  const box = (await stage.boundingBox())!;
+  const last = (await rows.nth(19).boundingBox())!;
+  expect(last.y + last.height).toBeLessThanOrEqual(box.y + box.height);
+  // Still readable: the label is at least 12px.
+  expect(await rows.nth(0).evaluate((el) => parseFloat(getComputedStyle(el.firstElementChild!).fontSize))).toBeGreaterThanOrEqual(12);
+});
+
 test("Hasil E-Vote before the first vote points to the E-Vote page", async ({ page }) => {
   await installSupabaseStub(page);
   await page.goto("/admin");
