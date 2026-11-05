@@ -305,3 +305,40 @@ test("after a reset, a phone that already voted can vote again", async ({ page }
     ["00000000-0000-4000-8000-0000000reset", [1]],
   ]);
 });
+
+test("the admin gives the vote a title and subtitle, shown on Hasil E-Vote and on the attendee's page, without starting a new vote", async ({ page }) => {
+  const poll = pollRow({ options: ["Round table", "Classroom"], max_picks: 1 });
+  const state = await installSupabaseStub(page, {
+    polls: [poll],
+    ballots: [1, 2].map((n) => ({ poll_id: poll.id, device_id: deviceId(n), picks: [0] })),
+  });
+  await page.goto("/admin");
+  await signInAsAdmin(page);
+  await page.getByRole("link", { name: "E-Vote", exact: true }).click();
+  await expect(page.getByLabel("Pilihan 2", { exact: true })).toHaveValue("Classroom");
+  await page.getByLabel("Judul", { exact: true }).fill("Layout Ruangan Rakernas");
+  await page.getByLabel("Subjudul", { exact: true }).fill("Mau duduk bagaimana?");
+  await page.getByRole("button", { name: "Simpan & buka voting", exact: true }).click();
+  await expect(page.getByText("Voting dibuka lagi.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Mulai voting baru" })).toHaveCount(0);
+  expect(state.polls).toEqual([expect.objectContaining({ id: poll.id, title: "Layout Ruangan Rakernas", subtitle: "Mau duduk bagaimana?" })]);
+  expect(state.rpcCalls.find((call) => call.name === "guestbook_save_poll")?.body).toMatchObject({
+    p_title: "Layout Ruangan Rakernas",
+    p_subtitle: "Mau duduk bagaimana?",
+  });
+
+  await page.getByRole("link", { name: "Hasil E-Vote", exact: true }).click();
+  const stage = page.getByTestId("evote-stage");
+  await expect(stage).toContainText("Layout Ruangan Rakernas");
+  await expect(stage).toContainText("Mau duduk bagaimana?");
+  await expect(stage).toContainText("2 orang sudah memilih");
+  await expect(stage).not.toContainText("Hasil E-Vote");
+  await expect(stage).not.toContainText("Pilih 1 dari pilihan di bawah");
+
+  await page.goto("/vote");
+  await expect(page.getByRole("heading", { name: "Layout Ruangan Rakernas" })).toBeVisible();
+  await expect(page.getByText("Mau duduk bagaimana?", { exact: true })).toBeVisible();
+  await expect(page.getByText("Pilih 1 dari pilihan di bawah", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Round table" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Classroom" })).toBeVisible();
+});

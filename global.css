@@ -36,6 +36,20 @@ table {
     transform: none;
   }
 }
+/* Undian's confetti: each piece falls the stage's height while turning over. */
+@keyframes confetti {
+  from {
+    transform: translateY(-6cqh) rotate(0deg);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(106cqh) rotate(720deg);
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;

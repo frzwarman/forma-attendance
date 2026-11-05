@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { normalizeOptions, pollProblem, sameVote, shares, togglePick } from "./evote";
+import { normalizeOptions, pickInstruction, pollProblem, sameVote, shares, togglePick, voteSubtitle, voteTitle } from "./evote";
 
 it("cleans the admin's options: trimmed, blanks dropped, repeats ignoring case dropped with the first spelling kept", () => {
   assert.deepEqual(normalizeOptions([" Round table ", "", "   ", "Classroom", "round table", "Classroom "]), ["Round table", "Classroom"]);
@@ -49,6 +49,15 @@ it("saving the same options in the same order with the same number of picks carr
   assert.equal(sameVote(poll, ["Round table", "Classroom"], 2), false);
   assert.equal(sameVote(poll, ["Round table", "U-shape"], 1), false);
   assert.equal(sameVote(poll, ["Round table", "Classroom", "U-shape"], 1), false);
+});
+
+it("shows the admin's title and subtitle, trimmed, and falls back when they are blank", () => {
+  assert.equal(voteTitle({ title: " Layout Ruangan Rakernas " }, "Hasil E-Vote"), "Layout Ruangan Rakernas");
+  assert.equal(voteTitle({ title: "" }, "Hasil E-Vote"), "Hasil E-Vote");
+  assert.equal(voteTitle({ title: "   " }, "E-Vote"), "E-Vote");
+  assert.equal(voteSubtitle({ subtitle: " Mau duduk bagaimana? ", max_picks: 1 }), "Mau duduk bagaimana?");
+  assert.equal(voteSubtitle({ subtitle: "", max_picks: 1 }), pickInstruction(1));
+  assert.equal(voteSubtitle({ subtitle: "  ", max_picks: 3 }), "Pilih maksimal 3 dari pilihan di bawah");
 });
 
 it("gives each option's share of the people who voted, in whole percent", () => {

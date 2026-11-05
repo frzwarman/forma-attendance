@@ -58,13 +58,14 @@ test("guestbook tables have RLS and no direct client writes", async () => {
       has_table_privilege('anon', c.oid, 'UPDATE') as anon_update,
       has_table_privilege('anon', c.oid, 'DELETE') as anon_delete,
       has_table_privilege('authenticated', c.oid, 'INSERT') as auth_insert,
-      has_table_privilege('authenticated', c.oid, 'UPDATE') as auth_update
+      -- Any column: the wheel grants update on two columns only, which has_table_privilege does not see.
+      has_any_column_privilege('authenticated', c.oid, 'UPDATE') as auth_update
     from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r' and c.relname like 'guestbook_%' order by 1
   `);
   assert.deepEqual(rows.map((r) => r.relname), [
     "guestbook_admins", "guestbook_ballots", "guestbook_checkins", "guestbook_draw_winners",
-    "guestbook_feedback", "guestbook_polls", "guestbook_sessions", "guestbook_settings",
+    "guestbook_feedback", "guestbook_polls", "guestbook_sessions", "guestbook_settings", "guestbook_wheel_entries",
   ]);
   for (const row of rows) {
     assert.equal(row.relrowsecurity, true, row.relname);
@@ -75,6 +76,9 @@ test("guestbook tables have RLS and no direct client writes", async () => {
     assert.equal(byName[table].auth_insert, false, table);
     assert.equal(byName[table].auth_update, false, table);
   }
+  // Kembalikan ke roda is a client update of won_at and prize (column-limited, tests/database/wheel.test.mjs).
+  assert.equal(byName.guestbook_wheel_entries.auth_insert, false);
+  assert.equal(byName.guestbook_wheel_entries.auth_update, true);
 });
 
 test("phone keys normalise formatting and the +62 prefix", async () => {
@@ -672,4 +676,15 @@ test("02-11-2026: Sesi 1 runs past 12:00, and the 12:00 automatic check-out is u
     await db.exec(`delete from public.guestbook_checkins where email like 'fix.%';
       delete from public.guestbook_sessions; insert into public.guestbook_sessions select * from saved_sessions_fix; drop table saved_sessions_fix;`);
   }
+});
+
+test("functions the API can call never delete or update without a WHERE clause (Supabase's safeupdate refuses them)", async () => {
+  const { rows } = await db.query(`
+    select p.proname, p.prosrc from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname like 'guestbook_%' and p.prokind = 'f'
+  `);
+  assert.ok(rows.length >= 10);
+  for (const { proname, prosrc } of rows)
+    for (const statement of prosrc.match(/\b(delete\s+from|update)\s+[^;]*;/gi) ?? [])
+      assert.match(statement, /\bwhere\b/i, `${proname}: ${statement.replace(/\s+/g, " ").trim()}`);
 });

@@ -1,10 +1,13 @@
 // E-Vote: one vote at a time with the options an admin sets and how many each person may pick
-// (supabase/migrations/20261111000000_guestbook_evote.sql). Picks are option positions, 0-based.
-export type Poll = { id: string; created_at: string; options: string[]; max_picks: number; is_open: boolean };
+// (supabase/migrations/20261111000000_guestbook_evote.sql). Picks are option positions, 0-based. The title and
+// subtitle are what the monitor and the attendee's page show over the options; blank means the defaults.
+export type Poll = { id: string; created_at: string; options: string[]; max_picks: number; is_open: boolean; title: string; subtitle: string };
 
 export const OPTIONS_MIN = 2;
 export const OPTIONS_MAX = 20;
 export const OPTION_LENGTH_MAX = 120;
+export const TITLE_MAX = 120;
+export const SUBTITLE_MAX = 200;
 
 // Trimmed, blank lines dropped, repeats (ignoring case) dropped; the first spelling stays.
 export function normalizeOptions(options: string[]): string[] {
@@ -46,6 +49,10 @@ export const sameVote = (poll: Pick<Poll, "options" | "max_picks"> | null, optio
 // The ballot's heading; with several picks allowed, fewer is fine too.
 export const pickInstruction = (maxPicks: number) =>
   maxPicks === 1 ? "Pilih 1 dari pilihan di bawah" : `Pilih maksimal ${maxPicks} dari pilihan di bawah`;
+
+// The admin's title and subtitle, or the page's own words when they are blank.
+export const voteTitle = (poll: Pick<Poll, "title">, fallback: string) => poll.title.trim() || fallback;
+export const voteSubtitle = (poll: Pick<Poll, "subtitle" | "max_picks">) => poll.subtitle.trim() || pickInstruction(poll.max_picks);
 
 // Each option's share of the people who voted, in whole percent.
 export const shares = (counts: number[], voters: number) => counts.map((count) => (voters ? Math.round((count * 100) / voters) : 0));

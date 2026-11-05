@@ -3,7 +3,7 @@ import { useState } from "react";
 import { View } from "react-native";
 import { CircleCheck, Lock } from "../components/icons";
 import { Button, Card, T } from "../components/ui";
-import { pickInstruction, togglePick, type Poll } from "../domain/evote";
+import { pickInstruction, togglePick, voteSubtitle, type Poll } from "../domain/evote";
 import { castBallot, rememberBallot, storedBallot, useCurrentPoll } from "../services/evote";
 import { FONT_STACK, useTheme } from "../theme";
 
@@ -112,7 +112,7 @@ function Ballot({ poll, notice, onVoted, onChanged }: { poll: Poll; notice: stri
         </T>
       )}
       <T size={20} weight="extra" accessibilityRole="header">
-        {instruction}
+        {voteSubtitle(poll)}
       </T>
       {/* Native radio buttons and checkboxes: keyboard and screen readers work as everywhere else. */}
       <div role={single ? "radiogroup" : "group"} aria-label={instruction} style={{ display: "flex", flexDirection: "column", gap: 10 }}>

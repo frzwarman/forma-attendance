@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { useBrandBackground } from "../../components/Brand";
 import { Maximize } from "../../components/icons";
 import { Button, Card, Row, T } from "../../components/ui";
-import { pickInstruction, shares } from "../../domain/evote";
+import { shares, voteSubtitle, voteTitle } from "../../domain/evote";
 import { usePollResults } from "../../services/adminContext";
 import { FONT_STACK, useTheme } from "../../theme";
 
@@ -79,8 +79,8 @@ export function HasilEVote() {
           <div style={{ minHeight: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "2.4cqw", padding: "4.5cqw 6cqw" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "2cqw" }}>
               <div>
-                <div style={{ fontSize: "max(22px, 4.2cqw)", fontWeight: 800, lineHeight: 1.1 }}>Hasil E-Vote</div>
-                {poll && <div style={{ marginTop: "0.8cqw", fontSize: "max(13px, 1.7cqw)", color: c.onBackgroundMuted }}>{pickInstruction(poll.max_picks)}</div>}
+                <div style={{ fontSize: "max(22px, 4.2cqw)", fontWeight: 800, lineHeight: 1.1 }}>{poll ? voteTitle(poll, "Hasil E-Vote") : "Hasil E-Vote"}</div>
+                {poll && <div style={{ marginTop: "0.8cqw", fontSize: "max(13px, 1.7cqw)", color: c.onBackgroundMuted }}>{voteSubtitle(poll)}</div>}
               </div>
               {poll && (
                 <div

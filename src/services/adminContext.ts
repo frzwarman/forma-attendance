@@ -25,3 +25,9 @@ export function useWinners() {
   const api = useAdminApi();
   return useQuery({ queryKey: ["winners"], queryFn: api.fetchWinners, refetchInterval: 10_000 });
 }
+
+// Undian's list, winners included.
+export function useWheel() {
+  const api = useAdminApi();
+  return useQuery({ queryKey: ["wheel"], queryFn: api.fetchWheel, refetchInterval: 10_000 });
+}

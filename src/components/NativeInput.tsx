@@ -80,6 +80,8 @@ export function FileInput({
               const file = event.target.files?.[0] ?? null;
               setName(file?.name ?? "");
               onChange(file);
+              // Choosing the same file again (fixed and saved under the same name) must fire again.
+              event.target.value = "";
             }}
             style={{ position: "absolute", left: 0, top: 0, width: 1, height: 1, opacity: 0, overflow: "hidden" }}
           />

@@ -33,8 +33,13 @@ async function as(role, userId, run) {
   }
 }
 const one = async (sql, params) => (await db.query(sql, params)).rows[0]?.result;
-const savePoll = (options, maxPicks, userId = ADMIN) =>
-  as("authenticated", userId, () => one("select public.guestbook_save_poll($1::text[], $2::int) as result", [options, maxPicks]));
+// Without title and subtitle this is the call of a client from before 20261116000000_guestbook_wheel.sql.
+const savePoll = (options, maxPicks, userId = ADMIN, title, subtitle) =>
+  as("authenticated", userId, () =>
+    title === undefined && subtitle === undefined
+      ? one("select public.guestbook_save_poll($1::text[], $2::int) as result", [options, maxPicks])
+      : one("select public.guestbook_save_poll($1::text[], $2::int, $3::text, $4::text) as result", [options, maxPicks, title, subtitle]),
+  );
 const closePoll = (userId = ADMIN) => as("authenticated", userId, () => one("select public.guestbook_close_poll() as result"));
 const results = (userId = ADMIN) => as("authenticated", userId, () => one("select public.guestbook_poll_results() as result"));
 const vote = (pollId, deviceId, picks) =>
@@ -388,4 +393,52 @@ test("votes still waiting for the batch when Reset hitungan is pressed are not s
   } finally {
     await db.exec("delete from private.guestbook_sheet; delete from net.sent");
   }
+});
+
+test("a vote's title and subtitle are saved trimmed and read by everyone; a save without them leaves them empty", async () => {
+  const poll = await savePoll(["Round table", "Classroom"], 1, ADMIN, "  Layout Ruangan Rakernas ", " Mau duduk bagaimana? ");
+  assert.deepEqual([poll.title, poll.subtitle], ["Layout Ruangan Rakernas", "Mau duduk bagaimana?"]);
+  const current = await currentPoll();
+  assert.deepEqual([current.id, current.title, current.subtitle], [poll.id, "Layout Ruangan Rakernas", "Mau duduk bagaimana?"]);
+  assert.deepEqual((await results()).poll, { ...current, created_at: poll.created_at });
+  // The texts alone do not make a new vote.
+  assert.equal((await savePoll(["Round table", "Classroom"], 1, ADMIN, null, null)).id, poll.id);
+  assert.deepEqual(await currentPoll().then(({ title, subtitle }) => [title, subtitle]), ["", ""]);
+
+  const plain = await savePoll(["Nasi goreng", "Soto"], 1);
+  assert.notEqual(plain.id, poll.id);
+  assert.deepEqual([plain.title, plain.subtitle], ["", ""]);
+});
+
+test("new texts for the same options keep the vote under way, its count and a reopen; other options start a new vote with the texts", async () => {
+  const poll = await savePoll(["Round table", "Classroom"], 1, ADMIN, "Layout", "Pilih satu");
+  await vote(poll.id, device(1), [0]);
+  await closePoll();
+  const renamed = await savePoll(["Round table", "Classroom"], 1, ADMIN, "Layout Ruangan", "Mau duduk bagaimana?");
+  assert.deepEqual([renamed.id, renamed.is_open, renamed.title, renamed.subtitle], [poll.id, true, "Layout Ruangan", "Mau duduk bagaimana?"]);
+  assert.deepEqual(await results().then(({ voters, counts }) => ({ voters, counts })), { voters: 1, counts: [1, 0] });
+  assert.deepEqual(await vote(poll.id, device(1), [1]), { status: "already", picks: [0] });
+
+  const next = await savePoll(["Round table", "Classroom", "U-shape"], 1, ADMIN, "Layout Ruangan", "Mau duduk bagaimana?");
+  assert.notEqual(next.id, poll.id);
+  assert.deepEqual([next.title, next.subtitle], ["Layout Ruangan", "Mau duduk bagaimana?"]);
+  assert.deepEqual(await results().then(({ poll: shown, voters }) => ({ id: shown.id, voters })), { id: next.id, voters: 0 });
+  assert.equal(await ballotCount(), 1);
+});
+
+test("Reset hitungan keeps the title and subtitle", async () => {
+  const poll = await savePoll(["Round table", "Classroom"], 1, ADMIN, "Layout Ruangan", "Mau duduk bagaimana?");
+  const fresh = await resetPoll();
+  assert.notEqual(fresh.id, poll.id);
+  assert.deepEqual([fresh.title, fresh.subtitle], ["Layout Ruangan", "Mau duduk bagaimana?"]);
+  assert.deepEqual(await currentPoll().then(({ id: current, title, subtitle }) => [current, title, subtitle]), [fresh.id, "Layout Ruangan", "Mau duduk bagaimana?"]);
+});
+
+test("a title over 120 or a subtitle over 200 characters is refused", async () => {
+  await assert.rejects(savePoll(["Round table", "Classroom"], 1, ADMIN, "x".repeat(121), ""), /Judul maksimal 120 karakter/);
+  await assert.rejects(savePoll(["Round table", "Classroom"], 1, ADMIN, "", "x".repeat(201)), /Subjudul maksimal 200 karakter/);
+  assert.equal(await currentPoll(), undefined);
+  // Trimmed first, and the limits themselves pass.
+  const poll = await savePoll(["Round table", "Classroom"], 1, ADMIN, ` ${"x".repeat(120)} `, ` ${"y".repeat(200)} `);
+  assert.deepEqual([poll.title.length, poll.subtitle.length], [120, 200]);
 });

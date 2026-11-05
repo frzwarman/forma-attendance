@@ -17,9 +17,10 @@ export async function fetchPollResults(): Promise<PollResults> {
   return data as PollResults;
 }
 
-// Simpan & buka voting: the same options carry on the vote (opened again), others start a new one.
-export async function savePoll(options: string[], maxPicks: number): Promise<Poll> {
-  const { data, error } = await getSupabase().rpc("guestbook_save_poll", { p_options: options, p_max_picks: maxPicks });
+// Simpan & buka voting: the same options carry on the vote (opened again, with the new title and subtitle),
+// others start a new one.
+export async function savePoll(options: string[], maxPicks: number, title: string, subtitle: string): Promise<Poll> {
+  const { data, error } = await getSupabase().rpc("guestbook_save_poll", { p_options: options, p_max_picks: maxPicks, p_title: title, p_subtitle: subtitle });
   if (error) throw failure(error);
   return data as Poll;
 }

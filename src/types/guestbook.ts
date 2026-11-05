@@ -57,6 +57,10 @@ export type Winner = {
   drawn_by: string | null;
 };
 
+// Undian's wheel: the list an admin uploads (guestbook_wheel_entries), in file order. A winner keeps its row,
+// with won_at and the prize set, until an admin puts it back on the wheel.
+export type WheelEntry = { id: string; position: number; name: string; note: string; prize: string; won_at: string | null };
+
 // checkout_token: the phone keeps it to check out later. A repeat check-in (same phone or e-mail) is
 // "returning", with the time of this visit, and gets a new code when the name typed is the stored
 // one (from migration 20261102000000_guestbook_repeat_checkout_code.sql). A database without

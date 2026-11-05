@@ -2,7 +2,7 @@
 // public route never downloads the client. Pages reach it through adminContext.
 import { isAdmin, signIn, signOut, useSession } from "./auth";
 import { adminCheckOut, checkOutAll, fetchAllCheckIns, fetchWinners, signedFileUrl, startSession } from "./checkinsAdmin";
-import { drawWinner, removeWinner } from "./draw";
+import { fetchWheel, importWheel, removeFromWheel, returnToWheel, spinWheel } from "./draw";
 import { saveEventContent, uploadMaterial, uploadPdfPages, uploadProfileImage } from "./eventAdmin";
 import { closePoll, fetchPollResults, resetPoll, savePoll } from "./evoteAdmin";
 import { saveFormFields, updateSettings, uploadBrandImage } from "./settingsAdmin";
@@ -15,8 +15,11 @@ export const adminApi = {
   adminCheckOut,
   checkOutAll,
   startSession,
-  drawWinner,
-  removeWinner,
+  fetchWheel,
+  importWheel,
+  spinWheel,
+  returnToWheel,
+  removeFromWheel,
   updateSettings,
   uploadBrandImage,
   saveEventContent,

@@ -1,6 +1,6 @@
 import type { Page, Request, Route } from "@playwright/test";
 import type { Poll } from "../../src/domain/evote";
-import type { CheckIn, Settings, Winner } from "../../src/types/guestbook";
+import type { CheckIn, Settings, WheelEntry, Winner } from "../../src/types/guestbook";
 
 export type Ballot = { poll_id: string; device_id: string; picks: number[] };
 export type StubState = {
@@ -18,6 +18,8 @@ export type StubState = {
   // E-Vote (guestbook_polls, the latest is the vote under way) and every phone's ballot.
   polls: Poll[];
   ballots: Ballot[];
+  // Undian's spin wheel (guestbook_wheel_entries): the uploaded list, winners marked by won_at.
+  wheel: WheelEntry[];
 };
 type Seed = {
   settings?: Partial<Settings>;
@@ -40,6 +42,9 @@ type Seed = {
   ballots?: Ballot[];
   // A database without migration 20261111000000_guestbook_evote.sql: no E-Vote table or functions.
   legacyEvote?: boolean;
+  wheel?: WheelEntry[];
+  // A database without the wheel migration: no guestbook_wheel_entries table or its functions.
+  legacyWheel?: boolean;
   // Check-out codes held by phones from check-ins made before the test: code -> check-in ID.
   tokens?: Record<string, string>;
 };
@@ -95,8 +100,14 @@ export function pollRow(overrides: Partial<Poll> = {}): Poll {
     options: ["Round table", "Classroom"],
     max_picks: 1,
     is_open: true,
+    title: "",
+    subtitle: "",
     ...overrides,
   };
+}
+export function wheelEntry(overrides: Partial<WheelEntry> = {}): WheelEntry {
+  const n = ++counter;
+  return { id: uuid(), position: n, name: `Peserta ${n}`, note: "", prize: "", won_at: null, ...overrides };
 }
 // A phone's E-Vote ID, as the page makes them: 16 random bytes as hex.
 export const deviceId = (n: number) => n.toString(16).padStart(32, "0");
@@ -161,6 +172,7 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     sessions: [...(seed.sessions || [])],
     polls: [...(seed.polls || [])],
     ballots: [...(seed.ballots || [])],
+    wheel: [...(seed.wheel || [])],
   };
   if (!seed.intro) await page.addInitScript(() => sessionStorage.setItem("guestbook.intro.seen", "1"));
   const admin = seed.admin || { email: "admin@bawaslu.test", password: "rahasia123" };
@@ -316,13 +328,15 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     if (options.some((option) => option.length > 120)) return refused(route, "Setiap pilihan maksimal 120 karakter");
     if (new Set(options.map((option) => option.toLowerCase())).size !== options.length) return refused(route, "Pilihan tidak boleh sama");
     if (!Number.isInteger(max) || max < 1 || max > options.length) return refused(route, `Jumlah pilihan per orang harus 1 sampai ${options.length}`);
+    const title = String(body.p_title ?? "").trim();
+    const subtitle = String(body.p_subtitle ?? "").trim();
     const latest = latestPoll();
     if (latest && latest.max_picks === max && latest.options.length === options.length && latest.options.every((option, i) => option === options[i])) {
-      latest.is_open = true;
+      Object.assign(latest, { is_open: true, title, subtitle });
       return json(route, latest);
     }
     const created = Math.max(Date.now(), latest ? Date.parse(latest.created_at) + 1 : 0);
-    const poll: Poll = { id: uuid(), created_at: new Date(created).toISOString(), options, max_picks: max, is_open: true };
+    const poll: Poll = { id: uuid(), created_at: new Date(created).toISOString(), options, max_picks: max, is_open: true, title, subtitle };
     state.polls.push(poll);
     return json(route, poll);
   });
@@ -400,6 +414,44 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
       return json(route, removed);
     }
     return json(route, [...state.winners].sort((a, b) => b.drawn_at.localeCompare(a.drawn_at)));
+  });
+
+  // Undian's spin wheel: the uploaded list, a random not-yet-won entry per spin, and an admin's
+  // PATCH (won_at, prize) that puts a winner back.
+  await page.route("**/rest/v1/guestbook_wheel_entries*", (route, request) => {
+    if (seed.legacyWheel) return json(route, { code: "PGRST205", message: "Could not find the table 'public.guestbook_wheel_entries' in the schema cache" }, 404);
+    if (request.method() === "DELETE") {
+      const id = (new URL(request.url()).searchParams.get("id") || "").replace(/^eq\./, "");
+      state.wheel = state.wheel.filter((e) => e.id !== id);
+      return json(route, []);
+    }
+    if (request.method() === "PATCH") {
+      const id = (new URL(request.url()).searchParams.get("id") || "").replace(/^eq\./, "");
+      const body = parseBody(request);
+      const entry = state.wheel.find((e) => e.id === id);
+      if (entry && "won_at" in body) entry.won_at = body.won_at as string | null;
+      if (entry && "prize" in body) entry.prize = String(body.prize ?? "");
+      return json(route, wantsObject(request) && entry ? entry : []);
+    }
+    return json(route, [...state.wheel].sort((a, b) => a.position - b.position));
+  });
+  await page.route("**/rest/v1/rpc/guestbook_wheel_import", (route, request) => {
+    if (seed.legacyWheel) return noFunction(route, "guestbook_wheel_import");
+    const body = parseBody(request);
+    state.rpcCalls.push({ name: "guestbook_wheel_import", body });
+    const entries = (body.p_entries as { name?: unknown; note?: unknown }[] | null) ?? [];
+    state.wheel = entries.map((entry, i) => wheelEntry({ position: i + 1, name: String(entry.name ?? "").trim(), note: String(entry.note ?? "").trim() }));
+    return json(route, state.wheel.length);
+  });
+  await page.route("**/rest/v1/rpc/guestbook_wheel_spin", (route, request) => {
+    if (seed.legacyWheel) return noFunction(route, "guestbook_wheel_spin");
+    const body = parseBody(request);
+    state.rpcCalls.push({ name: "guestbook_wheel_spin", body });
+    const pool = state.wheel.filter((entry) => !entry.won_at);
+    if (!pool.length) return json(route, { status: "empty" });
+    const entry = pool[Math.floor(Math.random() * pool.length)];
+    Object.assign(entry, { won_at: new Date().toISOString(), prize: String(body.p_prize ?? "").trim() });
+    return json(route, { status: "drawn", entry });
   });
 
   await page.route("**/auth/v1/token?*", async (route, request) => {

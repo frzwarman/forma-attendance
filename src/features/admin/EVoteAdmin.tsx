@@ -4,7 +4,18 @@ import { View } from "react-native";
 import { Lock, Plus, RotateCcw, Save, Trash, Vote } from "../../components/icons";
 import { Modal } from "../../components/Modal";
 import { Badge, Button, Card, Divider, Field, IconHeading, Row, T } from "../../components/ui";
-import { normalizeOptions, OPTION_LENGTH_MAX, OPTIONS_MAX, OPTIONS_MIN, pollProblem, sameVote, type Poll } from "../../domain/evote";
+import {
+  normalizeOptions,
+  OPTION_LENGTH_MAX,
+  OPTIONS_MAX,
+  OPTIONS_MIN,
+  pickInstruction,
+  pollProblem,
+  sameVote,
+  SUBTITLE_MAX,
+  TITLE_MAX,
+  type Poll,
+} from "../../domain/evote";
 import { useAdminApi, usePollResults } from "../../services/adminContext";
 import { useTheme } from "../../theme";
 
@@ -49,15 +60,22 @@ function Editor({ poll, voters, notice, onNotice }: { poll: Poll | null; voters:
   const client = useQueryClient();
   const [options, setOptions] = useState<string[]>(poll?.options ?? ["", ""]);
   const [maxPicks, setMaxPicks] = useState(poll?.max_picks ?? 1);
+  // Over the options on Hasil E-Vote and the attendee's page; blank means the pages' own words.
+  const [title, setTitle] = useState(poll?.title ?? "");
+  const [subtitle, setSubtitle] = useState(poll?.subtitle ?? "");
   const [busy, setBusy] = useState<"" | "save" | "close" | "reset">("");
   const [error, setError] = useState("");
   // The options waiting for Ya, mulai voting baru.
   const [confirming, setConfirming] = useState<string[]>();
   const [confirmReset, setConfirmReset] = useState(false);
 
-  function edit(next: string[]) {
+  function clear() {
     setError("");
     onNotice("");
+  }
+
+  function edit(next: string[]) {
+    clear();
     setOptions(next);
     setMaxPicks((max) => Math.min(max, next.length));
   }
@@ -76,9 +94,11 @@ function Editor({ poll, voters, notice, onNotice }: { poll: Poll | null; voters:
     setError("");
     onNotice("");
     try {
-      const saved = await api.savePoll(next, maxPicks);
+      const saved = await api.savePoll(next, maxPicks, title.trim(), subtitle.trim());
       setConfirming(undefined);
       setOptions(saved.options);
+      setTitle(saved.title);
+      setSubtitle(saved.subtitle);
       onNotice(saved.id === poll?.id ? "Voting dibuka lagi." : "Voting baru dibuka.");
       await client.invalidateQueries({ queryKey: ["poll-results"] });
     } catch (cause) {
@@ -133,6 +153,29 @@ function Editor({ poll, voters, notice, onNotice }: { poll: Poll | null; voters:
         </View>
         <Badge tone={status.tone} label={status.label} />
       </Row>
+      <Field
+        label="Judul"
+        placeholder="Hasil E-Vote"
+        value={title}
+        maxLength={TITLE_MAX}
+        editable={!busy}
+        onChangeText={(text) => {
+          clear();
+          setTitle(text);
+        }}
+      />
+      <Field
+        label="Subjudul"
+        placeholder={pickInstruction(maxPicks)}
+        value={subtitle}
+        maxLength={SUBTITLE_MAX}
+        editable={!busy}
+        onChangeText={(text) => {
+          clear();
+          setSubtitle(text);
+        }}
+      />
+      <Divider />
       {options.map((option, i) => (
         <Row key={i} style={{ gap: 8, alignItems: "center" }}>
           <View style={{ flex: 1 }}>

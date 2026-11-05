@@ -178,7 +178,10 @@ test("a start that fails is explained in the popup, which stays open to try agai
 });
 
 test("past midnight the session keeps running until the admin starts Sesi 1, and the card says so", async ({ page }) => {
-  await installSupabaseStub(page, { sessions: [{ label: "Sesi 2", started_at: new Date(Date.now() - 20 * 3600 * 1000).toISOString() }] });
+  // Yesterday 19:00 WIB: "20 hours ago" is still today when the suite runs in the evening.
+  const wib = new Date(Date.now() + 7 * 3600 * 1000);
+  const yesterdayEvening = new Date(Date.UTC(wib.getUTCFullYear(), wib.getUTCMonth(), wib.getUTCDate() - 1, 19 - 7));
+  await installSupabaseStub(page, { sessions: [{ label: "Sesi 2", started_at: yesterdayEvening.toISOString() }] });
   await page.goto("/admin");
   await signInAsAdmin(page);
   await expect(page.getByText(/^Sesi 2 sejak \d{2}\/\d{2}\/\d{4} \d{2}:\d{2} WIB$/)).toBeVisible();
