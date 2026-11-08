@@ -85,6 +85,8 @@ Share the public link (the page with *Registrasi* and *E-Vote*, or a QR code of 
 
 ## Admin guide
 
+The sidebar groups the pages by when they are used: *Saat acara* (Daftar Check-in, E-Vote, Hasil E-Vote, Undian), *Setelah acara* (Laporan) and *Pengaturan* (Formulir, Info acara, Tampilan); on a narrow screen they are one scrolling row with a rule between the groups.
+
 - **Daftar Check-in** (`/admin`): running total, search by name, phone, e-mail or hotel room, newest first, a *Kamar* column with each attendee's hotel room, refreshed every 10 seconds. *Lihat berkas* opens an attendee's upload through a short-lived signed link. The list pages through PostgREST in blocks of 1,000, so a 4,000-row event loads completely.
 - **Sesi**: the card above the tiles shows the session under way. Press *Mulai Sesi 1* or *Mulai Sesi 2* when that session really begins and confirm in the popup: check-ins from then on belong to it (and its sheet tab, named in the popup), and attendees who checked in earlier get the form again to check in for it; nobody is checked out. Nothing changes on its own, midnight included, so the first press of each day is *Mulai Sesi 1*; the card warns in red while a session from an earlier day is still running. The button of the session under way is disabled (a Sesi 1 carried over from an earlier day leaves *Mulai Sesi 1* open, for today's).
 - **Check-out**: the Check-out column shows when each attendee left. *Check out* records it now for someone who cannot use their phone, *Batalkan* undoes a mistake, and *Check out semua* (with a confirmation) closes everyone still present at the end of the event. The *Sudah check-out* tile shows how many have left and how many are still present.

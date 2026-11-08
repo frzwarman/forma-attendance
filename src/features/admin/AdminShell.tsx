@@ -8,15 +8,26 @@ import { signOut } from "../../services/adminApi";
 import { useSettings } from "../../services/settings";
 import { useTheme } from "../../theme";
 
-const items: [string, string, IconComponent][] = [
-  ["Daftar Check-in", "/admin", LayoutList],
-  ["Undian", "/admin/undian", Gift],
-  ["E-Vote", "/admin/evote", Vote],
-  ["Hasil E-Vote", "/admin/hasil-evote", ChartColumn],
-  ["Laporan", "/admin/laporan", FileText],
-  ["Formulir", "/admin/formulir", ClipboardList],
-  ["Info acara", "/admin/acara", Presentation],
-  ["Tampilan", "/admin/tampilan", Palette],
+// The pages by when they are used: during the event, after it, and the set-up done beforehand.
+const groups: { title: string; items: [string, string, IconComponent][] }[] = [
+  {
+    title: "Saat acara",
+    items: [
+      ["Daftar Check-in", "/admin", LayoutList],
+      ["E-Vote", "/admin/evote", Vote],
+      ["Hasil E-Vote", "/admin/hasil-evote", ChartColumn],
+      ["Undian", "/admin/undian", Gift],
+    ],
+  },
+  { title: "Setelah acara", items: [["Laporan", "/admin/laporan", FileText]] },
+  {
+    title: "Pengaturan",
+    items: [
+      ["Formulir", "/admin/formulir", ClipboardList],
+      ["Info acara", "/admin/acara", Presentation],
+      ["Tampilan", "/admin/tampilan", Palette],
+    ],
+  },
 ];
 
 function NavItem({ label, href, icon: Icon, active, compact }: { label: string; href: string; icon: IconComponent; active: boolean; compact: boolean }) {
@@ -55,9 +66,21 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const { width } = useWindowDimensions();
   const wide = width >= 960;
-  const nav = items.map(([label, href, Icon]) => (
-    <NavItem key={href} label={label} href={href} icon={Icon} active={path === href} compact={!wide} />
-  ));
+  const item = ([label, href, Icon]: [string, string, IconComponent]) => <NavItem key={href} label={label} href={href} icon={Icon} active={path === href} compact={!wide} />;
+  // Wide: each group under its title. Narrow: one scrolling row, a thin rule between the groups.
+  const nav = wide
+    ? groups.map((group) => (
+        <View key={group.title} style={{ gap: 4 }}>
+          <T size={12} weight="semibold" color="rgba(255, 255, 255, 0.5)" style={{ paddingHorizontal: 14, paddingBottom: 4 }}>
+            {group.title}
+          </T>
+          {group.items.map(item)}
+        </View>
+      ))
+    : groups.flatMap((group, i) => [
+        ...(i ? [<View key={`rule-${group.title}`} style={{ width: 1, backgroundColor: "rgba(255, 255, 255, 0.2)", marginVertical: 8, marginHorizontal: 4 }} />] : []),
+        ...group.items.map(item),
+      ]);
   // data-print: Laporan's Cetak hides the navigation and lets the content run over the pages (global.css).
   const content = (
     <ScrollView {...printAs("page")} style={{ flex: 1, backgroundColor: c.ground }} contentContainerStyle={{ padding: wide ? 32 : 16, paddingBottom: 64 }}>
@@ -81,7 +104,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <View style={{ paddingHorizontal: 6 }}>
               <Logo width={150} />
             </View>
-            <View style={{ gap: 4 }}>{nav}</View>
+            <View style={{ gap: 18 }}>{nav}</View>
           </View>
           <View style={{ gap: 12, paddingHorizontal: 6 }}>
             <T size={12} color="rgba(255, 255, 255, 0.6)">
