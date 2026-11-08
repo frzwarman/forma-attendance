@@ -1,9 +1,9 @@
 import { Link, usePathname } from "expo-router";
-import { ChartColumn, ClipboardList, Gift, LayoutList, LogOut, Palette, Presentation, Vote, type IconComponent } from "../../components/icons";
+import { ChartColumn, ClipboardList, FileText, Gift, LayoutList, LogOut, Palette, Presentation, Vote, type IconComponent } from "../../components/icons";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions, type ViewStyle } from "react-native";
 import { Logo } from "../../components/Brand";
-import { Button, Row, T } from "../../components/ui";
+import { Button, printAs, Row, T } from "../../components/ui";
 import { signOut } from "../../services/adminApi";
 import { useSettings } from "../../services/settings";
 import { useTheme } from "../../theme";
@@ -13,6 +13,7 @@ const items: [string, string, IconComponent][] = [
   ["Undian", "/admin/undian", Gift],
   ["E-Vote", "/admin/evote", Vote],
   ["Hasil E-Vote", "/admin/hasil-evote", ChartColumn],
+  ["Laporan", "/admin/laporan", FileText],
   ["Formulir", "/admin/formulir", ClipboardList],
   ["Info acara", "/admin/acara", Presentation],
   ["Tampilan", "/admin/tampilan", Palette],
@@ -57,8 +58,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const nav = items.map(([label, href, Icon]) => (
     <NavItem key={href} label={label} href={href} icon={Icon} active={path === href} compact={!wide} />
   ));
+  // data-print: Laporan's Cetak hides the navigation and lets the content run over the pages (global.css).
   const content = (
-    <ScrollView style={{ flex: 1, backgroundColor: c.ground }} contentContainerStyle={{ padding: wide ? 32 : 16, paddingBottom: 64 }}>
+    <ScrollView {...printAs("page")} style={{ flex: 1, backgroundColor: c.ground }} contentContainerStyle={{ padding: wide ? 32 : 16, paddingBottom: 64 }}>
       <View style={{ width: "100%", maxWidth: 1180, alignSelf: "center", gap: 24 }}>{children}</View>
     </ScrollView>
   );
@@ -66,6 +68,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <View style={{ flex: 1, flexDirection: "row" }}>
         <View
+          {...printAs("hide")}
           style={{
             width: 256,
             backgroundColor: c.background,
@@ -92,7 +95,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     );
   return (
     <View style={{ flex: 1 }}>
-      <View style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, gap: 12 }}>
+      <View {...printAs("hide")} style={{ backgroundColor: c.background, paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, gap: 12 }}>
         <Row style={{ justifyContent: "space-between" }}>
           <Logo width={104} />
           <Button variant="inverse" small icon={LogOut} label="Keluar" onPress={() => void signOut()} />

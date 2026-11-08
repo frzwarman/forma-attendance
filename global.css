@@ -36,6 +36,23 @@ table {
     transform: none;
   }
 }
+/* Laporan's Cetak / simpan PDF: no navigation, and the scrolling content area grows to its full height so
+   every page prints instead of the visible screen only. */
+@media print {
+  [data-print="hide"] {
+    display: none !important;
+  }
+  html,
+  body,
+  #root,
+  #root > div,
+  [data-print="page"],
+  [data-print="page"] > div {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+}
 /* Undian's confetti: each piece falls the stage's height while turning over. */
 @keyframes confetti {
   from {

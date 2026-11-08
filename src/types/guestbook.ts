@@ -57,6 +57,9 @@ export type Winner = {
   drawn_by: string | null;
 };
 
+// A Kesan & Pesan message, sent from the attendee's page under their check-in (admins read them).
+export type Feedback = { id: string; created_at: string; checkin_id: string; message: string };
+
 // Undian's wheel: the list an admin uploads (guestbook_wheel_entries), in file order. A winner keeps its row,
 // with won_at and the prize set, until an admin puts it back on the wheel.
 export type WheelEntry = { id: string; position: number; name: string; note: string; prize: string; won_at: string | null };

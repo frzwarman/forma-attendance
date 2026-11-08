@@ -442,3 +442,22 @@ test("a title over 120 or a subtitle over 200 characters is refused", async () =
   const poll = await savePoll(["Round table", "Classroom"], 1, ADMIN, ` ${"x".repeat(120)} `, ` ${"y".repeat(200)} `);
   assert.deepEqual([poll.title.length, poll.subtitle.length], [120, 200]);
 });
+
+test("the poll history lists every vote, newest first, with its voters and counts, for admins only", async () => {
+  const history = (userId = ADMIN) => as("authenticated", userId, () => one("select public.guestbook_poll_history() as result"));
+  assert.deepEqual(await history(), []);
+  const first = await savePoll(["Round table", "Classroom table"], 1);
+  await vote(first.id, device(1), [0]);
+  await vote(first.id, device(2), [1]);
+  await vote(first.id, device(3), [1]);
+  const second = await savePoll(["Nasi goreng", "Soto", "Sate"], 2);
+  await vote(second.id, device(1), [0, 2]);
+  await assert.rejects(history(OTHER), /Hanya admin/);
+  await assert.rejects(as("anon", "", () => one("select public.guestbook_poll_history() as result")));
+  const rows = await history();
+  assert.deepEqual(rows.map(({ poll, voters, counts }) => [poll.id, voters, counts]), [
+    [second.id, 1, [1, 0, 1]],
+    [first.id, 3, [1, 2]],
+  ]);
+  assert.deepEqual(rows[1].poll.options, ["Round table", "Classroom table"]);
+});

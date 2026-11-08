@@ -7,7 +7,7 @@ import { Badge, Button, Card, Empty, Field, Row, Stat, T } from "../../component
 import { exportFileName, exportRows, toCsv, toXlsx } from "../../domain/export";
 import { formFieldsFrom } from "../../domain/formFields";
 import { formatWib } from "../../domain/time";
-import { useAdminApi, useCheckIns, useWinners } from "../../services/adminContext";
+import { useAdminApi, useCheckIns, useWheel, useWinners } from "../../services/adminContext";
 import { downloadFile } from "../../services/download";
 import { SESSION_LABELS, sessionTab, useCurrentSession, type EventSession } from "../../services/session";
 import { useSettings } from "../../services/settings";
@@ -24,6 +24,8 @@ export function Daftar() {
   const client = useQueryClient();
   const checkins = useCheckIns();
   const winners = useWinners();
+  // The tile counts the spin wheel's winners; the old check-in draw (winners) stays for the export columns.
+  const wheel = useWheel();
   const { settings } = useSettings();
   const [query, setQuery] = useState("");
   const [shown, setShown] = useState(STEP);
@@ -190,7 +192,7 @@ export function Daftar() {
         <Stat label="Total peserta" value={rows.length.toLocaleString("id-ID")} icon={Users} hint="Diperbarui setiap 10 detik" />
         <Stat label="Check-in hari ini" value={today.toLocaleString("id-ID")} icon={CalendarCheck} hint="Waktu Indonesia Barat" />
         <Stat label="Sudah check-out" value={checkedOut.toLocaleString("id-ID")} icon={LogOut} hint={`Masih di lokasi: ${present.toLocaleString("id-ID")}`} />
-        <Stat label="Pemenang undian" value={(winners.data ?? []).length.toLocaleString("id-ID")} icon={Trophy} tone="gold" hint="Lihat halaman Undian" />
+        <Stat label="Pemenang undian" value={(wheel.data ?? []).filter((entry) => entry.won_at).length.toLocaleString("id-ID")} icon={Trophy} tone="gold" hint="Lihat halaman Undian" />
       </Row>
       {checkins.isError && (
         <T accessibilityRole="alert" color={c.danger}>

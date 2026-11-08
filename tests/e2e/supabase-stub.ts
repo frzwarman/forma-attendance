@@ -380,6 +380,24 @@ export async function installSupabaseStub(page: Page, seed: Seed = {}): Promise<
     state.ballots.push({ poll_id: poll.id, device_id: device, picks: sorted });
     return json(route, { status: "recorded", picks: sorted });
   });
+  // Laporan: every poll with its count, newest first.
+  await page.route("**/rest/v1/rpc/guestbook_poll_history", (route) => {
+    if (seed.legacyEvote) return noFunction(route, "guestbook_poll_history");
+    const history = [...state.polls]
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      .map((poll) => {
+        const ballots = state.ballots.filter((ballot) => ballot.poll_id === poll.id);
+        return { poll, voters: ballots.length, counts: poll.options.map((_, i) => ballots.filter((ballot) => ballot.picks.includes(i)).length) };
+      });
+    return json(route, history);
+  });
+  // Laporan reads every message; the stub keeps them without ids or times, so they are made up here.
+  await page.route("**/rest/v1/guestbook_feedback*", (route) =>
+    json(
+      route,
+      state.feedback.map((row, i) => ({ id: `feedback-${i + 1}`, created_at: new Date(Date.UTC(2026, 10, 2, 5, i)).toISOString(), ...row })),
+    ),
+  );
   await page.route("**/rest/v1/rpc/guestbook_poll_results", (route) => {
     if (seed.legacyEvote) return noFunction(route, "guestbook_poll_results");
     const poll = latestPoll();

@@ -5,6 +5,7 @@ import { adminCheckOut, checkOutAll, fetchAllCheckIns, fetchWinners, signedFileU
 import { fetchWheel, importWheel, removeFromWheel, returnToWheel, spinWheel, updateWheelEntry } from "./draw";
 import { saveEventContent, uploadMaterial, uploadPdfPages, uploadProfileImage } from "./eventAdmin";
 import { closePoll, fetchPollResults, resetPoll, savePoll } from "./evoteAdmin";
+import { fetchFeedback, fetchPollHistory } from "./report";
 import { saveFormFields, updateSettings, uploadBrandImage } from "./settingsAdmin";
 
 export const adminApi = {
@@ -32,6 +33,8 @@ export const adminApi = {
   savePoll,
   closePoll,
   resetPoll,
+  fetchFeedback,
+  fetchPollHistory,
 };
 export type AdminApi = typeof adminApi;
 export { signIn, signOut, useSession };

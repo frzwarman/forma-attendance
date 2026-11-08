@@ -13,6 +13,10 @@ import {
 } from "react-native";
 import { fonts, fontWeights, useTheme } from "../theme";
 
+// React Native Web renders dataSet as data-* attributes (the types do not know it): data-print marks what
+// Laporan's Cetak hides ("hide") and the scroll area that must grow to its full height ("page"), see global.css.
+export const printAs = (mode: "hide" | "page") => ({ dataSet: { print: mode } }) as object;
+
 export function T({
   children,
   size = 15,
@@ -272,17 +276,20 @@ export function Stat({
   hint,
   icon: Icon,
   tone = "neutral",
+  testID,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon?: IconComponent;
   tone?: "neutral" | "gold";
+  testID?: string;
 }) {
   const c = useTheme();
   const iconColor = tone === "gold" ? "#7a5a1f" : c.background;
   return (
     <View
+      testID={testID}
       style={{
         flex: 1,
         minWidth: 150,
