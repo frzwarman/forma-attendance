@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CheckIn } from "../types/guestbook";
-import { answerTallies, arrivalHours, eventRows, formQuotes, isDemo, parseSheetVisits, perDay, summary, tally, wibDay, wibHour } from "./report";
+import { answerTallies, arrivalHours, availableDays, defaultPoll, eventRows, formQuotes, isDemo, isTestRow, narrative, parseSheetVisits, perDay, realPolls, shiftDay, summary, tally, wibDay, wibHour } from "./report";
 
 let n = 0;
 function row(overrides: Partial<CheckIn> = {}): CheckIn {
@@ -141,4 +141,64 @@ test("the sheet's Check-in tab gives check-ins and people per session, in time o
   });
   assert.throws(() => parseSheetVisits([["Nama", "Divisi"], ["Budi", "Hukum"]]), /Kolom "Sesi" tidak ditemukan/);
   assert.throws(() => parseSheetVisits([["Sesi", "Nama"]]), /Tidak ada baris check-in/);
+});
+
+test("shiftDay moves a WIB day by whole days, across month ends", () => {
+  assert.equal(shiftDay("2026-11-02", -6), "2026-10-27");
+  assert.equal(shiftDay("2026-10-31", 1), "2026-11-01");
+});
+
+test("the conclusion is written from the numbers: a headline, then one fact per topic with the key part marked", () => {
+  const rows = [
+    row({ created_at: "2026-11-02T01:00:00.000Z", last_checked_in_at: "2026-11-04T06:00:00.000Z", checkin_count: 5, divisi: "Biro Hukum" }),
+    row({ created_at: "2026-11-02T02:00:00.000Z", divisi: "Biro Hukum" }),
+    row({ created_at: "2026-11-03T02:00:00.000Z", divisi: "" }),
+  ];
+  const text = narrative({
+    total: summary(rows),
+    days: perDay(rows),
+    divisi: tally(rows.map((r) => r.divisi), "Tidak diisi"),
+    poll: { title: "Layout Ruangan", options: ["Round table", "Classroom table"], counts: [47, 66], voters: 113 },
+    sessions: [
+      { label: "02-11-2026 Sesi 1", visits: 90, people: 90 },
+      { label: "02-11-2026 Sesi 2", visits: 120, people: 118 },
+    ],
+    quotes: 11,
+    winners: 2,
+  });
+  assert.deepEqual(text, {
+    headline: "**3 peserta** hadir selama **3 hari** (02/11/2026–04/11/2026) dengan **7 check-in**, rata-rata 2,3 per orang.",
+    facts: [
+      { label: "Puncak kedatangan", text: "**02/11/2026**, 2 peserta baru" },
+      { label: "Divisi terbesar", text: "**Biro Hukum**, 2 orang; 1 tidak mengisi divisi" },
+      { label: "Sesi teramai", text: "**02-11-2026 Sesi 2**, 120 check-in dari 118 orang" },
+      { label: "E-Vote", text: "**Classroom table** unggul, **58%** dari 113 suara (Layout Ruangan)" },
+      { label: "Kesan & Pesan", text: "**11** pesan masuk" },
+      { label: "Undian", text: "**2** pemenang" },
+    ],
+  });
+  // The fallback title is not repeated.
+  const plain = narrative({ total: summary(rows), days: [], divisi: [], poll: { title: "E-Vote", options: ["A", "B"], counts: [1, 0], voters: 1 }, quotes: 0, winners: 0 });
+  assert.equal(plain.facts.find((f) => f.label === "E-Vote")?.text, "**A** unggul, **100%** dari 1 suara");
+  assert.deepEqual(narrative({ total: summary([]), days: [], divisi: [], quotes: 0, winners: 0 }), { headline: "Belum ada check-in dalam rentang ini.", facts: [] });
+});
+
+test("trial check-ins are known by their name or the demo domain, whole words only", () => {
+  for (const name of ["test", "Test", "Peserta Uji 9276", "uji coba", "Coba Dulu", "contoh peserta", "TES"]) assert.equal(isTestRow(row({ name })), true, name);
+  for (const name of ["Fujianthy Kartikasari", "Agustesa Putri", "Budi Santoso", "Pujiati"]) assert.equal(isTestRow(row({ name })), false, name);
+  assert.equal(isTestRow(row({ name: "Budi", email: "demo@example.com" })), true);
+  assert.deepEqual(eventRows([row({ name: "test" }), row({ name: "Siti Rahma" })]).map((r) => r.name), ["Siti Rahma"]);
+});
+
+test("the days to pick from are the ones with a first check-in", () => {
+  assert.deepEqual(availableDays([row({ created_at: "2026-11-03T01:00:00.000Z" }), row({ created_at: "2026-11-02T01:00:00.000Z" }), row({ created_at: "2026-11-02T05:00:00.000Z" })]), ["2026-11-02", "2026-11-03"]);
+});
+
+test("a vote is real from 10 voters; the latest real one is shown first, else the biggest", () => {
+  const p = (id: string, created_at: string, voters: number) => ({ poll: { id, created_at }, voters });
+  const polls = [p("trial", "2026-11-06T01:00:00Z", 1), p("reset", "2026-11-04T08:36:00Z", 108), p("first", "2026-11-04T06:09:00Z", 113), p("tiny", "2026-11-04T08:13:00Z", 2)];
+  assert.deepEqual(realPolls(polls).map((x) => x.poll.id), ["reset", "first"]);
+  assert.equal(defaultPoll(polls)?.poll.id, "reset");
+  assert.equal(defaultPoll([p("a", "2026-11-04T06:09:00Z", 3), p("b", "2026-11-06T01:00:00Z", 1)])?.poll.id, "a");
+  assert.equal(defaultPoll([]), undefined);
 });

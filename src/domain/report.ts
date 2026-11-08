@@ -14,16 +14,19 @@ export const wibHour = (iso: string) => inWib(iso).getUTCHours();
 // The demo seed's rows (supabase/seed/demo-checkins.sql) use this reserved domain.
 export const DEMO_DOMAIN = "@example.com";
 export const isDemo = (row: Pick<CheckIn, "email">) => row.email.trim().toLowerCase().endsWith(DEMO_DOMAIN);
+// Trial check-ins made while setting up: "test", "Peserta Uji 9276", "coba"... as whole words, so Fujianthy stays.
+const TEST_NAME = /(^|[^\p{L}])(test|testing|tes|uji|dummy|coba|percobaan|contoh|demo)(?![\p{L}])/iu;
+export const isTestRow = (row: Pick<CheckIn, "email" | "name">) => isDemo(row) || TEST_NAME.test(row.name);
 
 // WIB days, inclusive; either end may be left open.
 export type DateRange = { from?: string; to?: string };
 
-// The attendees the report is about: no demo rows, first check-in within the range, in check-in order (so a
+// The attendees the report is about: no trial rows, first check-in within the range, in check-in order (so a
 // tally keeps the spelling of whoever came first).
 export function eventRows(checkins: CheckIn[], range: DateRange = {}): CheckIn[] {
   return checkins
     .filter((row) => {
-      if (isDemo(row)) return false;
+      if (isTestRow(row)) return false;
       const day = wibDay(row.created_at);
       return (!range.from || day >= range.from) && (!range.to || day <= range.to);
     })
@@ -80,7 +83,9 @@ export function arrivalHours(rows: CheckIn[]): { hour: number; count: number }[]
   return hours;
 }
 
-const key = (value: string) => value.toLowerCase().replace(/\s+/g, " ");
+// How a tally groups spellings: trimmed, single spaces, case ignored. The report filters by the same key.
+export const tallyKey = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
+const key = tallyKey;
 
 // Counts per distinct value, spellings differing only in case or spacing grouped under the first one seen,
 // most common first. Blanks are dropped, or counted under blankLabel when given.
@@ -160,4 +165,63 @@ export function parseSheetVisits(rows: unknown[][]): { visits: number; sessions:
       .sort(([a], [b]) => order(a).localeCompare(order(b)))
       .map(([label, { visits: count, people }]) => ({ label, visits: count, people: people.size })),
   };
+}
+
+// "YYYY-MM-DD" moved by whole days.
+export function shiftDay(day: string, days: number): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+const dayLabel = (day: string) => day.split("-").reverse().join("/");
+const num = (n: number) => n.toLocaleString("id-ID");
+
+export type NarrativeInput = {
+  total: Summary;
+  days: { day: string; first: number; last: number }[];
+  divisi: Tally;
+  poll?: { title: string; options: string[]; counts: number[]; voters: number };
+  sessions?: { label: string; visits: number; people: number }[];
+  quotes: number;
+  winners: number;
+};
+// One fact of the conclusion; **text** marks what to read first.
+export type Fact = { label: string; text: string };
+export type Narrative = { headline: string; facts: Fact[] };
+
+// The conclusion in words from the same numbers the charts show: a headline and one fact per topic.
+export function narrative({ total, days, divisi, poll, sessions, quotes, winners }: NarrativeInput): Narrative {
+  if (!total.attendees) return { headline: "Belum ada check-in dalam rentang ini.", facts: [] };
+  const headline = `**${num(total.attendees)} peserta** hadir selama **${num(total.days)} hari** (${dayLabel(total.firstDay!)}–${dayLabel(total.lastDay!)}) dengan **${num(total.visits)} check-in**, rata-rata ${num(total.perPerson)} per orang.`;
+  const facts: Fact[] = [];
+  const peak = days.reduce<(typeof days)[number] | undefined>((best, d) => (!best || d.first > best.first ? d : best), undefined);
+  if (peak && days.length > 1) facts.push({ label: "Puncak kedatangan", text: `**${dayLabel(peak.day)}**, ${num(peak.first)} peserta baru` });
+  const named = divisi.filter((d) => d.label !== "Tidak diisi");
+  const blank = divisi.find((d) => d.label === "Tidak diisi");
+  if (named.length) facts.push({ label: "Divisi terbesar", text: `**${named[0].label}**, ${num(named[0].count)} orang${blank ? `; ${num(blank.count)} tidak mengisi divisi` : ""}` });
+  const busiest = sessions?.reduce<(typeof sessions)[number] | undefined>((best, s) => (!best || s.visits > best.visits ? s : best), undefined);
+  if (busiest) facts.push({ label: "Sesi teramai", text: `**${busiest.label}**, ${num(busiest.visits)} check-in dari ${num(busiest.people)} orang` });
+  if (poll && poll.voters > 0) {
+    const lead = poll.counts.reduce((best, count, i) => (count > poll.counts[best] ? i : best), 0);
+    const share = Math.round((poll.counts[lead] * 100) / poll.voters);
+    facts.push({ label: "E-Vote", text: `**${poll.options[lead]}** unggul, **${share}%** dari ${num(poll.voters)} suara${poll.title && poll.title !== "E-Vote" ? ` (${poll.title})` : ""}` });
+  }
+  facts.push({ label: "Kesan & Pesan", text: `**${num(quotes)}** pesan masuk` });
+  facts.push({ label: "Undian", text: `**${num(winners)}** pemenang` });
+  return { headline, facts };
+}
+
+// The WIB days with a first check-in, oldest first: the only days worth picking.
+export const availableDays = (rows: CheckIn[]) => [...new Set(rows.map((row) => wibDay(row.created_at)))].sort();
+
+// A vote counts as real from this many voters; smaller ones are trials.
+export const REAL_VOTERS = 10;
+export type PollSummary = { poll: { id: string; created_at: string }; voters: number };
+export const realPolls = <P extends PollSummary>(polls: P[]) => polls.filter((p) => p.voters >= REAL_VOTERS);
+// The vote to show first: the latest real one (a reset makes a new, later poll; the real count is the last
+// one people voted in), else whichever had most voters.
+export function defaultPoll<P extends PollSummary>(polls: P[]): P | undefined {
+  const real = realPolls(polls).sort((a, b) => b.poll.created_at.localeCompare(a.poll.created_at));
+  return real[0] ?? [...polls].sort((a, b) => b.voters - a.voters)[0];
 }
