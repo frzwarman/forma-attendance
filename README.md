@@ -123,6 +123,10 @@ To show the admin list and the exports with realistic content, run `supabase/see
 
 `npm run demo:export` builds the same data in embedded Postgres and writes sample exports to `artifacts/contoh-ekspor-check-in.xlsx` and `artifacts/contoh-ekspor-check-in.csv` using the admin page's export code.
 
+## Keeping the free database running
+
+Supabase pauses a Free Plan project after about a week without user traffic (a few requests a day are enough to prevent it; a paused project is restored from the dashboard with its data). `.github/workflows/keep-alive.yml` reads the public settings row once a day through the REST API. It needs two repository secrets (GitHub → Settings → Secrets and variables → Actions): `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`, the same public values as `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Run it once by hand (Actions → Keep Supabase awake → Run workflow) to check the secrets. GitHub turns scheduled workflows off after 60 days without a commit and mails a warning first; a commit turns them back on. Delete the workflow when the project may pause. Paid plans are never paused.
+
 ## Data and privacy
 
 Exports contain personal data; store and share them accordingly. After the event, delete the data from the Supabase SQL editor and empty the `guestbook-uploads` bucket in Storage:
